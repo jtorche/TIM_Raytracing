@@ -1,0 +1,60 @@
+#version 450
+
+#extension GL_EXT_scalar_block_layout : enable
+
+#include "system.fxh"
+#include "struct_cpp.fxh"
+#include "collision.fxh"
+
+layout(std430, set=0, binding = g_PassData_bind)
+uniform PassData_block
+{
+	PassData g_passData;
+};
+
+layout(std430, set = 0, binding = g_BvhPrimitives_bind) buffer BvhPrimitives
+{
+	PackedPrimitive g_BvhPrimitiveData[];
+};
+
+layout(std430, set = 0, binding = g_BvhNodes_bind) buffer BvhNodes
+{
+	PackedBVHNode g_BvhNodeData[];
+};
+
+layout(std430, set = 0, binding = g_BvhLeafData_bind) buffer BvhLeafData
+{
+	uint g_BvhLeafData[];
+};
+
+layout(set=0, binding = g_outputImage_bind) uniform writeonly image2D g_outputImage;
+
+layout(push_constant) uniform pushConstants 
+{
+    uint bvhRootOffset;
+	uint primitiveListOffset;
+};
+
+layout (local_size_x = 16, local_size_y = 16) in;
+void main()
+{
+	if(gl_GlobalInvocationID.x < g_passData.frameSize.x && gl_GlobalInvocationID.y < g_passData.frameSize.y)
+	{	
+		imageStore(g_outputImage, ivec2(gl_GlobalInvocationID.x, gl_GlobalInvocationID.y), vec4(0.5, 0.5, 0.5, 1));
+		vec3 stepW = (g_passData.frustumCorner10.xyz - g_passData.frustumCorner00.xyz) * g_passData.invFrameSize.x;
+		vec3 stepH = (g_passData.frustumCorner01.xyz - g_passData.frustumCorner00.xyz) * g_passData.invFrameSize.y;
+		
+		vec3 rayTarget = g_passData.frustumCorner00.xyz + stepW * gl_GlobalInvocationID.x + stepH * gl_GlobalInvocationID.y;
+
+		Ray ray = createRay(g_passData.cameraPos.xyz, normalize(rayTarget - ray.from));
+		Hit hit;
+		Sphere sphere; sphere.center = vec3(0,0,0); sphere.radius = 1; sphere.invRadius = 1;
+
+		
+		if(HitSphere(ray, sphere, 0, 10, hit))
+		{
+		    imageStore(g_outputImage, ivec2(gl_GlobalInvocationID.x, gl_GlobalInvocationID.y), vec4(hit.normal * 0.5 + 0.5, 1));
+		}
+	}
+}
+
