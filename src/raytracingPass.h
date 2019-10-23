@@ -1,5 +1,5 @@
-#include "src/rtRenderer/public/IRenderer.h"
-#include "src/ShaderCompiler/ShaderCompiler.h"
+#include "rtRenderer/public/IRenderer.h"
+#include "ShaderCompiler/ShaderCompiler.h"
 
 class SimpleCamera;
 class BVHBuilder;

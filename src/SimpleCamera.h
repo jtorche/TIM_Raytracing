@@ -1,4 +1,4 @@
-#include "src/timCore/type.h"
+#include "timCore/type.h"
 
 class SimpleCamera
 {
