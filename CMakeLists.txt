@@ -27,7 +27,7 @@ set_property(TARGET shaderCompiler PROPERTY CXX_STANDARD 17)
 #Shaders
 file(GLOB_RECURSE SC_FXH src/Shaders/*.fxh)
 file(GLOB_RECURSE SC_COMP src/Shaders/*.comp)
-ADD_LIBRARY(shaders dummy.cpp ${SC_FXH} ${SC_COMP})
+ADD_LIBRARY(shaders src/dummy.cpp ${SC_FXH} ${SC_COMP})
 
 #VezRenderer
 find_package(Vulkan REQUIRED)
@@ -45,8 +45,8 @@ target_link_libraries(VezRenderer optimized VEZ)
 set_property(TARGET VezRenderer PROPERTY CXX_STANDARD 17)
 
 # Main exe
-file(GLOB MAIN_HDRS *.h)
-file(GLOB MAIN_SRCS *.cpp)
+file(GLOB MAIN_HDRS src/*.h)
+file(GLOB MAIN_SRCS src/*.cpp)
 
 ADD_EXECUTABLE(Program ${MAIN_SRCS} ${MAIN_HDRS})
 target_include_directories(Program PRIVATE "extern/glfw/include")
