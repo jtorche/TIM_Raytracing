@@ -9,21 +9,16 @@ RayTracingPass::RayTracingPass(IRenderer* _renderer, IRenderContext* _context) :
 {
     m_bvh = std::make_unique<BVHBuilder>();
 
-    //m_bvh->addSphere({ {  3, 3, 0.5f }, 1 });
-    //m_bvh->addSphere({ { -3, 3, 0.5f }, 1 });
-    //m_bvh->addSphere({ {  3,-3, 0.5f }, 1 });
-    //m_bvh->addSphere({ { -3,-3, 0.5f }, 1 });
-    //m_bvh->addSphere({ { -3, 0, 0.25f }, 0.5 });
-    //m_bvh->addSphere({ {  3, 0, 0.25f }, 0.5 });
-    //m_bvh->addSphere({ { 0,0, 1 }, 1 });
-    //m_bvh->addSphere({ { 0,0, 1.5f }, 1 });
-    //m_bvh->addSphere({ { 0,0, 2.0f }, 1 });
-    //m_bvh->addSphere({ { 0,0, 2.5f }, 1 });
-
-    m_bvh->addSphere({ {  4, 4, 0 }, 1 });
-    m_bvh->addSphere({ {  -4, 4, 0 }, 1 });
-    m_bvh->addSphere({ {  4, -4, 0 }, 1 });
-    m_bvh->addSphere({ {  -4, -4, 0 }, 1 });
+    m_bvh->addSphere({ {  3, 3, 0.5f }, 1 });
+    m_bvh->addSphere({ { -3, 3, 0.5f }, 1 });
+    m_bvh->addSphere({ {  3,-3, 0.5f }, 1 });
+    m_bvh->addSphere({ { -3,-3, 0.5f }, 1 });
+    m_bvh->addSphere({ { -3, 0, 0.25f }, 0.5 });
+    m_bvh->addSphere({ {  3, 0, 0.25f }, 0.5 });
+    m_bvh->addSphere({ { 0,0, 1 }, 1 });
+    m_bvh->addSphere({ { 0,0, 1.5f }, 1 });
+    m_bvh->addSphere({ { 0,0, 2.0f }, 1 });
+    m_bvh->addSphere({ { 0,0, 2.5f }, 1 });
 
     m_bvh->build(Box{ vec3{ -5,-5,-5 }, vec3{5,5,5} });
 
