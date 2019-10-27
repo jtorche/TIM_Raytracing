@@ -41,4 +41,18 @@ namespace tim
     {
         return x + (x % align == 0 ? 0 : align - x % align);
     }
+
+    template<typename T, typename A>
+    constexpr T * alignUpPtr(T * _ptr, A align)
+    {
+        std::uintptr_t ptr = reinterpret_cast<std::uintptr_t>(_ptr);
+        ptr = ptr + (ptr % align == 0 ? 0 : align - ptr % align);
+        return reinterpret_cast<T*>(ptr);
+    }
+
+    template<typename T>
+    constexpr T absolute_difference(T a, T b)
+    {
+        return a < b ? b - a : a - b;
+    }
 }

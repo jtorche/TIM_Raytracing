@@ -25,6 +25,7 @@ namespace tim
         void Resize(u32 _x, u32 _y) override;
         void InvalidateShaders() override;
 
+        void WaitForIdle() override;
         void BeginFrame() override;
         void EndFrame() override;
         void Execute(IRenderContext *) override;

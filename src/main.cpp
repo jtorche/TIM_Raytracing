@@ -98,51 +98,57 @@ int main()
 
     std::array<const char*, 64> macros =
     {
-        "FIRST"
+        "NO_BVH"
     };
 
     ShaderCompiler shaderCompiler("../src/Shaders/", macros);
     g_renderer->Init(shaderCompiler , &winHandle, frameResolution.x, frameResolution.y, false);
 
     IRenderContext* context = g_renderer->CreateRenderContext(RenderContextType::Graphics);
+    
+    {
+        RayTracingPass rtPass(g_renderer, context);
 
-    double prevTime = glfwGetTime();
-    double frameTime = 0.01;
-    u32 frameIndex = 0;
-	/* Loop until the user closes the window */
-	while (!glfwWindowShouldClose(window))
-	{
-		/* Poll for and process events */
-		glfwPollEvents();
-        camera.update(float(frameTime));
+        double prevTime = glfwGetTime();
+        double frameTime = 0.01;
+        u32 frameIndex = 0;
+        /* Loop until the user closes the window */
+        while (!glfwWindowShouldClose(window))
+        {
+            /* Poll for and process events */
+            glfwPollEvents();
+            camera.update(float(frameTime));
 
-        g_renderer->BeginFrame();
-        ImageHandle backbuffer = g_renderer->GetBackBuffer();
+            g_renderer->BeginFrame();
+            ImageHandle backbuffer = g_renderer->GetBackBuffer();
 
-        context->BeginRender();
-        context->ClearImage(backbuffer, Color{ 0, 0, 0, 0 });
+            context->BeginRender();
+            context->ClearImage(backbuffer, Color{ 0, 0, 0, 0 });
 
-        RayTracingPass rtPass(frameResolution, g_renderer, context);
-        rtPass.draw(backbuffer, camera);
+            rtPass.setFrameBufferSize(frameResolution);
+            rtPass.draw(backbuffer, camera);
 
-        context->EndRender();
+            context->EndRender();
 
-        g_renderer->Execute(context);
+            g_renderer->Execute(context);
 
-        g_renderer->EndFrame();
-        g_renderer->Present();
+            g_renderer->EndFrame();
+            g_renderer->Present();
 
-        if (frameIndex % 100 == 0)
-            std::cout << "FPS : " << u32(0.5f + 1.f / float(frameTime)) << std::endl;
+            if (frameIndex % 100 == 0)
+                std::cout << "FPS : " << u32(0.5f + 1.f / float(frameTime)) << std::endl;
 
-        double curTime = glfwGetTime();
-        frameTime = curTime - prevTime;
-        prevTime = curTime;
-        frameIndex++;
+            double curTime = glfwGetTime();
+            frameTime = curTime - prevTime;
+            prevTime = curTime;
+            frameIndex++;
 
-        double sleepTime = std::max<double>(0, (1.0 / 60) - frameTime);
-        Sleep(u32(1000.0 * sleepTime));
-	}
+            double sleepTime = std::max<double>(0, (1.0 / 60) - frameTime);
+            Sleep(u32(1000.0 * sleepTime));
+        }
+
+        g_renderer->WaitForIdle();
+    }
 
     g_renderer->Deinit();
 	tim::destroyRenderer(g_renderer);

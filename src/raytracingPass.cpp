@@ -5,20 +5,25 @@
 using namespace tim;
 #include "Shaders/struct_cpp.fxh"
 
-RayTracingPass::RayTracingPass(uvec2 _frameSize, IRenderer* _renderer, IRenderContext* _context) : m_frameSize{ _frameSize },  m_renderer { _renderer }, m_context{ _context }
+RayTracingPass::RayTracingPass(IRenderer* _renderer, IRenderContext* _context) : m_frameSize{ 800,600 },  m_renderer { _renderer }, m_context{ _context }
 {
     m_bvh = std::make_unique<BVHBuilder>();
 
-    m_bvh->addSphere({ {  3, 3, 0.5f }, 1 });
-    m_bvh->addSphere({ { -3, 3, 0.5f }, 1 });
-    m_bvh->addSphere({ {  3,-3, 0.5f }, 1 });
-    m_bvh->addSphere({ { -3,-3, 0.5f }, 1 });
-    m_bvh->addSphere({ { -3, 0, 0.25f }, 0.5 });
-    m_bvh->addSphere({ {  3, 0, 0.25f }, 0.5 });
-    m_bvh->addSphere({ { 0,0, 1 }, 2 });
-    m_bvh->addSphere({ { 0,0, 1.25f }, 1.5 });
-    m_bvh->addSphere({ { 0,0, 1.35f }, 1 });
-    m_bvh->addSphere({ { 0,0, 1.5f }, 0.7f });
+    //m_bvh->addSphere({ {  3, 3, 0.5f }, 1 });
+    //m_bvh->addSphere({ { -3, 3, 0.5f }, 1 });
+    //m_bvh->addSphere({ {  3,-3, 0.5f }, 1 });
+    //m_bvh->addSphere({ { -3,-3, 0.5f }, 1 });
+    //m_bvh->addSphere({ { -3, 0, 0.25f }, 0.5 });
+    //m_bvh->addSphere({ {  3, 0, 0.25f }, 0.5 });
+    //m_bvh->addSphere({ { 0,0, 1 }, 1 });
+    //m_bvh->addSphere({ { 0,0, 1.5f }, 1 });
+    //m_bvh->addSphere({ { 0,0, 2.0f }, 1 });
+    //m_bvh->addSphere({ { 0,0, 2.5f }, 1 });
+
+    m_bvh->addSphere({ {  4, 4, 0 }, 1 });
+    m_bvh->addSphere({ {  -4, 4, 0 }, 1 });
+    m_bvh->addSphere({ {  4, -4, 0 }, 1 });
+    m_bvh->addSphere({ {  -4, -4, 0 }, 1 });
 
     m_bvh->build(Box{ vec3{ -5,-5,-5 }, vec3{5,5,5} });
 
@@ -34,41 +39,13 @@ RayTracingPass::~RayTracingPass()
     m_renderer->DestroyBuffer(m_bvhBuffer);
 }
 
-float RayBoxIntersect(vec3 rpos, vec3 rdir, vec3 vmin, vec3 vmax)
+void RayTracingPass::setFrameBufferSize(tim::uvec2 _res)
 {
-    float t1 = (vmin.x - rpos.x) / rdir.x;
-    float t2 = (vmax.x - rpos.x) / rdir.x;
-    float t3 = (vmin.y - rpos.y) / rdir.y;
-    float t4 = (vmax.y - rpos.y) / rdir.y;
-    float t5 = (vmin.z - rpos.z) / rdir.z;
-    float t6 = (vmax.z - rpos.z) / rdir.z;
-
-    float aMin = t1 < t2 ? t1 : t2;
-    float bMin = t3 < t4 ? t3 : t4;
-    float cMin = t5 < t6 ? t5 : t6;
-
-    float aMax = t1 > t2 ? t1 : t2;
-    float bMax = t3 > t4 ? t3 : t4;
-    float cMax = t5 > t6 ? t5 : t6;
-
-    float fMax = aMin > bMin ? aMin : bMin;
-    float fMin = aMax < bMax ? aMax : bMax;
-
-    float t7 = fMax > cMin ? fMax : cMin;
-    float t8 = fMin < cMax ? fMin : cMax;
-
-    float t9 = (t8 < 0 || t7 > t8) ? -1 : t7;
-
-    return t9;
+    m_frameSize = _res;
 }
 
 void RayTracingPass::draw(tim::ImageHandle _output, const SimpleCamera& _camera)
 {
-    vec3 rpos = { 3,1,3 }; vec3 rdir = { -1,0,0 };
-    vec3 minEx = {-1,-1,-1};
-    vec3 maxEx = { 1,1,1 };
-    float r = RayBoxIntersect(rpos, rdir, minEx, maxEx);
-
     const float fov = 70.f * 3.14f / 180;
 
     PassData passData;
@@ -107,9 +84,13 @@ void RayTracingPass::draw(tim::ImageHandle _output, const SimpleCamera& _camera)
     };
 
     arg.m_imageBindings = imgBinds;
-    arg.m_numImageBindings = 1;
+    arg.m_numImageBindings = _countof(imgBinds);
     arg.m_bufferBindings = bufBinds;
-    arg.m_numBufferBindings = 1;
+    arg.m_numBufferBindings = _countof(bufBinds);
+
+    u32 constants[] = { m_bvh->getPrimitivesCount(), m_bvh->getNodesCount() };
+    arg.m_constants = constants;
+    arg.m_constantSize = sizeof(u32) * _countof(constants);
     arg.m_key = { TIM_HASH32(cameraPass.comp), {} };
 
     m_context->Dispatch(arg, alignUp<u32>(m_frameSize.x, 16) / 16, alignUp<u32>(m_frameSize.y, 16) / 16);

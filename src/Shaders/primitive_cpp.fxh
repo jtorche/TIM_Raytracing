@@ -39,11 +39,10 @@ struct PackedPrimitive
 
 struct PackedBVHNode
 {
-	float minExtent[3];
-	float maxExtent[3];
-	uint child_lr;
-	uint objectOffset;
-	uint numObjects_parent;
+	uvec4 nid; // 0:parent_sibling, 1:child_lr, 2:leafData_offset, 3:leafData_size
+	vec4 n0xy;
+	vec4 n1xy;
+	vec4 nz;
 };
 
 #endif

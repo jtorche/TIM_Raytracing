@@ -246,6 +246,11 @@ namespace tim
         m_shaderCompiler->clearCache();
     }
 
+    void VezRenderer::WaitForIdle()
+    {
+        vezDeviceWaitIdle(m_vkDevice);
+    }
+
     void VezRenderer::BeginFrame()
     {
         if (m_graphicsQueue.m_fences[m_frameIndex] != VK_NULL_HANDLE)

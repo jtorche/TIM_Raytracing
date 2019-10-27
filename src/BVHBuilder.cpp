@@ -16,14 +16,14 @@ namespace
 
     CollisionType boxBoxCollision(const Box& _box1, const Box& _box2)
     {
-        if (_box1.minExtent.x > _box2.maxExtent.x || _box1.minExtent.y > _box2.maxExtent.y || _box1.minExtent.z > _box2.maxExtent.z ||
-            _box2.minExtent.x > _box1.maxExtent.x || _box2.minExtent.y > _box1.maxExtent.y || _box2.minExtent.z > _box1.maxExtent.z)
+        if (_box1.minExtent.x >= _box2.maxExtent.x || _box1.minExtent.y >= _box2.maxExtent.y || _box1.minExtent.z >= _box2.maxExtent.z ||
+            _box2.minExtent.x >= _box1.maxExtent.x || _box2.minExtent.y >= _box1.maxExtent.y || _box2.minExtent.z >= _box1.maxExtent.z)
         {
-            CollisionType::Disjoint;
+            return CollisionType::Disjoint;
         }
 
-        if (_box1.minExtent.x > _box2.minExtent.x&& _box1.minExtent.y > _box2.minExtent.y&& _box1.minExtent.z > _box2.minExtent.z&&
-            _box1.maxExtent.x < _box2.maxExtent.x && _box1.maxExtent.y < _box2.maxExtent.y && _box1.maxExtent.z < _box2.maxExtent.z)
+        if (_box1.minExtent.x >= _box2.minExtent.x && _box1.minExtent.y >= _box2.minExtent.y && _box1.minExtent.z >= _box2.minExtent.z &&
+            _box1.maxExtent.x <= _box2.maxExtent.x && _box1.maxExtent.y <= _box2.maxExtent.y && _box1.maxExtent.z <= _box2.maxExtent.z)
         {
             return CollisionType::Contained;
         }
@@ -47,6 +47,12 @@ namespace
             return {};
         }
     }
+
+    float getBoxVolume(const Box& _box)
+    {
+        vec3 dim = _box.maxExtent - _box.minExtent;
+        return dim.x * dim.y * dim.z;
+    }
 }
 
 void BVHBuilder::addSphere(const Sphere& _sphere)
@@ -57,7 +63,7 @@ void BVHBuilder::addSphere(const Sphere& _sphere)
 
 void BVHBuilder::build(const Box& _sceneSize)
 {
-    TIM_ASSERT(m_objects.size() < u16(-1));
+    TIM_ASSERT(m_objects.size() < 0x7FFF);
 
     m_nodes.reserve(size_t(1) << (m_maxDepth + 1));
     m_nodes.push_back({});
@@ -85,14 +91,15 @@ void BVHBuilder::build(const Box& _sceneSize)
 
 void BVHBuilder::addObjectsRec(u32 _depth, ObjectIt _objectsBegin, ObjectIt _objectsEnd, BVHBuilder::Node* _curNode)
 {
+    constexpr u32 g_maxObject = 0x7FFF;
+
     size_t numObjects = std::distance(_objectsBegin, _objectsEnd);
     if (numObjects <= m_maxObjPerNode || _depth >= m_maxDepth)
     {
         for (auto it = _objectsBegin; it != _objectsEnd; ++it)
-        {
             _curNode->primitiveList.push_back(*it);
-            return;
-        }
+            
+        return;
     }
     else
     {
@@ -101,18 +108,32 @@ void BVHBuilder::addObjectsRec(u32 _depth, ObjectIt _objectsBegin, ObjectIt _obj
         Box leftBox[3], rightBox[3];
         size_t numObjInLeft[3] = { 0,0,0 }, numObjInRight[3] = { 0,0,0 };
 
-        searchBestSplit(_curNode, _objectsBegin, _objectsEnd, [](vec3 _step) { return _step.x; },
-                        leftBox[0], rightBox[0], numObjInLeft[0], numObjInRight[0]);
-        searchBestSplit(_curNode, _objectsBegin, _objectsEnd, [](vec3 _step) { return _step.y; },
-                        leftBox[1], rightBox[1], numObjInLeft[1], numObjInRight[1]);
-        searchBestSplit(_curNode, _objectsBegin, _objectsEnd, [](vec3 _step) { return _step.z; },
-                        leftBox[2], rightBox[2], numObjInLeft[2], numObjInRight[2]);
+        searchBestSplit(_curNode, _objectsBegin, _objectsEnd, 
+            [](const vec3& step) { return vec3(step.x,0,0); }, [](const vec3& _step) { return vec3{ 0, _step.y, _step.z }; },
+            leftBox[0], rightBox[0], numObjInLeft[0], numObjInRight[0]);
+        searchBestSplit(_curNode, _objectsBegin, _objectsEnd, 
+            [](const vec3& step) { return vec3(0,step.y,0); }, [](const vec3& _step) { return vec3{ _step.x, 0, _step.z }; },
+            leftBox[1], rightBox[1], numObjInLeft[1], numObjInRight[1]);
+        searchBestSplit(_curNode, _objectsBegin, _objectsEnd, 
+            [](const vec3& step) { return vec3(0,0,step.z); }, [](const vec3& _step) { return vec3{ _step.x, _step.y, 0 }; },
+            leftBox[2], rightBox[2], numObjInLeft[2], numObjInRight[2]);
 
         // search for best homogeneous split
-        u32 bestSplit = 0;
-        bestSplit = numObjInLeft[bestSplit] * numObjInRight[bestSplit] > numObjInLeft[1] * numObjInRight[1] ? bestSplit : 1;
-        bestSplit = numObjInLeft[bestSplit] * numObjInRight[bestSplit] > numObjInLeft[2] * numObjInRight[2] ? bestSplit : 2;
+        auto getBestSplit = [&](u32 s0, u32 s1)
+        {
+            if (numObjInLeft[s0] + numObjInRight[s0] < numObjInLeft[s1] + numObjInRight[s1])
+                return s0;
 
+            if (absolute_difference(numObjInLeft[s0], numObjInRight[s0]) < absolute_difference(numObjInLeft[s1], numObjInRight[s1]))
+                return s0;
+
+            if (fabs(getBoxVolume(leftBox[s0]) - getBoxVolume(rightBox[s0])) < fabs(getBoxVolume(leftBox[s1]) - getBoxVolume(rightBox[s1])))
+                return s0;
+
+            return s1;
+        };
+
+        u32 bestSplit = getBestSplit(getBestSplit(0, 1), 2);
         std::vector<u32> objectLeft; objectLeft.reserve(numObjInLeft[bestSplit]);
         std::vector<u32> objectRight; objectRight.reserve(numObjInRight[bestSplit]);
 
@@ -124,23 +145,30 @@ void BVHBuilder::addObjectsRec(u32 _depth, ObjectIt _objectsBegin, ObjectIt _obj
                 objectRight.push_back(*it);
         }
 
-        TIM_ASSERT(m_nodes.size() < m_nodes.capacity());
+        TIM_ASSERT(m_nodes.size() < g_maxObject);
         m_nodes.push_back({});
-        m_nodes.back().extent = leftBox[bestSplit];
-        m_nodes.back().parent = _curNode;
-        _curNode->left = &m_nodes.back();
-        addObjectsRec(_depth + 1, objectLeft.begin(), objectLeft.end(), &m_nodes.back());
+        Node& leftNode = m_nodes.back();
+        leftNode.extent = leftBox[bestSplit];
+        leftNode.parent = _curNode;
+        _curNode->left = &leftNode;
 
+        TIM_ASSERT(m_nodes.size() < g_maxObject);
         m_nodes.push_back({});
-        m_nodes.back().extent = rightBox[bestSplit];
-        m_nodes.back().parent = _curNode;
-        _curNode->right = &m_nodes.back();
-        addObjectsRec(_depth + 1, objectRight.begin(), objectRight.end(), &m_nodes.back());
+        Node& rightNode = m_nodes.back();
+        rightNode.extent = rightBox[bestSplit];
+        rightNode.parent = _curNode;
+        _curNode->right = &rightNode;
+
+        leftNode.sibling = &rightNode;
+        rightNode.sibling = &leftNode;
+        addObjectsRec(_depth + 1, objectLeft.begin(), objectLeft.end(), &leftNode);
+        addObjectsRec(_depth + 1, objectRight.begin(), objectRight.end(), &rightNode);
     }
 }
 
-template<typename Fun>
-void BVHBuilder::searchBestSplit(BVHBuilder::Node* _curNode, ObjectIt _objectsBegin, ObjectIt _objectsEnd, const Fun& _extractStep,
+template<typename Fun1, typename Fun2>
+void BVHBuilder::searchBestSplit(BVHBuilder::Node* _curNode, ObjectIt _objectsBegin, ObjectIt _objectsEnd, 
+                                 const Fun1& _computeStep, const Fun2& _computeFixedStep,
                                  Box& _leftBox, Box& _rightBox, size_t& _numObjInLeft, size_t& _numObjInRight) const
 {
     const u32 NumSplit = 32;
@@ -149,33 +177,57 @@ void BVHBuilder::searchBestSplit(BVHBuilder::Node* _curNode, ObjectIt _objectsBe
     vec3 boxDim = _curNode->extent.maxExtent - _curNode->extent.minExtent;
     vec3 boxStep = boxDim / NumSplit;
 
+    bool prevObjectRepartitioHeuristic = false;
+    float prevVolumeDiff = std::numeric_limits<float>::max();
+
+    vec3 step = _computeStep(boxStep);
+    vec3 fixedStep = _computeFixedStep(boxDim);
+
     for (u32 i = 0; i < NumSplit; ++i)
     {
-        vec3 newMaxExtent = _curNode->extent.minExtent + _extractStep(boxStep) * i;
-        _leftBox = { _curNode->extent.minExtent, newMaxExtent };
-        _rightBox = { newMaxExtent, _curNode->extent.maxExtent };
+        Box leftBox = { _curNode->extent.minExtent, _curNode->extent.minExtent + fixedStep + step * i };
+        Box rightBox = { _curNode->extent.minExtent + step * i, _curNode->extent.maxExtent };
 
-        _numObjInLeft = std::count_if(_objectsBegin, _objectsEnd, [&](u32 _id)
-            {
-                bool collide = boxBoxCollision(_leftBox, getAABB(m_objects[_id])) != CollisionType::Disjoint;
-                return collide;
-            });
+        size_t numObjInLeft = std::count_if(_objectsBegin, _objectsEnd, [&](u32 _id)
+        {
+            bool collide = boxBoxCollision(leftBox, getAABB(m_objects[_id])) != CollisionType::Disjoint;
+            return collide;
+        });
 
-        _numObjInRight = std::count_if(_objectsBegin, _objectsEnd, [&](u32 _id)
-            {
-                bool collide = boxBoxCollision(_rightBox, getAABB(m_objects[_id])) != CollisionType::Disjoint;
-                return collide;
-            });
+        size_t numObjInRight = std::count_if(_objectsBegin, _objectsEnd, [&](u32 _id)
+        {
+            bool collide = boxBoxCollision(rightBox, getAABB(m_objects[_id])) != CollisionType::Disjoint;
+            return collide;
+        });
 
-        if (_numObjInLeft + _numObjInRight == numObjects || _numObjInLeft > _numObjInRight)
+        bool isEven = numObjects % 2 == 0;
+        bool cond1 = numObjInLeft + numObjInRight == numObjects &&
+                     (isEven ? numObjInLeft == numObjInRight : numObjInRight == numObjInLeft + 1);
+
+        bool repartitionHeuristic = cond1 || numObjInLeft > numObjInRight;
+
+        if (prevObjectRepartitioHeuristic && !repartitionHeuristic) // the repartitionHeuristic is no more valide, take previous split
             break;
+
+        if (prevObjectRepartitioHeuristic && repartitionHeuristic)
+        {
+            if (prevVolumeDiff < fabsf(getBoxVolume(leftBox) - getBoxVolume(rightBox)))
+                break;
+        }
+
+        prevObjectRepartitioHeuristic = repartitionHeuristic;
+        prevVolumeDiff = fabsf(getBoxVolume(leftBox) - getBoxVolume(rightBox));
+        _leftBox = leftBox;
+        _rightBox = rightBox;
+        _numObjInLeft = numObjInLeft;
+        _numObjInRight = numObjInRight;
     }
 }
 
 u32 BVHBuilder::getBvhGpuSize() const
 {
-    u32 size = (u32)m_nodes.size() * sizeof(PackedBVHNode);
-    size += (u32)m_objects.size() * sizeof(PackedPrimitive);
+    u32 size = tim::alignUp<u32>((u32)m_nodes.size() * sizeof(PackedBVHNode), m_bufferAlignment);
+    size += tim::alignUp<u32>((u32)m_objects.size() * sizeof(PackedPrimitive), m_bufferAlignment);
     for (const BVHBuilder::Node& n : m_nodes)
     {
         size += (u32)n.primitiveList.size() * sizeof(u32);
@@ -206,7 +258,43 @@ namespace
     }
 }
 
-void BVHBuilder::fillGpuBuffer(void* _data, uvec2& _primitiveOffsetRange, uvec2 _nodeOffsetRange, uvec2& _leafDataOffsetRange)
+void BVHBuilder::packNodeData(PackedBVHNode* _outNode, const BVHBuilder::Node& _node, u32 _leafDataOffset)
+{
+    constexpr u16 InvalidNodeId = 0x7FFF;
+    u16 leftIndex = _node.left ? u16(_node.left - &m_nodes[0]) : InvalidNodeId;
+    u16 rightIndex = _node.right ? u16(_node.right - &m_nodes[0]) : InvalidNodeId;
+    u16 parentIndex = _node.parent ? u16(_node.parent - &m_nodes[0]) : InvalidNodeId;
+    u16 siblingIndex = _node.sibling ? u16(_node.sibling - &m_nodes[0]) : InvalidNodeId;
+    TIM_ASSERT((leftIndex == InvalidNodeId && rightIndex == InvalidNodeId) || (leftIndex != InvalidNodeId && rightIndex != InvalidNodeId));
+
+    auto isLeaf = [](const BVHBuilder::Node * node) { return node ? node->left == nullptr : false; };
+    auto hasParent = [](const BVHBuilder::Node* node) { return node ? node->parent != nullptr : false; };
+
+    // add bit to fast check if leaf
+    siblingIndex = isLeaf(&_node) && hasParent(&_node) ? 0x8000 | siblingIndex : siblingIndex;
+    leftIndex = isLeaf(_node.left) ? 0x8000 | leftIndex : leftIndex;
+    rightIndex = isLeaf(_node.right) ? 0x8000 | rightIndex : rightIndex;
+
+    _outNode->nid = uvec4(parentIndex + (siblingIndex << 16), leftIndex + (rightIndex << 16), _leafDataOffset, u32(_node.primitiveList.size()));
+    
+    TIM_ASSERT((leftIndex == InvalidNodeId && rightIndex == InvalidNodeId) || (leftIndex != InvalidNodeId && rightIndex != InvalidNodeId));
+    if (leftIndex != InvalidNodeId)
+    {
+        Box box0 = _node.left->extent;
+        Box box1 = _node.right->extent;
+        _outNode->n0xy = vec4(box0.minExtent.x, box0.minExtent.y, box0.maxExtent.x, box0.maxExtent.y);
+        _outNode->n1xy = vec4(box1.minExtent.x, box1.minExtent.y, box1.maxExtent.x, box1.maxExtent.y);
+        _outNode->nz = vec4(box0.minExtent.z, box0.maxExtent.z, box1.minExtent.z, box1.maxExtent.z);
+    }
+    else
+    {
+        _outNode->n0xy = vec4(0,0,0,0);
+        _outNode->n1xy = vec4(0,0,0,0);
+        _outNode->nz = vec4(0,0,0,0);
+    }
+}
+
+void BVHBuilder::fillGpuBuffer(void* _data, uvec2& _primitiveOffsetRange, uvec2& _nodeOffsetRange, uvec2& _leafDataOffsetRange)
 {
     ubyte* out = (ubyte*)_data;
     for (u32 i = 0; i < m_objects.size(); ++i)
@@ -230,28 +318,28 @@ void BVHBuilder::fillGpuBuffer(void* _data, uvec2& _primitiveOffsetRange, uvec2 
         out += sizeof(PackedPrimitive);
     }
 
-    u32* primitiveListBegin = reinterpret_cast<u32*>(out + ((u32)m_nodes.size() * sizeof(PackedBVHNode)));
+    u32 objectBufferSize = u32(m_objects.size() * sizeof(PackedPrimitive));
+    _primitiveOffsetRange = { 0, objectBufferSize };
+    out = (ubyte*)_data + alignUp(objectBufferSize, m_bufferAlignment);
+
+    u32 nodeBufferSize = u32(m_nodes.size() * sizeof(PackedBVHNode));
+    _nodeOffsetRange = { (u32)std::distance((ubyte*)_data, out), nodeBufferSize };
+    
+    u32* primitiveListBegin = reinterpret_cast<u32*>(out + alignUp(nodeBufferSize, m_bufferAlignment));
     u32* primitiveListCurPtr = primitiveListBegin;
 
+    TIM_ASSERT(m_nodes.size() < 0x7FFF);
     for (const BVHBuilder::Node& n : m_nodes)
     {
-        PackedBVHNode * node = reinterpret_cast<PackedBVHNode*>(out);
-        u16 leftIndex = n.left ? u16(n.left - &m_nodes[0]) : 0xFFFF;
-        u16 rightIndex = n.right ? u16(n.right - &m_nodes[0]) : 0xFFFF;
-        node->child_lr = leftIndex + (rightIndex << 16);
-        n.extent.minExtent.assign(node->minExtent);
-        n.extent.maxExtent.assign(node->maxExtent);
+        PackedBVHNode* node = reinterpret_cast<PackedBVHNode*>(out);
+        u32 leafDataIndex = n.primitiveList.empty() ? u32(-1) : u32(primitiveListCurPtr - primitiveListBegin);
+        packNodeData(node, n, leafDataIndex);
 
-        u16 parentIndex = n.parent ? u16(n.parent - &m_nodes[0]) : 0xFFFF;
-        node->numObjects_parent = u32(n.primitiveList.size()) + (parentIndex << 16);
-        node->objectOffset = n.primitiveList.empty() ? u32(-1) : u32(primitiveListCurPtr - primitiveListBegin);
-        memcpy(primitiveListCurPtr, n.primitiveList.data(), n.primitiveList.size());
+        memcpy(primitiveListCurPtr, n.primitiveList.data(), sizeof(u32) * n.primitiveList.size());
         primitiveListCurPtr += n.primitiveList.size();
         out += sizeof(PackedBVHNode);
     }
 
-    _primitiveOffsetRange = { 0, (u32)m_objects.size() * sizeof(PackedPrimitive) };
-    _nodeOffsetRange =      { _primitiveOffsetRange.y, (u32)m_nodes.size() * sizeof(PackedBVHNode) };
-    _leafDataOffsetRange =  { _primitiveOffsetRange.y + _nodeOffsetRange.y, sizeof(u32) * u32(primitiveListCurPtr - primitiveListBegin) };
+    _leafDataOffsetRange = { (u32)std::distance((ubyte*)_data, (ubyte*)primitiveListBegin), (u32)std::distance((ubyte*)primitiveListBegin, (ubyte*)primitiveListCurPtr) };
 }
 

@@ -1,62 +1,72 @@
-#ifndef H_COLLISION_FXH_
-#define H_COLLISION_FXH_
+#ifndef H_BVHTRAVERSAL_FXH_
+#define H_BVHTRAVERSAL_FXH_
 
-#include "primitive_cpp.fxh"
+#include "collision.fxh"
 
-// MBVH2 traversal loop
-int nodeId = 0;
-uint64_t bitstack = 0;
-int parentId, siblingId;
-// cached node links
-for(; ;) 
+bool  bvh_isLeaf(uint _nid);
+void  bvh_getParentSiblingId(uint _nid, out uint _parentId, out uint _siblingId);
+void  bvh_getNodeId(uint _nid, out uint _left, out uint _right, out uint _parentId, out uint _siblingId);
+void  bvh_getNodeBoxes(uint _nid, out Box _box0, out Box _box1);
+bool  bvh_collide(uint _nid, Ray r);
+
+void traverseBvh(Ray r, uint rootId)
 {
-// Inner node loop
-while(isInner(nodeId)) 
-{
-// Load node through texture cache
-// node links  -> nid
-// node bounds -> n0xy, n1xy, nz
-int4 nid  = __ldg((int4*)bvh + nodeId);
-float4 n0xy = __ldg((float4*)bvh + nodeId + 1);
-float4 n1xy = __ldg((float4*)bvh + nodeId + 2);
-float4 nz   = __ldg((float4*)bvh + nodeId + 3); 
-parentId  = nid.x;
-siblingId = nid.y;
-// Box intersection
-float near0, far0, near1, far1;
-intersectBoxes(ray, n0xy, n1xy, nz,near0, far0, near1, far1);
-bool hit0 = (far0 >= near0);
-boolhit1 = (far1 >= near1); 
-if(!hit0 && !hit1)
-break;
-bitstack <<= 1;
-if(hit0 && hit1) 
-{
-nodeId = (near1 < near0) ? nid.w : nid.z;
-bitstack |= 1;
-}
-else
-{
-nodeId = hit0 ? nid.z : nid.w;
-}
-}
-// Leaf node
-if(!isInner(nodeId)) 
-{
-...
-}
-// Backtrackwhile((bitstack & 1) == 0) 
-{
-if(bitstack == 0)
-return;
-nodeId = parentId;
-int4 nid = *((int4*)bvh + nodeId);
-parentId  = nid.x;
-siblingId = nid.y;
-bitstack >>= 1;
-}
-nodeId = siblingId;
-bitstack ^= 1;
+	// MBVH2 traversal loop
+	uint nodeId = rootId;
+	uint bitstack = 0;
+	uint parentId, siblingId;
+	// cached node links
+	while(true) 
+	{
+		// Inner node loop
+		while(!bvh_isLeaf(nodeId))
+		{
+			uint child0Id, child1Id;
+			bvh_getNodeId(nodeId, child0Id, child1Id, parentId, siblingId);
+
+			Box box0, box1;
+			bvh_getNodeBoxes(nodeId, box0, box1);
+
+			// Box intersection
+			float d0 = CollideBox(r, box0);
+			float d1 = CollideBox(r, box1);
+		
+			if(d0 < 0 && d1 < 0)
+				break;
+
+			bitstack  = bitstack << 1;
+
+			if(d0 >= 0 && d1 >= 0) 
+			{
+				nodeId = (d1 < d0) ? child1Id : child0Id;
+				bitstack = bitstack | 1;
+			}
+			else
+			{
+				nodeId = (d0 >= 0) ? child0Id : child1Id;
+			}
+		}
+
+		if(bvh_isLeaf(nodeId)) 
+		{
+			if(bvh_collide(nodeId, r))
+				return;
+		}
+
+		// Backtrack
+		while((bitstack & 1) == 0) 
+		{
+			if(bitstack == 0)
+				return;
+
+			nodeId = parentId;
+			bvh_getParentSiblingId(nodeId, parentId, siblingId);
+			bitstack = bitstack >> 1;
+		}
+
+		nodeId = siblingId;
+		bitstack = bitstack ^ 1;
+	}
 }
 
 #endif

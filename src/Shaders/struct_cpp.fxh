@@ -3,9 +3,9 @@
 
 #define g_PassData_bind 0
 #define g_outputImage_bind 1
-#define g_BvhPrimitives_bind 1
-#define g_BvhNodes_bind 2
-#define g_BvhLeafData_bind 3
+#define g_BvhPrimitives_bind 2
+#define g_BvhNodes_bind 3
+#define g_BvhLeafData_bind 4
 
 struct PassData
 {

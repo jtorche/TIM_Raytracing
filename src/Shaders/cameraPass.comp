@@ -5,6 +5,7 @@
 #include "system.fxh"
 #include "struct_cpp.fxh"
 #include "collision.fxh"
+#include "bvhTraversal.fxh"
 
 layout(std430, set=0, binding = g_PassData_bind)
 uniform PassData_block
@@ -31,30 +32,106 @@ layout(set=0, binding = g_outputImage_bind) uniform writeonly image2D g_outputIm
 
 layout(push_constant) uniform pushConstants 
 {
-    uint bvhRootOffset;
-	uint primitiveListOffset;
-};
+	uint numPrimitives;
+	uint numNodes;
+} g_Constants;
+
+#include "bvhGetter.fxh"
+
+void brutForceTraverse(Ray _ray);
 
 layout (local_size_x = 16, local_size_y = 16) in;
 void main()
 {
-	if(gl_GlobalInvocationID.x < g_passData.frameSize.x && gl_GlobalInvocationID.y < g_passData.frameSize.y)
+	ivec2 pixelCoord = ivec2(gl_GlobalInvocationID.x, gl_NumWorkGroups.y * 16 - gl_GlobalInvocationID.y);
+	if(pixelCoord.x < g_passData.frameSize.x && pixelCoord.y < g_passData.frameSize.y)
 	{	
-		imageStore(g_outputImage, ivec2(gl_GlobalInvocationID.x, gl_GlobalInvocationID.y), vec4(0.5, 0.5, 0.5, 1));
+		imageStore(g_outputImage, pixelCoord, vec4(0.5, 0.5, 0.5, 1));
 		vec3 stepW = (g_passData.frustumCorner10.xyz - g_passData.frustumCorner00.xyz) * g_passData.invFrameSize.x;
 		vec3 stepH = (g_passData.frustumCorner01.xyz - g_passData.frustumCorner00.xyz) * g_passData.invFrameSize.y;
 		
 		vec3 rayTarget = g_passData.frustumCorner00.xyz + stepW * gl_GlobalInvocationID.x + stepH * gl_GlobalInvocationID.y;
 
-		Ray ray = createRay(g_passData.cameraPos.xyz, normalize(rayTarget - ray.from));
-		Hit hit;
-		Sphere sphere; sphere.center = vec3(0,0,0); sphere.radius = 1; sphere.invRadius = 1;
+		Ray ray = createRay(g_passData.cameraPos.xyz, normalize(rayTarget - g_passData.cameraPos.xyz));
 
-		
-		if(HitSphere(ray, sphere, 0, 10, hit))
+		// brutForceTraverse(ray);
+		traverseBvh(ray, g_Constants.numNodes == 1 ? 0x8000 : 0);
+		//bvh_collide(0, ray);
+	}
+}
+
+void onHit(Ray _ray, Hit _hit)
+{
+	ivec2 pixelCoord = ivec2(gl_GlobalInvocationID.x, gl_NumWorkGroups.y * 16 - gl_GlobalInvocationID.y);
+	imageStore(g_outputImage, pixelCoord, vec4(_hit.normal * 0.5 + 0.5, 1));
+}
+
+Sphere loadSphere(uint objIndex)
+{
+	Sphere sphere;
+	sphere.center = vec3(g_BvhPrimitiveData[objIndex].fparam[0], g_BvhPrimitiveData[objIndex].fparam[1], g_BvhPrimitiveData[objIndex].fparam[2]);
+	sphere.radius = g_BvhPrimitiveData[objIndex].fparam[3];
+	sphere.invRadius = g_BvhPrimitiveData[objIndex].fparam[4];
+	return sphere;
+}
+
+bool bvh_collide(uint _nid, Ray r)
+{
+	_nid = _nid & 0x7FFF;
+	uint leafDataOffset = g_BvhNodeData[_nid].nid.z;
+	uint numObjects = g_BvhNodeData[_nid].nid.w;
+
+	Hit closestHit;
+	closestHit.t = 3.402823e+38;
+	bool hasHit = HitPlane(r, vec4(0,0,1,0), 0, closestHit);
+
+	for(uint i=0 ; i<numObjects ; ++i)
+	{
+		uint objIndex = g_BvhLeafData[leafDataOffset + i];
+
+		if(g_BvhPrimitiveData[objIndex].iparam == Primitive_Sphere)
 		{
-		    imageStore(g_outputImage, ivec2(gl_GlobalInvocationID.x, gl_GlobalInvocationID.y), vec4(hit.normal * 0.5 + 0.5, 1));
+			Hit hitInfo;
+			if(HitSphere(r, loadSphere(objIndex), 0, hitInfo))
+			{
+				if(hitInfo.t < closestHit.t)
+				{
+					closestHit = hitInfo;
+					hasHit = true;
+				}
+			}
 		}
 	}
+
+	if(hasHit)
+		onHit(r, closestHit);
+
+	return hasHit;
+}
+
+void brutForceTraverse(Ray _ray)
+{
+	Hit closestHit;
+	closestHit.t = 3.402823e+38;
+	bool hasHit = HitPlane(_ray, vec4(0,0,1,0), 0, closestHit);
+
+	for(uint i=0 ; i<g_Constants.numPrimitives ; ++i)
+	{
+		if(g_BvhPrimitiveData[i].iparam == Primitive_Sphere)
+		{
+			Hit hitInfo;
+			if(HitSphere(_ray, loadSphere(i), 0, hitInfo))
+			{
+				if(hitInfo.t < closestHit.t)
+				{
+					closestHit = hitInfo;
+					hasHit = true;
+				}
+			}
+		}
+	}
+
+	if(hasHit)
+		onHit(_ray, closestHit);
 }
 

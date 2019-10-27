@@ -7,9 +7,10 @@ class BVHBuilder;
 class RayTracingPass
 {
 public:
-    RayTracingPass(tim::uvec2 _frameSize, tim::IRenderer* _renderer, tim::IRenderContext * _context);
+    RayTracingPass(tim::IRenderer* _renderer, tim::IRenderContext * _context);
     ~RayTracingPass();
-
+    
+    void setFrameBufferSize(tim::uvec2 _res);
     void draw(tim::ImageHandle _output, const SimpleCamera& _camera);
 
 private:

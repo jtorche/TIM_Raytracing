@@ -28,7 +28,7 @@ private:
     bool m_leftMouseButton = false;
     float m_mouseDx = 0, m_mouseDy = 0;
 
-    tim::vec3 pos = { 5,0,0 };
+    tim::vec3 pos = { 5,0,1 };
     tim::vec3 dir = { -1,0,0 };
     tim::vec3 up = { 0,0,1 };
     tim::mat4 m_viewMat = {};
