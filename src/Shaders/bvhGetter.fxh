@@ -15,13 +15,11 @@ void bvh_getParentSiblingId(uint _nid, out uint _parentId, out uint _siblingId)
 	_siblingId = (packed & 0xFFFF0000) >> 16;
 }
 
-void bvh_getNodeId(uint _nid, out uint _left, out uint _right, out uint _parentId, out uint _siblingId)
+void bvh_getChildId(uint _nid, out uint _left, out uint _right)
 {
-	uvec2 packed = g_BvhNodeData[_nid].nid.xy;
-	_parentId = packed.x & 0x0000FFFF;
-	_siblingId = (packed.x & 0xFFFF0000) >> 16;
-	_left = packed.y & 0x0000FFFF;
-	_right = (packed.y & 0xFFFF0000) >> 16;
+	uint packed = g_BvhNodeData[_nid].nid.y;
+	_left = packed & 0x0000FFFF;
+	_right = (packed & 0xFFFF0000) >> 16;
 }
 
 void bvh_getNodeBoxes(uint _nid, out Box _box0, out Box _box1)

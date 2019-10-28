@@ -20,9 +20,10 @@ struct Primitive
 class BVHBuilder
 {
 public:
-    BVHBuilder(u32 _maxDepth = 1, u32 _maxObjPerNode = 0) : m_maxDepth{ _maxDepth }, m_maxObjPerNode{ _maxObjPerNode } {}
+    BVHBuilder(u32 _maxDepth = 5, u32 _maxObjPerNode = 4) : m_maxDepth{ _maxDepth }, m_maxObjPerNode{ _maxObjPerNode } {}
 
     void addSphere(const Sphere&);
+    void addBox(const Box& _box);
     void build(const Box& _sceneSize);
 
     u32 getPrimitivesCount() const { return u32(m_objects.size()); }

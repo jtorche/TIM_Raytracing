@@ -61,6 +61,11 @@ void BVHBuilder::addSphere(const Sphere& _sphere)
     m_objects.back().m_sphere.invRadius = 1.f / _sphere.radius;
 }
 
+void BVHBuilder::addBox(const Box& _box)
+{
+    m_objects.push_back({ _box });
+}
+
 void BVHBuilder::build(const Box& _sceneSize)
 {
     TIM_ASSERT(m_objects.size() < 0x7FFF);

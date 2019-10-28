@@ -12,21 +12,18 @@ Ray createRay(vec3 _from, vec3 _dir)
 	return r;
 }
 
-float CollideBox(Ray r, Box _box)
+float CollideBox(Ray _ray, Box _box, float tmin, float tmax)
 {
-    float t1 = (_box.minExtent.x - r.from.x) * r.invdir.x;
-    float t2 = (_box.maxExtent.x - r.from.x) * r.invdir.x;
-    float t3 = (_box.minExtent.y - r.from.y) * r.invdir.y;
-    float t4 = (_box.maxExtent.y - r.from.y) * r.invdir.y;
-    float t5 = (_box.minExtent.z - r.from.z) * r.invdir.z;
-    float t6 = (_box.maxExtent.z - r.from.z) * r.invdir.z;
+    vec3 t0s = (_box.minExtent - _ray.from) * _ray.invdir;
+    vec3 t1s = (_box.maxExtent - _ray.from) * _ray.invdir;
 
-    float t7 = max(max(min(t1, t2), min(t3, t4)), min(t5, t6));
-    float t8 = min(min(max(t1, t2), max(t3, t4)), max(t5, t6));
+    vec3 tsmaller = min(t0s, t1s);
+    vec3 tbigger = max(t0s, t1s);
 
-    float t9 = (t8 < 0 || t7 > t8) ? -1 : t7;
+    tmin = max(tmin, max(tsmaller[0], max(tsmaller[1], tsmaller[2])));
+    tmax = min(tmax, min(tbigger[0], min(tbigger[1], tbigger[2])));
 
-    return t9;
+    return (tmin < tmax) ? tmin : -1;
 }
 
 struct Hit
@@ -35,7 +32,7 @@ struct Hit
     float t;
 };
 
-bool HitSphere(Ray r, Sphere s, float tMin, out Hit outHit)
+bool HitSphere(Ray r, Sphere s, float tMin, float tmax, out Hit outHit)
 {
     vec3 oc = r.from - s.center;
     float b = dot(oc, r.dir);
@@ -46,7 +43,7 @@ bool HitSphere(Ray r, Sphere s, float tMin, out Hit outHit)
         float discrSq = sqrt(discr);
 
         float t = (-b - discrSq);
-        if (t > tMin)
+        if (t > tMin && t < tmax)
         {
 			vec3 pos = r.from + t * r.dir;
             outHit.normal = (pos - s.center) * s.invRadius;
@@ -54,7 +51,7 @@ bool HitSphere(Ray r, Sphere s, float tMin, out Hit outHit)
             return true;
         }
         t = (-b + discrSq);
-        if (t > tMin)
+        if (t > tMin && t < tmax)
         {
 			vec3 pos = r.from + t * r.dir;
             outHit.normal = (pos - s.center) * s.invRadius;
@@ -65,23 +62,25 @@ bool HitSphere(Ray r, Sphere s, float tMin, out Hit outHit)
     return false;
 }
 
-bool HitPlane(Ray r, vec4 _plane, float tMin, inout Hit _outHit)
+bool HitBox(Ray r, Box box, float tMin, float tmax, out Hit outHit)
 {
-    float denom = dot(-_plane.xyz, r.dir); 
-    if (denom > 1e-6) 
-	{ 
-        vec3 p0l0 = (-_plane.xyz * _plane.w) - r.from; 
-        float t = dot(p0l0, -_plane.xyz) / denom; 
+	float t = CollideBox(r, box, tMin, tmax);
+	if(t >= tMin)
+	{
+		vec3 pos = r.from + r.dir * t;
+		vec3 center = (box.maxExtent + box.minExtent) * 0.5;
 
-		if(t >= tMin)
-		{
-			_outHit.t = t;
-			_outHit.normal = _plane.xyz;
-			return true; 
-		}
-    } 
- 
-    return false; 
+		vec3 p = pos - center;
+		vec3 d = (box.maxExtent - box.minExtent) * 0.5;
+
+		vec3 normal = 1.0001 * (p / d);
+
+		outHit.t = t;
+		outHit.normal = vec3(int(normal.x), int(normal.y), int(normal.z));
+		return true;
+	}
+
+	return false;
 }
 
 #endif

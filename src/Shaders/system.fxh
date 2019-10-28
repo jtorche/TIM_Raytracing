@@ -21,4 +21,6 @@ vec4 toLinear(vec4 sRGB)
     return mix(higher, lower, cutoff);
 }
 
+#define TMAX 1000
+
 #endif

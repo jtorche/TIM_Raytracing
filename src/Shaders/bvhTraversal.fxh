@@ -5,11 +5,11 @@
 
 bool  bvh_isLeaf(uint _nid);
 void  bvh_getParentSiblingId(uint _nid, out uint _parentId, out uint _siblingId);
-void  bvh_getNodeId(uint _nid, out uint _left, out uint _right, out uint _parentId, out uint _siblingId);
+void  bvh_getChildId(uint _nid, out uint _left, out uint _right);
 void  bvh_getNodeBoxes(uint _nid, out Box _box0, out Box _box1);
-bool  bvh_collide(uint _nid, Ray r);
+void  bvh_collide(uint _nid, Ray r, inout Hit closestHit);
 
-void traverseBvh(Ray r, uint rootId)
+void traverseBvh(Ray r, uint rootId, inout Hit closestHit)
 {
 	// MBVH2 traversal loop
 	uint nodeId = rootId;
@@ -22,14 +22,14 @@ void traverseBvh(Ray r, uint rootId)
 		while(!bvh_isLeaf(nodeId))
 		{
 			uint child0Id, child1Id;
-			bvh_getNodeId(nodeId, child0Id, child1Id, parentId, siblingId);
+			bvh_getChildId(nodeId, child0Id, child1Id);
 
 			Box box0, box1;
 			bvh_getNodeBoxes(nodeId, box0, box1);
 
 			// Box intersection
-			float d0 = CollideBox(r, box0);
-			float d1 = CollideBox(r, box1);
+			float d0 = CollideBox(r, box0, 0, closestHit.t);
+			float d1 = CollideBox(r, box1, 0, closestHit.t);
 		
 			if(d0 < 0 && d1 < 0)
 				break;
@@ -49,9 +49,10 @@ void traverseBvh(Ray r, uint rootId)
 
 		if(bvh_isLeaf(nodeId)) 
 		{
-			if(bvh_collide(nodeId, r))
-				return;
+			bvh_collide(nodeId, r, closestHit);
 		}
+
+		bvh_getParentSiblingId(nodeId, parentId, siblingId);
 
 		// Backtrack
 		while((bitstack & 1) == 0) 

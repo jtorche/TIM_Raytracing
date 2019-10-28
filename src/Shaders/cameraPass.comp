@@ -38,7 +38,7 @@ layout(push_constant) uniform pushConstants
 
 #include "bvhGetter.fxh"
 
-void brutForceTraverse(Ray _ray);
+void brutForceTraverse(Ray _ray, inout Hit closestHit);
 
 layout (local_size_x = 16, local_size_y = 16) in;
 void main()
@@ -54,16 +54,17 @@ void main()
 
 		Ray ray = createRay(g_passData.cameraPos.xyz, normalize(rayTarget - g_passData.cameraPos.xyz));
 
-		// brutForceTraverse(ray);
-		traverseBvh(ray, g_Constants.numNodes == 1 ? 0x8000 : 0);
-		//bvh_collide(0, ray);
-	}
-}
 
-void onHit(Ray _ray, Hit _hit)
-{
-	ivec2 pixelCoord = ivec2(gl_GlobalInvocationID.x, gl_NumWorkGroups.y * 16 - gl_GlobalInvocationID.y);
-	imageStore(g_outputImage, pixelCoord, vec4(_hit.normal * 0.5 + 0.5, 1));
+
+		Hit closestHit;
+		closestHit.t = TMAX;
+
+		brutForceTraverse(ray, closestHit);
+		// traverseBvh(ray, g_Constants.numNodes == 1 ? 0x8000 : 0, closestHit);
+
+		if(closestHit.t < TMAX)
+			imageStore(g_outputImage, pixelCoord, vec4(closestHit.normal * 0.5 + 0.5, 1));
+	}
 }
 
 Sphere loadSphere(uint objIndex)
@@ -75,63 +76,52 @@ Sphere loadSphere(uint objIndex)
 	return sphere;
 }
 
-bool bvh_collide(uint _nid, Ray r)
+Box loadBox(uint objIndex)
+{
+	Box box;
+	box.minExtent = vec3(g_BvhPrimitiveData[objIndex].fparam[0], g_BvhPrimitiveData[objIndex].fparam[1], g_BvhPrimitiveData[objIndex].fparam[2]);
+	box.maxExtent = vec3(g_BvhPrimitiveData[objIndex].fparam[3], g_BvhPrimitiveData[objIndex].fparam[4], g_BvhPrimitiveData[objIndex].fparam[5]);
+	return box;
+}
+
+void hitPrimitive(uint objIndex, Ray r, inout Hit closestHit)
+{
+	uint type =  g_BvhPrimitiveData[objIndex].iparam;
+	Hit hitInfo;
+	bool hasHit = false;
+	switch(type)
+	{
+		case Primitive_Sphere: 
+		hasHit = HitSphere(r, loadSphere(objIndex), 0, closestHit.t, hitInfo);
+		break;
+
+		case Primitive_AABB: 
+		hasHit = HitBox(r, loadBox(objIndex), 0, closestHit.t, hitInfo);
+		break;
+	}
+
+	if(hasHit)
+		closestHit = hitInfo;
+}
+
+void bvh_collide(uint _nid, Ray _ray, inout Hit closestHit)
 {
 	_nid = _nid & 0x7FFF;
 	uint leafDataOffset = g_BvhNodeData[_nid].nid.z;
 	uint numObjects = g_BvhNodeData[_nid].nid.w;
 
-	Hit closestHit;
-	closestHit.t = 3.402823e+38;
-	bool hasHit = HitPlane(r, vec4(0,0,1,0), 0, closestHit);
-
 	for(uint i=0 ; i<numObjects ; ++i)
 	{
 		uint objIndex = g_BvhLeafData[leafDataOffset + i];
-
-		if(g_BvhPrimitiveData[objIndex].iparam == Primitive_Sphere)
-		{
-			Hit hitInfo;
-			if(HitSphere(r, loadSphere(objIndex), 0, hitInfo))
-			{
-				if(hitInfo.t < closestHit.t)
-				{
-					closestHit = hitInfo;
-					hasHit = true;
-				}
-			}
-		}
+		hitPrimitive(objIndex, _ray, closestHit);
 	}
-
-	if(hasHit)
-		onHit(r, closestHit);
-
-	return hasHit;
 }
 
-void brutForceTraverse(Ray _ray)
+void brutForceTraverse(Ray _ray, inout Hit closestHit)
 {
-	Hit closestHit;
-	closestHit.t = 3.402823e+38;
-	bool hasHit = HitPlane(_ray, vec4(0,0,1,0), 0, closestHit);
-
 	for(uint i=0 ; i<g_Constants.numPrimitives ; ++i)
 	{
-		if(g_BvhPrimitiveData[i].iparam == Primitive_Sphere)
-		{
-			Hit hitInfo;
-			if(HitSphere(_ray, loadSphere(i), 0, hitInfo))
-			{
-				if(hitInfo.t < closestHit.t)
-				{
-					closestHit = hitInfo;
-					hasHit = true;
-				}
-			}
-		}
+		hitPrimitive(i, _ray, closestHit);
 	}
-
-	if(hasHit)
-		onHit(_ray, closestHit);
 }
 
