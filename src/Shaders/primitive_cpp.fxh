@@ -5,6 +5,10 @@
 #define Primitive_AABB		2
 #define Primitive_OBB		3
 
+#define Light_Point			1
+#define Light_Sphere		2
+#define Light_Area			3
+
 struct Ray
 {
     vec3 from;
@@ -39,10 +43,23 @@ struct PackedPrimitive
 
 struct PackedBVHNode
 {
-	uvec4 nid; // 0:parent_sibling, 1:child_lr, 2:leafData_offset, 3:leafData_size
+	uvec4 nid; // 0:parent_sibling, 1:child_lr, 2:leafData_offset, 3:numPrimitive | numLights
 	vec4 n0xy;
 	vec4 n1xy;
 	vec4 nz;
+};
+
+struct PointLight // attenuation: 1 /  ( ((x/r) * 5)^2 + 1 )
+{
+	vec3 pos;
+	float radius;
+	vec3 color;
+};
+
+struct PackedLight
+{
+	uint iparam;
+	float fparam[7];
 };
 
 #endif

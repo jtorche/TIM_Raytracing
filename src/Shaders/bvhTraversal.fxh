@@ -15,7 +15,7 @@ void traverseBvh(Ray r, uint rootId, inout Hit closestHit)
 	uint nodeId = rootId;
 	uint bitstack = 0;
 	uint parentId, siblingId;
-	// cached node links
+
 	while(true) 
 	{
 		// Inner node loop

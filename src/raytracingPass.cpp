@@ -16,15 +16,15 @@ RayTracingPass::RayTracingPass(IRenderer* _renderer, IRenderContext* _context) :
     m_bvh->addSphere({ { -3, 0, 0.25f }, 0.5 });
     m_bvh->addSphere({ {  3, 0, 0.25f }, 0.5 });
     m_bvh->addSphere({ { 0,0, 1 }, 1 });
-    
-    m_bvh->addBox(Box{ { -5,-5,-0.1 }, { 5, 5, 0.1} });
+    m_bvh->addBox(Box{ { -5, -5, -0.1f }, { 5, 5, 0.1f } });
+    m_bvh->addPointLight({ { 0, 0, 5 }, 5, { 1, 1, 1 } });
 
     m_bvh->build(Box{ vec3{ -5,-5,-5 }, vec3{5,5,5} });
 
     u32 size = m_bvh->getBvhGpuSize();
     m_bvhBuffer = _renderer->CreateBuffer(size, MemoryType::Default, BufferUsage::Storage | BufferUsage::Transfer);
     std::unique_ptr<ubyte[]> buffer = std::unique_ptr<ubyte[]>(new ubyte[size]);
-    m_bvh->fillGpuBuffer(buffer.get(), m_bvhPrimitiveOffsetRange, m_bvhNodeOffsetRange, m_bvhLeafDataOffsetRange);
+    m_bvh->fillGpuBuffer(buffer.get(), m_bvhPrimitiveOffsetRange, m_bvhLightOffsetRange, m_bvhNodeOffsetRange, m_bvhLeafDataOffsetRange);
     _renderer->UploadBuffer(m_bvhBuffer, buffer.get(), size);
 }
 
@@ -73,6 +73,7 @@ void RayTracingPass::draw(tim::ImageHandle _output, const SimpleCamera& _camera)
     BufferBinding bufBinds[] = {
         { passDataBuffer, { 0, g_PassData_bind } },
         { { m_bvhBuffer, m_bvhPrimitiveOffsetRange.x, m_bvhPrimitiveOffsetRange.y }, { 0, g_BvhPrimitives_bind } },
+        { { m_bvhBuffer, m_bvhLightOffsetRange.x, m_bvhLightOffsetRange.y }, { 0, g_BvhLights_bind } },
         { { m_bvhBuffer, m_bvhNodeOffsetRange.x, m_bvhNodeOffsetRange.y }, { 0, g_BvhNodes_bind } },
         { { m_bvhBuffer, m_bvhLeafDataOffsetRange.x, m_bvhLeafDataOffsetRange.y }, { 0, g_BvhLeafData_bind } },
     };

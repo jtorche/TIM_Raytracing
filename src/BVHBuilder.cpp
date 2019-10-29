@@ -6,7 +6,7 @@ using namespace tim;
 namespace
 {
     enum class CollisionType { Disjoint, Intersect, Contained };
-    CollisionType sphereBoxCollision(const Box& _box, const Sphere& _sphere)
+    CollisionType sphereBoxCollision(const Sphere& _sphere, const Box& _box)
     {
         vec3 closestPointInAabb = linalg::min_(linalg::max_(_sphere.center, _box.minExtent), _box.maxExtent);
         float distanceSquared = linalg::length2(closestPointInAabb - _sphere.center);
@@ -31,6 +31,38 @@ namespace
         return CollisionType::Intersect;
     }
 
+    CollisionType primitiveBoxCollision(const Primitive& _prim, const Box& _box)
+    {
+        switch (_prim.type)
+        {
+        case Primitive_Sphere:
+            return sphereBoxCollision(_prim.m_sphere, _box);
+        case Primitive_AABB:
+            return boxBoxCollision(_prim.m_aabb, _box);
+        default:
+            TIM_ASSERT(false);
+            return {};
+        }
+    }
+
+    CollisionType primitiveSphereCollision(const Primitive& _prim, const Sphere& _sphere)
+    {
+        switch (_prim.type)
+        {
+        case Primitive_Sphere:
+        {
+            float dist2 = _prim.m_sphere.radius + _sphere.radius;
+            dist2 *= dist2;
+            return linalg::length2(_prim.m_sphere.center - _sphere.center) < dist2 ? CollisionType::Intersect : CollisionType::Disjoint;
+        }
+        case Primitive_AABB:
+            return sphereBoxCollision(_sphere, _prim.m_aabb);
+        default:
+            TIM_ASSERT(false);
+            return {};
+        }
+    }
+
     Box getAABB(const Primitive& _prim)
     {
         switch (_prim.type)
@@ -53,6 +85,19 @@ namespace
         vec3 dim = _box.maxExtent - _box.minExtent;
         return dim.x * dim.y * dim.z;
     }
+
+    Sphere getBoundingSphere(const Light& _light)
+    {
+        switch (_light.type)
+        {
+        case Light_Point:
+            return Sphere{ _light.m_point.pos, _light.m_point.radius, 1.f / _light.m_point.radius };
+
+        default:
+            TIM_ASSERT(false);
+            return {};
+        }
+    }
 }
 
 void BVHBuilder::addSphere(const Sphere& _sphere)
@@ -64,6 +109,11 @@ void BVHBuilder::addSphere(const Sphere& _sphere)
 void BVHBuilder::addBox(const Box& _box)
 {
     m_objects.push_back({ _box });
+}
+
+void BVHBuilder::addPointLight(const PointLight& _light)
+{
+    m_lights.push_back({ _light });
 }
 
 void BVHBuilder::build(const Box& _sceneSize)
@@ -104,6 +154,19 @@ void BVHBuilder::addObjectsRec(u32 _depth, ObjectIt _objectsBegin, ObjectIt _obj
         for (auto it = _objectsBegin; it != _objectsEnd; ++it)
             _curNode->primitiveList.push_back(*it);
             
+        for (size_t i=0 ; i<m_lights.size() ; ++i)
+        {
+            const Light& light = m_lights[i];
+            Sphere sphere = getBoundingSphere(light);
+
+            if (std::any_of(_objectsBegin, _objectsEnd, [&](u32 _objIndex)
+                {
+                    return primitiveSphereCollision(m_objects[_objIndex], sphere) != CollisionType::Disjoint;
+                }))
+            {
+                _curNode->lightList.push_back(u32(i));
+            }
+        }
         return;
     }
     else
@@ -144,9 +207,9 @@ void BVHBuilder::addObjectsRec(u32 _depth, ObjectIt _objectsBegin, ObjectIt _obj
 
         for (auto it = _objectsBegin; it != _objectsEnd; ++it)
         {
-            if (boxBoxCollision(leftBox[bestSplit], getAABB(m_objects[*it])) != CollisionType::Disjoint)
+            if (primitiveBoxCollision(m_objects[*it], leftBox[bestSplit]) != CollisionType::Disjoint)
                 objectLeft.push_back(*it);
-            if (boxBoxCollision(rightBox[bestSplit], getAABB(m_objects[*it])) != CollisionType::Disjoint)
+            if (primitiveBoxCollision(m_objects[*it], rightBox[bestSplit]) != CollisionType::Disjoint)
                 objectRight.push_back(*it);
         }
 
@@ -233,9 +296,10 @@ u32 BVHBuilder::getBvhGpuSize() const
 {
     u32 size = tim::alignUp<u32>((u32)m_nodes.size() * sizeof(PackedBVHNode), m_bufferAlignment);
     size += tim::alignUp<u32>((u32)m_objects.size() * sizeof(PackedPrimitive), m_bufferAlignment);
+    size += tim::alignUp<u32>((u32)m_lights.size() * sizeof(PackedLight), m_bufferAlignment);
     for (const BVHBuilder::Node& n : m_nodes)
     {
-        size += (u32)n.primitiveList.size() * sizeof(u32);
+        size += (u32)(n.primitiveList.size() + n.lightList.size()) * sizeof(u32);
     }
     return size;
 }
@@ -261,6 +325,20 @@ namespace
         prim->fparam[4] = _box.maxExtent.y;
         prim->fparam[5] = _box.maxExtent.z;
     }
+
+    void packPointLight(PackedLight* light, const PointLight& _pl)
+    {
+        light->iparam = Light_Point;
+        light->fparam[0] = _pl.pos.x;
+        light->fparam[1] = _pl.pos.y;
+        light->fparam[2] = _pl.pos.z;
+
+        light->fparam[3] = _pl.color.x;
+        light->fparam[4] = _pl.color.y;
+        light->fparam[5] = _pl.color.z;
+
+        light->fparam[6] = _pl.radius;
+    }
 }
 
 void BVHBuilder::packNodeData(PackedBVHNode* _outNode, const BVHBuilder::Node& _node, u32 _leafDataOffset)
@@ -280,7 +358,8 @@ void BVHBuilder::packNodeData(PackedBVHNode* _outNode, const BVHBuilder::Node& _
     leftIndex = isLeaf(_node.left) ? 0x8000 | leftIndex : leftIndex;
     rightIndex = isLeaf(_node.right) ? 0x8000 | rightIndex : rightIndex;
 
-    _outNode->nid = uvec4(parentIndex + (siblingIndex << 16), leftIndex + (rightIndex << 16), _leafDataOffset, u32(_node.primitiveList.size()));
+    u32 packedObjLightCount = u32(_node.primitiveList.size()) + (u32(_node.lightList.size()) << 16);
+    _outNode->nid = uvec4(parentIndex + (siblingIndex << 16), leftIndex + (rightIndex << 16), _leafDataOffset, packedObjLightCount);
     
     TIM_ASSERT((leftIndex == InvalidNodeId && rightIndex == InvalidNodeId) || (leftIndex != InvalidNodeId && rightIndex != InvalidNodeId));
     if (leftIndex != InvalidNodeId)
@@ -299,9 +378,15 @@ void BVHBuilder::packNodeData(PackedBVHNode* _outNode, const BVHBuilder::Node& _
     }
 }
 
-void BVHBuilder::fillGpuBuffer(void* _data, uvec2& _primitiveOffsetRange, uvec2& _nodeOffsetRange, uvec2& _leafDataOffsetRange)
+void BVHBuilder::fillGpuBuffer(void* _data, uvec2& _primitiveOffsetRange, uvec2& _lightOffsetRange, uvec2& _nodeOffsetRange, uvec2& _leafDataOffsetRange)
 {
     ubyte* out = (ubyte*)_data;
+    ubyte* prevout = out;
+
+    // Store primitive data
+    u32 objectBufferSize = u32(m_objects.size() * sizeof(PackedPrimitive));
+    _primitiveOffsetRange = { (u32)std::distance((ubyte*)_data, out), objectBufferSize };
+
     for (u32 i = 0; i < m_objects.size(); ++i)
     {
         PackedPrimitive* prim = reinterpret_cast<PackedPrimitive*>(out);
@@ -322,11 +407,32 @@ void BVHBuilder::fillGpuBuffer(void* _data, uvec2& _primitiveOffsetRange, uvec2&
         
         out += sizeof(PackedPrimitive);
     }
+    out = prevout + alignUp(objectBufferSize, m_bufferAlignment);
 
-    u32 objectBufferSize = u32(m_objects.size() * sizeof(PackedPrimitive));
-    _primitiveOffsetRange = { 0, objectBufferSize };
-    out = (ubyte*)_data + alignUp(objectBufferSize, m_bufferAlignment);
+    // Store light data
+    u32 lightBufferSize = u32(m_lights.size() * sizeof(PackedLight));
+    _lightOffsetRange = { (u32)std::distance((ubyte*)_data, out), lightBufferSize };
+    prevout = out;
+    for (u32 i = 0; i < m_lights.size(); ++i)
+    {
+        PackedLight* lightDat = reinterpret_cast<PackedLight*>(out);
+        switch (m_lights[i].type)
+        {
+        case Light_Point:
+            packPointLight(lightDat, m_lights[i].m_point);
+            break;
+        case Light_Sphere:
+        case Light_Area:
+        default:
+            TIM_ASSERT(false);
+            break;
+        }
 
+        out += sizeof(PackedLight);
+    }
+    out = prevout + alignUp(lightBufferSize, m_bufferAlignment);
+
+    // Store node data
     u32 nodeBufferSize = u32(m_nodes.size() * sizeof(PackedBVHNode));
     _nodeOffsetRange = { (u32)std::distance((ubyte*)_data, out), nodeBufferSize };
     
@@ -342,6 +448,8 @@ void BVHBuilder::fillGpuBuffer(void* _data, uvec2& _primitiveOffsetRange, uvec2&
 
         memcpy(primitiveListCurPtr, n.primitiveList.data(), sizeof(u32) * n.primitiveList.size());
         primitiveListCurPtr += n.primitiveList.size();
+        memcpy(primitiveListCurPtr, n.lightList.data(), sizeof(u32) * n.lightList.size());
+        primitiveListCurPtr += n.lightList.size();
         out += sizeof(PackedBVHNode);
     }
 

@@ -17,6 +17,17 @@ struct Primitive
     };
 };
 
+struct Light
+{
+    Light(PointLight _light) : type{ Light_Point }, m_point{ _light } {}
+
+    u32 type = 0;
+    union
+    {
+        PointLight  m_point = { {0,0,4}, 5, vec3(1,1,1) };
+    };
+};
+
 class BVHBuilder
 {
 public:
@@ -24,6 +35,7 @@ public:
 
     void addSphere(const Sphere&);
     void addBox(const Box& _box);
+    void addPointLight(const PointLight& _light);
     void build(const Box& _sceneSize);
 
     u32 getPrimitivesCount() const { return u32(m_objects.size()); }
@@ -32,7 +44,7 @@ public:
     u32 getBvhGpuSize() const;
 
     // return offset to root node + offset to first primitive list of leafs, offset 0 is for primitive data
-    void fillGpuBuffer(void* _data, uvec2& _primitiveOffsetRange, uvec2& _nodeOffsetRange, uvec2& m_leafDataOffsetRange);
+    void fillGpuBuffer(void* _data, uvec2& _primitiveOffsetRange, uvec2& _lightOffsetRange, uvec2& _nodeOffsetRange, uvec2& m_leafDataOffsetRange);
 
 private:
     struct Node;
@@ -57,8 +69,10 @@ private:
         Node* left = nullptr;
         Node* right = nullptr;
         std::vector<u32> primitiveList; // only if leaf
+        std::vector<u32> lightList; // only if leaf
     };
 
     std::vector<Node> m_nodes;
     std::vector<Primitive> m_objects;
+    std::vector<Light> m_lights;
 };

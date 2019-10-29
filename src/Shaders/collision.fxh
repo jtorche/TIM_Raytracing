@@ -30,6 +30,7 @@ struct Hit
 {
     vec3 normal;
     float t;
+	uint nid;
 };
 
 bool HitSphere(Ray r, Sphere s, float tMin, float tmax, out Hit outHit)
@@ -64,7 +65,7 @@ bool HitSphere(Ray r, Sphere s, float tMin, float tmax, out Hit outHit)
 
 bool HitBox(Ray r, Box box, float tMin, float tmax, out Hit outHit)
 {
-	float t = CollideBox(r, box, tMin, tmax);
+	float t = CollideBox(r, box, tMin, tmax).x;
 	if(t >= tMin)
 	{
 		vec3 pos = r.from + r.dir * t;

@@ -6,6 +6,7 @@
 #include "struct_cpp.fxh"
 #include "collision.fxh"
 #include "bvhTraversal.fxh"
+#include "lighting.fxh"
 
 layout(std430, set=0, binding = g_PassData_bind)
 uniform PassData_block
@@ -16,6 +17,11 @@ uniform PassData_block
 layout(std430, set = 0, binding = g_BvhPrimitives_bind) buffer BvhPrimitives
 {
 	PackedPrimitive g_BvhPrimitiveData[];
+};
+
+layout(std430, set = 0, binding = g_BvhLights_bind) buffer BvhLights
+{
+	PackedLight g_BvhLightData[];
 };
 
 layout(std430, set = 0, binding = g_BvhNodes_bind) buffer BvhNodes
@@ -37,8 +43,29 @@ layout(push_constant) uniform pushConstants
 } g_Constants;
 
 #include "bvhGetter.fxh"
+#include "bvhCollision.fxh"
 
-void brutForceTraverse(Ray _ray, inout Hit closestHit);
+vec3 computeDirectLighting(Ray _ray, Hit _hit)
+{
+	uint leafDataOffset = g_BvhNodeData[_hit.nid].nid.z;
+	uint packed = g_BvhNodeData[_hit.nid].nid.w;
+	uint numObjects = packed & 0xFFFF;
+	uint numLights = (packed & 0xFFFF0000) >> 16;
+
+	vec3 totalLight = vec3(0,0,0);
+	for(uint i=0 ; i<numLights ; ++i)
+	{
+		uint lightIndex = g_BvhLeafData[leafDataOffset + numObjects + i];
+		switch(g_BvhLightData[lightIndex].iparam)
+		{
+			case Light_Point:
+			totalLight += evalPointLight(loadPointLight(lightIndex), _ray.from + _ray.dir * _hit.t, _hit.normal, vec3(0,0,0));
+			break;
+		}
+	}
+
+	return totalLight;
+}
 
 layout (local_size_x = 16, local_size_y = 16) in;
 void main()
@@ -54,74 +81,20 @@ void main()
 
 		Ray ray = createRay(g_passData.cameraPos.xyz, normalize(rayTarget - g_passData.cameraPos.xyz));
 
-
-
 		Hit closestHit;
 		closestHit.t = TMAX;
+		closestHit.nid = 0xFFFFffff;
 
-		brutForceTraverse(ray, closestHit);
-		// traverseBvh(ray, g_Constants.numNodes == 1 ? 0x8000 : 0, closestHit);
+		// brutForceTraverse(ray, closestHit);
+		traverseBvh(ray, g_Constants.numNodes == 1 ? 0x8000 : 0, closestHit);
 
 		if(closestHit.t < TMAX)
-			imageStore(g_outputImage, pixelCoord, vec4(closestHit.normal * 0.5 + 0.5, 1));
-	}
-}
-
-Sphere loadSphere(uint objIndex)
-{
-	Sphere sphere;
-	sphere.center = vec3(g_BvhPrimitiveData[objIndex].fparam[0], g_BvhPrimitiveData[objIndex].fparam[1], g_BvhPrimitiveData[objIndex].fparam[2]);
-	sphere.radius = g_BvhPrimitiveData[objIndex].fparam[3];
-	sphere.invRadius = g_BvhPrimitiveData[objIndex].fparam[4];
-	return sphere;
-}
-
-Box loadBox(uint objIndex)
-{
-	Box box;
-	box.minExtent = vec3(g_BvhPrimitiveData[objIndex].fparam[0], g_BvhPrimitiveData[objIndex].fparam[1], g_BvhPrimitiveData[objIndex].fparam[2]);
-	box.maxExtent = vec3(g_BvhPrimitiveData[objIndex].fparam[3], g_BvhPrimitiveData[objIndex].fparam[4], g_BvhPrimitiveData[objIndex].fparam[5]);
-	return box;
-}
-
-void hitPrimitive(uint objIndex, Ray r, inout Hit closestHit)
-{
-	uint type =  g_BvhPrimitiveData[objIndex].iparam;
-	Hit hitInfo;
-	bool hasHit = false;
-	switch(type)
-	{
-		case Primitive_Sphere: 
-		hasHit = HitSphere(r, loadSphere(objIndex), 0, closestHit.t, hitInfo);
-		break;
-
-		case Primitive_AABB: 
-		hasHit = HitBox(r, loadBox(objIndex), 0, closestHit.t, hitInfo);
-		break;
-	}
-
-	if(hasHit)
-		closestHit = hitInfo;
-}
-
-void bvh_collide(uint _nid, Ray _ray, inout Hit closestHit)
-{
-	_nid = _nid & 0x7FFF;
-	uint leafDataOffset = g_BvhNodeData[_nid].nid.z;
-	uint numObjects = g_BvhNodeData[_nid].nid.w;
-
-	for(uint i=0 ; i<numObjects ; ++i)
-	{
-		uint objIndex = g_BvhLeafData[leafDataOffset + i];
-		hitPrimitive(objIndex, _ray, closestHit);
-	}
-}
-
-void brutForceTraverse(Ray _ray, inout Hit closestHit)
-{
-	for(uint i=0 ; i<g_Constants.numPrimitives ; ++i)
-	{
-		hitPrimitive(i, _ray, closestHit);
+		{
+			vec3 color = computeDirectLighting(ray, closestHit);
+			imageStore(g_outputImage, pixelCoord, fromLinear(vec4(color, 1)));
+		}
+		else
+			imageStore(g_outputImage, pixelCoord, vec4(0,0,0, 1));
 	}
 }
 

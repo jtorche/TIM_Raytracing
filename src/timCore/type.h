@@ -36,6 +36,18 @@ namespace tim
     using uvec2 = linalg::aliases::uint2;
     using uvec4 = linalg::aliases::uint4;
 
+    template<typename TO, typename FROM>
+    TO union_cast(FROM _from)
+    {
+        union
+        {
+            FROM a;
+            TO b;
+        } res;
+        res.a = _from;
+        return res.b;
+    }
+
     template<typename T>
     constexpr T alignUp(T x, T align)
     {

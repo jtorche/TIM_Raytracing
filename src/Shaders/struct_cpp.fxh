@@ -6,6 +6,7 @@
 #define g_BvhPrimitives_bind 2
 #define g_BvhNodes_bind 3
 #define g_BvhLeafData_bind 4
+#define g_BvhLights_bind 5
 
 struct PassData
 {
@@ -16,6 +17,11 @@ struct PassData
 	vec4 frustumCorner10;
 	vec4 frustumCorner01;
 	mat4 invProjView;
+};
+
+struct MaterialData
+{
+	int u;
 };
 
 #endif
