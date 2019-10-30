@@ -26,6 +26,23 @@ float CollideBox(Ray _ray, Box _box, float tmin, float tmax)
     return (tmin < tmax) ? tmin : -1;
 }
 
+bool CollideSphere(Ray r, Sphere s, float tmin, float tmax)
+{
+	vec3 oc = r.from - s.center;
+    float b = dot(oc, r.dir);
+    float c = dot(oc, oc) - s.radius*s.radius;
+    float discr = b * b - c;
+    if (discr > 0)
+    {
+        float discrSq = sqrt(discr);
+        float t0 = (-b - discrSq);
+		float t1 = (-b + discrSq);
+		return (tmin < t0 && t0 < tmax) || (tmin < t1 && t1 < tmax);  
+    }
+    return false;
+}
+
+
 struct Hit
 {
     vec3 normal;

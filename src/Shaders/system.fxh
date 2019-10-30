@@ -23,4 +23,7 @@ vec4 toLinear(vec4 sRGB)
 
 #define TMAX 1000
 
+#define g_AreaLightShadowUniformSampling	1
+#define g_AreaLightShadowSampleCount	    5
+
 #endif

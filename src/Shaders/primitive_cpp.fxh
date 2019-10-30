@@ -56,10 +56,27 @@ struct PointLight // attenuation: 1 /  ( ((x/r) * 5)^2 + 1 )
 	vec3 color;
 };
 
+struct SphereLight
+{
+	vec3 pos;
+	float radius;
+	vec3 color;
+	float sphereRadius;
+};
+
+struct AreaLight
+{
+	vec3 pos;
+	vec3 width;
+	vec3 height;
+	vec3 color;
+	float attenuationRadius;
+};
+
 struct PackedLight
 {
 	uint iparam;
-	float fparam[7];
+	float fparam[13];
 };
 
 #endif

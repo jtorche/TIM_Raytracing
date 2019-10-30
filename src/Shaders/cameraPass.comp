@@ -45,7 +45,7 @@ layout(push_constant) uniform pushConstants
 #include "bvhGetter.fxh"
 #include "bvhCollision.fxh"
 
-vec3 computeDirectLighting(Ray _ray, Hit _hit)
+vec3 computeDirectLighting(uint rootId, Ray _ray, Hit _hit)
 {
 	uint leafDataOffset = g_BvhNodeData[_hit.nid].nid.z;
 	uint packed = g_BvhNodeData[_hit.nid].nid.w;
@@ -59,7 +59,13 @@ vec3 computeDirectLighting(Ray _ray, Hit _hit)
 		switch(g_BvhLightData[lightIndex].iparam)
 		{
 			case Light_Point:
-			totalLight += evalPointLight(loadPointLight(lightIndex), _ray.from + _ray.dir * _hit.t, _hit.normal, vec3(0,0,0));
+			totalLight += evalPointLight(rootId, loadPointLight(lightIndex), _ray.from + _ray.dir * _hit.t, _hit.normal, vec3(0,0,0));
+			break;
+			case Light_Sphere:
+			totalLight += evalSphereLight(rootId, loadSphereLight(lightIndex), _ray.from + _ray.dir * _hit.t, _hit.normal, vec3(0,0,0));
+			break;
+			case Light_Area:
+			totalLight += evalAreaLight(rootId, loadAreaLight(lightIndex), _ray.from + _ray.dir * _hit.t, _hit.normal, vec3(0,0,0));
 			break;
 		}
 	}
@@ -86,15 +92,16 @@ void main()
 		closestHit.nid = 0xFFFFffff;
 
 		// brutForceTraverse(ray, closestHit);
-		traverseBvh(ray, g_Constants.numNodes == 1 ? 0x8000 : 0, closestHit);
+		uint rootId = g_Constants.numNodes == 1 ? 0x8000 : 0;
+		traverseBvh(ray, rootId, closestHit);
 
 		if(closestHit.t < TMAX)
 		{
-			vec3 color = computeDirectLighting(ray, closestHit);
+			vec3 color = computeDirectLighting(rootId, ray, closestHit);
 			imageStore(g_outputImage, pixelCoord, fromLinear(vec4(color, 1)));
 		}
 		else
-			imageStore(g_outputImage, pixelCoord, vec4(0,0,0, 1));
+		    imageStore(g_outputImage, pixelCoord, vec4(0,0,0, 1));
 	}
 }
 

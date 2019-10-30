@@ -19,12 +19,16 @@ struct Primitive
 
 struct Light
 {
-    Light(PointLight _light) : type{ Light_Point }, m_point{ _light } {}
+    Light(const PointLight& _light) : type{ Light_Point }, m_point{ _light } {}
+    Light(const SphereLight& _light) : type{ Light_Sphere }, m_sphere{ _light } {}
+    Light(const AreaLight& _light) : type{ Light_Area }, m_area{ _light } {}
 
     u32 type = 0;
     union
     {
         PointLight  m_point = { {0,0,4}, 5, vec3(1,1,1) };
+        SphereLight m_sphere;
+        AreaLight   m_area;
     };
 };
 
@@ -36,6 +40,8 @@ public:
     void addSphere(const Sphere&);
     void addBox(const Box& _box);
     void addPointLight(const PointLight& _light);
+    void addSphereLight(const SphereLight& _light);
+    void addAreaLight(const AreaLight& _light);
     void build(const Box& _sceneSize);
 
     u32 getPrimitivesCount() const { return u32(m_objects.size()); }

@@ -17,7 +17,18 @@ RayTracingPass::RayTracingPass(IRenderer* _renderer, IRenderContext* _context) :
     m_bvh->addSphere({ {  3, 0, 0.25f }, 0.5 });
     m_bvh->addSphere({ { 0,0, 1 }, 1 });
     m_bvh->addBox(Box{ { -5, -5, -0.1f }, { 5, 5, 0.1f } });
-    m_bvh->addPointLight({ { 0, 0, 5 }, 5, { 1, 1, 1 } });
+
+    //m_bvh->addSphere({ { 0, 0, 4 }, 0.19 });
+    //m_bvh->addSphereLight({ { 0, 0, 4 }, 25, { 1, 1, 1 }, 0.2 });
+    m_bvh->addPointLight({ { -3, -2, 4 }, 30, { 0, 1, 1 } });
+
+    AreaLight areaLight;
+    areaLight.pos = { 0, 0, 3 };
+    areaLight.width = { -1, 0, 0 };
+    areaLight.height = { 0, 1, 0 };
+    areaLight.color = { 1,1,1 };
+    areaLight.attenuationRadius = 40;
+    m_bvh->addAreaLight(areaLight);
 
     m_bvh->build(Box{ vec3{ -5,-5,-5 }, vec3{5,5,5} });
 
