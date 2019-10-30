@@ -14,48 +14,45 @@ float computeAttenuation(float _dist, float _lightRadius)
 	return clamp(att - (1.0 / g_LightCapThreshold), 0, 1);
 }
 
-vec3 evalPointLight(uint _rootId, in PointLight _pl, vec3 _pos, vec3 _normal, vec3 _eye)
+vec3 computeLighting(uint rootId, in Material _mat, vec3 lightColor, vec3 P, vec3 L, vec3 N, vec3 E, float att, float shadowRayLength)
 {
-	float d = length(_pl.pos - _pos);
-	vec3 L = (_pl.pos - _pos) / d;
-	
-	float dotL = clamp(dot(_normal, L), 0, 1);
-	float att = computeAttenuation(d, _pl.radius);
+	if(_mat.type_ids.x == Material_Emissive)
+		return _mat.color.xyz;
+
+	float dotL = clamp(dot(N, L), 0, 1);
 
 	if(att * dotL > 0.001)
 	{
-		Ray shadowRay; shadowRay.from = _pos; shadowRay.dir = L; shadowRay.invdir = vec3(1,1,1) / L;
-		float shadow = traverseBvhFast(shadowRay, _rootId, TMAX) ? 0 : 1;
+		Ray shadowRay; shadowRay.from = P; shadowRay.dir = L; shadowRay.invdir = vec3(1,1,1) / L;
+		float shadow = traverseBvhFast(shadowRay, rootId, shadowRayLength) ? 0 : 1;
 
-		return shadow * att * dotL * _pl.color;
+		return shadow * att * dotL * lightColor * _mat.color.xyz;
 	}
 
 	return vec3(0,0,0);
 }
 
-vec3 evalSphereLight(uint _rootId, in SphereLight _pl, vec3 _pos, vec3 _normal, vec3 _eye)
+vec3 evalPointLight(uint _rootId, in PointLight _pl, in Material _mat, vec3 _pos, vec3 _normal, vec3 _eye)
 {
 	float d = length(_pl.pos - _pos);
 	vec3 L = (_pl.pos - _pos) / d;
 	
-	float dotL = clamp(dot(_normal, L), 0, 1);
-	float att = computeAttenuation(d, _pl.radius);
-
-	if(att * dotL > 0.001)
-	{
-		Ray shadowRay; shadowRay.from = _pos; shadowRay.dir = L; shadowRay.invdir = vec3(1,1,1) / L;
-		float shadow = traverseBvhFast(shadowRay, _rootId, d - _pl.sphereRadius) ? 0 : 1;
-
-		return shadow * att * dotL * _pl.color;
-	}
-
-	return vec3(0,0,0);
+	return computeLighting(_rootId, _mat, _pl.color, _pos, L, _normal, _eye, computeAttenuation(d, _pl.radius), d);
 }
 
-vec3 evalAreaLight(uint _rootId, in AreaLight _al, vec3 _pos, vec3 _normal, vec3 _eye)
+vec3 evalSphereLight(uint _rootId, in SphereLight _sl, in Material _mat, vec3 _pos, vec3 _normal, vec3 _eye)
+{
+	float d = length(_sl.pos - _pos);
+	vec3 L = (_sl.pos - _pos) / d;
+
+	d = max(0.01, d - _sl.sphereRadius);
+	return computeLighting(_rootId, _mat, _sl.color, _pos, L, _normal, _eye, computeAttenuation(d, _sl.radius), d);
+}
+
+vec3 evalAreaLight(uint _rootId, in AreaLight _al, in Material _mat, vec3 _pos, vec3 _normal, vec3 _eye)
 {
 	vec3 areaNormal = normalize(cross(_al.width, _al.height));
-	float res = 0;
+	vec3 res = vec3(0,0,0);
 
 #if g_AreaLightShadowUniformSampling
 	#if g_AreaLightShadowSampleCount == 1
@@ -82,25 +79,17 @@ vec3 evalAreaLight(uint _rootId, in AreaLight _al, vec3 _pos, vec3 _normal, vec3
 			#endif
 		#endif
 			
-			
 			float d = length(sampledLight - _pos);
 			vec3 L = (sampledLight - _pos) / d;
-			
-			float dotL = clamp(dot(_normal, L), 0, 1);
-			float att = computeAttenuation(d, _al.attenuationRadius);
+
 			float areaAtt = clamp(dot(areaNormal, -L), 0, 1);
-			
-			if(areaAtt * att * dotL > 0.001)
-			{
-				Ray shadowRay; shadowRay.from = _pos; shadowRay.dir = L; shadowRay.invdir = vec3(1,1,1) / L;
-				float shadow = traverseBvhFast(shadowRay, _rootId, d) ? 0 : 1;
-			
-				res += shadow * att * dotL * areaAtt;
-			}
+			float att = computeAttenuation(d, _al.attenuationRadius);
+
+			res += computeLighting(_rootId, _mat, _al.color, _pos, L, _normal, _eye, att * areaAtt, d);
 		}
 	}
 
-	return _al.color * res / (g_AreaLightShadowSampleCount * g_AreaLightShadowSampleCount);
+	return  res / (g_AreaLightShadowSampleCount * g_AreaLightShadowSampleCount);
 }
 
 #endif

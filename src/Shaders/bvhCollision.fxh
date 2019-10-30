@@ -95,9 +95,12 @@ void bvh_collide(uint _nid, Ray _ray, inout Hit closestHit)
 		Hit hit;
 		bool hasHit = hitPrimitive(objIndex, _ray, closestHit.t, hit);
 
-		closestHit.t =		hasHit ? hit.t * 0.999	: closestHit.t;
-		closestHit.normal = hasHit ? hit.normal		: closestHit.normal;
-		closestHit.nid =	hasHit ? _nid			: closestHit.nid;
+		if(hasHit)
+		{
+			closestHit.t		= hit.t * 0.999;
+			closestHit.normal	= hit.normal;
+			closestHit.nid_mid	= _nid + (g_BvhPrimitiveData[objIndex].iparam & 0xFFFF0000);
+		}
 	}
 }
 

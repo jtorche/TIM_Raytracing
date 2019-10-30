@@ -47,7 +47,7 @@ struct Hit
 {
     vec3 normal;
     float t;
-	uint nid;
+	uint nid_mid;
 };
 
 bool HitSphere(Ray r, Sphere s, float tMin, float tmax, out Hit outHit)

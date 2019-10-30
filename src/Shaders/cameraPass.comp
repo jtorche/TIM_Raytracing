@@ -19,6 +19,11 @@ layout(std430, set = 0, binding = g_BvhPrimitives_bind) buffer BvhPrimitives
 	PackedPrimitive g_BvhPrimitiveData[];
 };
 
+layout(std430, set = 0, binding = g_BvhMaterials_bind) buffer BvhMaterials
+{	
+	Material g_BvhMaterialData[];
+};
+
 layout(std430, set = 0, binding = g_BvhLights_bind) buffer BvhLights
 {
 	PackedLight g_BvhLightData[];
@@ -47,8 +52,11 @@ layout(push_constant) uniform pushConstants
 
 vec3 computeDirectLighting(uint rootId, Ray _ray, Hit _hit)
 {
-	uint leafDataOffset = g_BvhNodeData[_hit.nid].nid.z;
-	uint packed = g_BvhNodeData[_hit.nid].nid.w;
+	uint nid = _hit.nid_mid & 0xFFFF;
+	uint matId = (_hit.nid_mid & 0xFFFF0000) >> 16;
+
+	uint leafDataOffset = g_BvhNodeData[nid].nid.z;
+	uint packed = g_BvhNodeData[nid].nid.w;
 	uint numObjects = packed & 0xFFFF;
 	uint numLights = (packed & 0xFFFF0000) >> 16;
 
@@ -59,13 +67,13 @@ vec3 computeDirectLighting(uint rootId, Ray _ray, Hit _hit)
 		switch(g_BvhLightData[lightIndex].iparam)
 		{
 			case Light_Point:
-			totalLight += evalPointLight(rootId, loadPointLight(lightIndex), _ray.from + _ray.dir * _hit.t, _hit.normal, vec3(0,0,0));
+			totalLight += evalPointLight(rootId, loadPointLight(lightIndex), g_BvhMaterialData[matId], _ray.from + _ray.dir * _hit.t, _hit.normal, vec3(0,0,0));
 			break;
 			case Light_Sphere:
-			totalLight += evalSphereLight(rootId, loadSphereLight(lightIndex), _ray.from + _ray.dir * _hit.t, _hit.normal, vec3(0,0,0));
+			totalLight += evalSphereLight(rootId, loadSphereLight(lightIndex), g_BvhMaterialData[matId], _ray.from + _ray.dir * _hit.t, _hit.normal, vec3(0,0,0));
 			break;
 			case Light_Area:
-			totalLight += evalAreaLight(rootId, loadAreaLight(lightIndex), _ray.from + _ray.dir * _hit.t, _hit.normal, vec3(0,0,0));
+			totalLight += evalAreaLight(rootId, loadAreaLight(lightIndex), g_BvhMaterialData[matId], _ray.from + _ray.dir * _hit.t, _hit.normal, vec3(0,0,0));
 			break;
 		}
 	}
@@ -89,7 +97,7 @@ void main()
 
 		Hit closestHit;
 		closestHit.t = TMAX;
-		closestHit.nid = 0xFFFFffff;
+		closestHit.nid_mid = 0xFFFFffff;
 
 		// brutForceTraverse(ray, closestHit);
 		uint rootId = g_Constants.numNodes == 1 ? 0x8000 : 0;

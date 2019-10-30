@@ -6,10 +6,11 @@ using namespace tim;
 
 struct Primitive
 {
-    Primitive(Sphere _sphere) : type{ Primitive_Sphere }, m_sphere{ _sphere } {}
-    Primitive(Box _box) : type{ Primitive_AABB }, m_aabb{ _box } {}
+    Primitive(const Sphere& _sphere, const Material& _mat) : type{ Primitive_Sphere }, material{ _mat }, m_sphere{ _sphere } {}
+    Primitive(const Box& _box, const Material& _mat) : type{ Primitive_AABB }, material{ _mat }, m_aabb{ _box } {}
 
     u32 type = 0;
+    Material material;
     union
     {
         Sphere  m_sphere = { {0,0,0}, 1, 1 };
@@ -35,10 +36,13 @@ struct Light
 class BVHBuilder
 {
 public:
+    static Material createLambertianMaterial(vec3 _color);
+    static Material createEmissiveMaterial(vec3 _color);
+
     BVHBuilder(u32 _maxDepth = 5, u32 _maxObjPerNode = 4) : m_maxDepth{ _maxDepth }, m_maxObjPerNode{ _maxObjPerNode } {}
 
-    void addSphere(const Sphere&);
-    void addBox(const Box& _box);
+    void addSphere(const Sphere&, const Material& _mat = createLambertianMaterial({ 0.7f, 0.7f, 0.7f }));
+    void addBox(const Box& _box, const Material& _mat = createLambertianMaterial({ 0.7f, 0.7f, 0.7f }));
     void addPointLight(const PointLight& _light);
     void addSphereLight(const SphereLight& _light);
     void addAreaLight(const AreaLight& _light);
@@ -50,17 +54,17 @@ public:
     u32 getBvhGpuSize() const;
 
     // return offset to root node + offset to first primitive list of leafs, offset 0 is for primitive data
-    void fillGpuBuffer(void* _data, uvec2& _primitiveOffsetRange, uvec2& _lightOffsetRange, uvec2& _nodeOffsetRange, uvec2& m_leafDataOffsetRange);
+    void fillGpuBuffer(void* _data, uvec2& _primitiveOffsetRange, uvec2& _materialOffsetRange, uvec2& _lightOffsetRange, uvec2& _nodeOffsetRange, uvec2& m_leafDataOffsetRange);
 
 private:
     struct Node;
     using ObjectIt = std::vector<u32>::iterator;
-    void addObjectsRec(u32 _depth, ObjectIt _objectsBegin, ObjectIt _objectsEnd, Node * _curNode);
+    void addObjectsRec(u32 _depth, ObjectIt _objectsBegin, ObjectIt _objectsEnd, Node* _curNode);
 
     template<typename Fun1, typename Fun2>
-    void searchBestSplit(Node * _curNode, ObjectIt _objectsBegin, ObjectIt _objectsEnd, const Fun1& _computeStep, const Fun2& _computeFixedStep,
-                         Box& _leftBox, Box& _rightBox, size_t& _numObjInLeft, size_t& _numObjInRight) const;
-    
+    void searchBestSplit(Node* _curNode, ObjectIt _objectsBegin, ObjectIt _objectsEnd, const Fun1& _computeStep, const Fun2& _computeFixedStep,
+        Box& _leftBox, Box& _rightBox, size_t& _numObjInLeft, size_t& _numObjInRight) const;
+
     void packNodeData(PackedBVHNode* _outNode, const BVHBuilder::Node& _node, u32 _leafDataOffset);
 
 private:

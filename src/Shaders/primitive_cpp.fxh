@@ -9,6 +9,11 @@
 #define Light_Sphere		2
 #define Light_Area			3
 
+#define Material_Emissive		1
+#define Material_Lambert		2
+#define Material_Mirror			3
+#define Material_Transparent	4
+
 struct Ray
 {
     vec3 from;
@@ -31,13 +36,14 @@ struct Sphere
 
 struct Material
 {
-	vec3 color;
-	float emissive;
+	uvec4	type_ids;
+	vec4	color;
+	vec4	params;
 };
 
 struct PackedPrimitive
 {
-	uint iparam;
+	uint iparam; // type|materialId
 	float fparam[6];
 };
 
@@ -49,7 +55,7 @@ struct PackedBVHNode
 	vec4 nz;
 };
 
-struct PointLight // attenuation: 1 /  ( ((x/r) * 5)^2 + 1 )
+struct PointLight
 {
 	vec3 pos;
 	float radius;

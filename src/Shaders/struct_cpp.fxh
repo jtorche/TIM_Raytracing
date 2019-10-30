@@ -7,6 +7,7 @@
 #define g_BvhNodes_bind 3
 #define g_BvhLeafData_bind 4
 #define g_BvhLights_bind 5
+#define g_BvhMaterials_bind 6
 
 struct PassData
 {

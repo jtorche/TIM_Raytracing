@@ -20,6 +20,7 @@ private:
     std::unique_ptr<BVHBuilder> m_bvh;
     tim::BufferHandle m_bvhBuffer;
     tim::uvec2 m_bvhPrimitiveOffsetRange;
+    tim::uvec2 m_bvhMaterialOffsetRange;
     tim::uvec2 m_bvhLightOffsetRange;
     tim::uvec2 m_bvhNodeOffsetRange;
     tim::uvec2 m_bvhLeafDataOffsetRange;

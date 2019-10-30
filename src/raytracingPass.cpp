@@ -7,20 +7,20 @@ using namespace tim;
 
 RayTracingPass::RayTracingPass(IRenderer* _renderer, IRenderContext* _context) : m_frameSize{ 800,600 },  m_renderer { _renderer }, m_context{ _context }
 {
-    m_bvh = std::make_unique<BVHBuilder>(1,0);
+    m_bvh = std::make_unique<BVHBuilder>(5, 4);
 
     m_bvh->addSphere({ {  3, 3, 0.5f }, 1 });
     m_bvh->addSphere({ { -3, 3, 0.5f }, 1 });
     m_bvh->addSphere({ {  3,-3, 0.5f }, 1 });
-    m_bvh->addSphere({ { -3,-3, 0.5f }, 1 });
+    m_bvh->addSphere({ { -3,-3, 0.5f }, 1 }, BVHBuilder::createLambertianMaterial({ 1, 1,0.5 }));
     m_bvh->addSphere({ { -3, 0, 0.25f }, 0.5 });
     m_bvh->addSphere({ {  3, 0, 0.25f }, 0.5 });
     m_bvh->addSphere({ { 0,0, 1 }, 1 });
     m_bvh->addBox(Box{ { -5, -5, -0.1f }, { 5, 5, 0.1f } });
 
-    //m_bvh->addSphere({ { 0, 0, 4 }, 0.19 });
-    //m_bvh->addSphereLight({ { 0, 0, 4 }, 25, { 1, 1, 1 }, 0.2 });
-    m_bvh->addPointLight({ { -3, -2, 4 }, 30, { 0, 1, 1 } });
+    m_bvh->addSphere({ { -2, -2, 4 }, 0.19 }, BVHBuilder::createEmissiveMaterial({ 0, 1, 1 }));
+    m_bvh->addSphereLight({ { -2, -2, 4 }, 25, { 0, 1, 1 }, 0.2 });
+    //m_bvh->addPointLight({ { -3, -2, 4 }, 30, { 0, 1, 1 } });
 
     AreaLight areaLight;
     areaLight.pos = { 0, 0, 3 };
@@ -28,14 +28,14 @@ RayTracingPass::RayTracingPass(IRenderer* _renderer, IRenderContext* _context) :
     areaLight.height = { 0, 1, 0 };
     areaLight.color = { 1,1,1 };
     areaLight.attenuationRadius = 40;
-    m_bvh->addAreaLight(areaLight);
+    // m_bvh->addAreaLight(areaLight);
 
     m_bvh->build(Box{ vec3{ -5,-5,-5 }, vec3{5,5,5} });
 
     u32 size = m_bvh->getBvhGpuSize();
     m_bvhBuffer = _renderer->CreateBuffer(size, MemoryType::Default, BufferUsage::Storage | BufferUsage::Transfer);
     std::unique_ptr<ubyte[]> buffer = std::unique_ptr<ubyte[]>(new ubyte[size]);
-    m_bvh->fillGpuBuffer(buffer.get(), m_bvhPrimitiveOffsetRange, m_bvhLightOffsetRange, m_bvhNodeOffsetRange, m_bvhLeafDataOffsetRange);
+    m_bvh->fillGpuBuffer(buffer.get(), m_bvhPrimitiveOffsetRange, m_bvhMaterialOffsetRange, m_bvhLightOffsetRange, m_bvhNodeOffsetRange, m_bvhLeafDataOffsetRange);
     _renderer->UploadBuffer(m_bvhBuffer, buffer.get(), size);
 }
 
@@ -84,6 +84,7 @@ void RayTracingPass::draw(tim::ImageHandle _output, const SimpleCamera& _camera)
     BufferBinding bufBinds[] = {
         { passDataBuffer, { 0, g_PassData_bind } },
         { { m_bvhBuffer, m_bvhPrimitiveOffsetRange.x, m_bvhPrimitiveOffsetRange.y }, { 0, g_BvhPrimitives_bind } },
+        { { m_bvhBuffer, m_bvhMaterialOffsetRange.x, m_bvhMaterialOffsetRange.y }, { 0, g_BvhMaterials_bind } },
         { { m_bvhBuffer, m_bvhLightOffsetRange.x, m_bvhLightOffsetRange.y }, { 0, g_BvhLights_bind } },
         { { m_bvhBuffer, m_bvhNodeOffsetRange.x, m_bvhNodeOffsetRange.y }, { 0, g_BvhNodes_bind } },
         { { m_bvhBuffer, m_bvhLeafDataOffsetRange.x, m_bvhLeafDataOffsetRange.y }, { 0, g_BvhLeafData_bind } },
