@@ -22,6 +22,7 @@ public:
 
     const tim::mat4& getViewMat() const { return m_viewMat; }
     const tim::vec3& getPos() const { return pos; }
+    const tim::vec3& getDir() const { return dir; }
 
 private:
     bool m_left = false, m_right = false, m_forward = false, m_backward = false;

@@ -116,4 +116,30 @@ bool HitBox(Ray r, Box box, float tMin, float tmax, out Hit outHit)
 	return false;
 }
 
+bool sphereFrustum4Collision(in Sphere _sphere, in vec4 _plans[4])
+{
+	for(uint i=0 ; i<4 ; ++i)
+	{
+		if(dot(_plans[i].xyz, _sphere.center) + _plans[i].w < -_sphere.radius)
+			return false;
+	}
+	return true;
+}
+
+bool boxFrustum4Collision(in Box _box, in vec4 _plans[4])
+{
+	for(uint i=0 ; i<4 ; ++i)
+	{
+		vec3 boxClose = vec3( 
+			_plans[i].x < 0 ? _box.minExtent.x : _box.maxExtent.x, 
+			_plans[i].y < 0 ? _box.minExtent.y : _box.maxExtent.y,
+			_plans[i].z < 0 ? _box.minExtent.z : _box.maxExtent.z );
+
+		float d = dot(boxClose, _plans[i].xyz) + _plans[i].w;
+		if(d < 0)
+			return false;
+	}
+	return true;
+}
+
 #endif

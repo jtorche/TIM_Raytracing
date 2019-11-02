@@ -9,15 +9,27 @@
 #define g_BvhLights_bind 5
 #define g_BvhMaterials_bind 6
 
+#define LOCAL_SIZE 16
+#define TMAX 100
+
 struct PassData
 {
 	uvec2 frameSize;
 	vec2 invFrameSize;
 	vec4 cameraPos;
+	vec4 cameraDir;
+	
 	vec4 frustumCorner00;
 	vec4 frustumCorner10;
 	vec4 frustumCorner01;
 	mat4 invProjView;
+};
+
+struct PushConstants
+{
+	uint numPrimitives;
+	uint numLights;
+	uint numNodes;
 };
 
 #endif

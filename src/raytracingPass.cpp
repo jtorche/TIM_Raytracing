@@ -35,6 +35,10 @@ RayTracingPass::RayTracingPass(IRenderer* _renderer, IRenderContext* _context) :
     
     m_bvh->addSphere({ { -2, -2, 4 }, 0.19f }, BVHBuilder::createEmissiveMaterial({ 0, 1, 1 }));
     m_bvh->addSphereLight({ { -2, -2, 4 }, 25, { 0, 1, 1 }, 0.2f });
+
+    m_bvh->addSphere({ { 2, 2, 4 }, 0.19f }, BVHBuilder::createEmissiveMaterial({ 1, 1, 0 }));
+    m_bvh->addSphereLight({ { 2, 2, 4 }, 15, { 1, 1, 0 }, 0.2f });
+
     //m_bvh->addPointLight({ { -3, -2, 4 }, 30, { 0, 1, 1 } });
 
     AreaLight areaLight;
@@ -87,15 +91,17 @@ void RayTracingPass::draw(tim::ImageHandle _output, const SimpleCamera& _camera)
     passData.frameSize = { m_frameSize.x, m_frameSize.y };
     passData.invFrameSize = { 1.f / m_frameSize.x, 1.f / m_frameSize.y };
     passData.cameraPos = { _camera.getPos(), 0 };
+    passData.cameraDir = { _camera.getDir(), 0 };
 
-    mat4 projMat = linalg::perspective_matrix<float>(fov, float(m_frameSize.x) / m_frameSize.y, 1, 10, linalg::neg_z, linalg::zero_to_one);
+
+    mat4 projMat = linalg::perspective_matrix<float>(fov, float(m_frameSize.x) / m_frameSize.y, 0.1f, TMAX, linalg::neg_z, linalg::zero_to_one);
     mat4 viewProj = linalg::mul(projMat, _camera.getViewMat());
     passData.invProjView = linalg::inverse(viewProj);
 
     passData.frustumCorner00 = linalg::mul(passData.invProjView, vec4(-1, -1, 1, 1));
     passData.frustumCorner10 = linalg::mul(passData.invProjView, vec4( 1, -1, 1, 1));
     passData.frustumCorner01 = linalg::mul(passData.invProjView, vec4(-1,  1, 1, 1));
-
+    
     passData.frustumCorner00 /= passData.frustumCorner00.w;
     passData.frustumCorner10 /= passData.frustumCorner10.w;
     passData.frustumCorner01 /= passData.frustumCorner01.w;
@@ -125,10 +131,11 @@ void RayTracingPass::draw(tim::ImageHandle _output, const SimpleCamera& _camera)
     arg.m_bufferBindings = bufBinds;
     arg.m_numBufferBindings = _countof(bufBinds);
 
-    u32 constants[] = { m_bvh->getPrimitivesCount(), m_bvh->getLightsCount(), m_bvh->getNodesCount() };
-    arg.m_constants = constants;
-    arg.m_constantSize = sizeof(u32) * _countof(constants);
+    PushConstants constants = { m_bvh->getPrimitivesCount(), m_bvh->getLightsCount(), m_bvh->getNodesCount() };
+    arg.m_constants = &constants;
+    arg.m_constantSize = sizeof(constants);
     arg.m_key = { TIM_HASH32(cameraPass.comp), {} };
 
-    m_context->Dispatch(arg, alignUp<u32>(m_frameSize.x, 16) / 16, alignUp<u32>(m_frameSize.y, 16) / 16);
+    const u32 localSize = LOCAL_SIZE;
+    m_context->Dispatch(arg, alignUp<u32>(m_frameSize.x, localSize) / localSize, alignUp<u32>(m_frameSize.y, localSize) / localSize);
 }

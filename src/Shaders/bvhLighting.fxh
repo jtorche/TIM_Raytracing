@@ -11,6 +11,7 @@ vec3 evalLighting(uint _rootId, uint lightIndex, uint _matId, in Ray _ray, in Cl
 #else
 	vec3 normal = _hit.normal;	
 #endif
+
 	switch(g_BvhLightData[lightIndex].iparam)
 	{
 		case Light_Point:

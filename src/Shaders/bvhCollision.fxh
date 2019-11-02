@@ -24,8 +24,8 @@ PointLight loadPointLight(uint lightIndex)
 {
 	PointLight l;
 	l.pos = vec3(g_BvhLightData[lightIndex].fparam[0], g_BvhLightData[lightIndex].fparam[1], g_BvhLightData[lightIndex].fparam[2]);
-	l.color = vec3(g_BvhLightData[lightIndex].fparam[3], g_BvhLightData[lightIndex].fparam[4], g_BvhLightData[lightIndex].fparam[5]);
-	l.radius = g_BvhLightData[lightIndex].fparam[6];
+	l.radius = g_BvhLightData[lightIndex].fparam[3];
+	l.color = vec3(g_BvhLightData[lightIndex].fparam[4], g_BvhLightData[lightIndex].fparam[5], g_BvhLightData[lightIndex].fparam[6]);
 	return l;
 }
 
@@ -33,10 +33,19 @@ SphereLight loadSphereLight(uint lightIndex)
 {
 	SphereLight l;
 	l.pos = vec3(g_BvhLightData[lightIndex].fparam[0], g_BvhLightData[lightIndex].fparam[1], g_BvhLightData[lightIndex].fparam[2]);
-	l.color = vec3(g_BvhLightData[lightIndex].fparam[3], g_BvhLightData[lightIndex].fparam[4], g_BvhLightData[lightIndex].fparam[5]);
-	l.radius = g_BvhLightData[lightIndex].fparam[6];
+	l.radius = g_BvhLightData[lightIndex].fparam[3];
+	l.color = vec3(g_BvhLightData[lightIndex].fparam[4], g_BvhLightData[lightIndex].fparam[5], g_BvhLightData[lightIndex].fparam[6]);
 	l.sphereRadius = g_BvhLightData[lightIndex].fparam[7];
 	return l;
+}
+
+Sphere loadSphereFromPointOrSphereLight(uint lightIndex)
+{
+	Sphere sphere;
+	sphere.center = vec3(g_BvhLightData[lightIndex].fparam[0], g_BvhLightData[lightIndex].fparam[1], g_BvhLightData[lightIndex].fparam[2]);
+	sphere.radius = g_BvhLightData[lightIndex].fparam[3];
+	sphere.invRadius = 1.0 / sphere.radius;
+	return sphere;
 }
 
 AreaLight loadAreaLight(uint lightIndex)

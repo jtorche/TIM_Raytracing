@@ -274,7 +274,7 @@ void BVHBuilder::searchBestSplit(BVHBuilder::Node* _curNode, ObjectIt _objectsBe
     const Fun1& _computeStep, const Fun2& _computeFixedStep,
     Box& _leftBox, Box& _rightBox, size_t& _numObjInLeft, size_t& _numObjInRight) const
 {
-    const u32 NumSplit = 32;
+    const u32 NumSplit = 128;
     size_t numObjects = std::distance(_objectsBegin, _objectsEnd);
     const bool isEven = numObjects % 2 == 0;
 
@@ -379,12 +379,11 @@ namespace
         light->fparam[0] = _pl.pos.x;
         light->fparam[1] = _pl.pos.y;
         light->fparam[2] = _pl.pos.z;
+        light->fparam[3] = _pl.radius;
 
-        light->fparam[3] = _pl.color.x;
-        light->fparam[4] = _pl.color.y;
-        light->fparam[5] = _pl.color.z;
-
-        light->fparam[6] = _pl.radius;
+        light->fparam[4] = _pl.color.x;
+        light->fparam[5] = _pl.color.y;
+        light->fparam[6] = _pl.color.z;
     }
 
     void packSphereLight(PackedLight* light, const SphereLight& _pl)
@@ -393,12 +392,11 @@ namespace
         light->fparam[0] = _pl.pos.x;
         light->fparam[1] = _pl.pos.y;
         light->fparam[2] = _pl.pos.z;
+        light->fparam[3] = _pl.radius;
 
-        light->fparam[3] = _pl.color.x;
-        light->fparam[4] = _pl.color.y;
-        light->fparam[5] = _pl.color.z;
-
-        light->fparam[6] = _pl.radius;
+        light->fparam[4] = _pl.color.x;
+        light->fparam[5] = _pl.color.y;
+        light->fparam[6] = _pl.color.z;
         light->fparam[7] = _pl.sphereRadius;
     }
 

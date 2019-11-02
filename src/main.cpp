@@ -78,6 +78,7 @@ void window_size_callback(GLFWwindow* window, int width, int height)
 
 int main()
 {
+    system("pause");
 	GLFWwindow* window;
 
 	/* Initialize the library */

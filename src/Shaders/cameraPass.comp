@@ -40,14 +40,11 @@ layout(std430, set = 0, binding = g_BvhLeafData_bind) buffer BvhLeafData
 
 layout(set=0, binding = g_outputImage_bind) uniform writeonly image2D g_outputImage;
 
-layout(push_constant) uniform pushConstants 
+layout(push_constant) uniform pushConstantBlock
 {
-	uint numPrimitives;
-	uint numLights;
-	uint numNodes;
-} g_Constants;
+	PushConstants g_Constants;
+};
 
-#define LOCAL_SIZE 16
 #if USE_SHARED_MEM
 shared vec3 g_normalHit[LOCAL_SIZE * LOCAL_SIZE];
 #endif
@@ -56,16 +53,18 @@ shared vec3 g_normalHit[LOCAL_SIZE * LOCAL_SIZE];
 #include "bvhGetter.fxh"
 #include "bvhCollision.fxh"
 #include "bvhLighting.fxh"
+#include "cullFrustum.fxh"
 
+#if !TILE_FRUSTUM_CULL
 layout (local_size_x = LOCAL_SIZE, local_size_y = LOCAL_SIZE) in;
 void main()
 {
-	ivec2 pixelCoord = ivec2(gl_GlobalInvocationID.x, gl_NumWorkGroups.y * 16 - gl_GlobalInvocationID.y);
+	ivec2 pixelCoord = ivec2(gl_GlobalInvocationID.x, gl_NumWorkGroups.y * LOCAL_SIZE - gl_GlobalInvocationID.y);
 	if(pixelCoord.x < g_passData.frameSize.x && pixelCoord.y < g_passData.frameSize.y)
 	{	
 		vec3 stepW = (g_passData.frustumCorner10.xyz - g_passData.frustumCorner00.xyz) * g_passData.invFrameSize.x;
 		vec3 stepH = (g_passData.frustumCorner01.xyz - g_passData.frustumCorner00.xyz) * g_passData.invFrameSize.y;
-		
+
 		vec3 rayTarget = g_passData.frustumCorner00.xyz + stepW * gl_GlobalInvocationID.x + stepH * gl_GlobalInvocationID.y;
 
 		Ray ray = createRay(g_passData.cameraPos.xyz, normalize(rayTarget - g_passData.cameraPos.xyz));
@@ -73,8 +72,8 @@ void main()
 		ClosestHit closestHit;
 		closestHit.t = TMAX;
 		closestHit.nid_mid = 0xFFFFffff;
-
 		uint rootId = g_Constants.numNodes == 1 ? 0x8000 : 0;
+
 	#if NO_BVH
 		brutForceTraverse(ray, closestHit);
 	#else
@@ -86,7 +85,7 @@ void main()
 		{
 		#if NO_BVH
 			for(uint i=0 ; i<g_Constants.numLights ; ++i)
-				pixelColor += evalLighting(rootId, i, closestHit.nid_mid,  ray, closestHit);
+				pixelColor += evalLighting(rootId, i, closestHit.nid_mid, ray, closestHit);
 		#else
 			pixelColor = computeDirectLighting(rootId, ray, closestHit);
 		#endif
@@ -95,4 +94,39 @@ void main()
 		imageStore(g_outputImage, pixelCoord, fromLinear(vec4(pixelColor, 1)));
 	}
 }
+#endif
 
+#if TILE_FRUSTUM_CULL
+layout (local_size_x = LOCAL_SIZE, local_size_y = LOCAL_SIZE) in;
+void main()
+{
+	cullWithFrustumTile(g_passData, g_Constants);
+
+	ivec2 pixelCoord = ivec2(gl_GlobalInvocationID.x, gl_NumWorkGroups.y * LOCAL_SIZE - gl_GlobalInvocationID.y);
+	if(pixelCoord.x < g_passData.frameSize.x && pixelCoord.y < g_passData.frameSize.y)
+	{	
+		vec3 stepW = (g_passData.frustumCorner10.xyz - g_passData.frustumCorner00.xyz) * g_passData.invFrameSize.x;
+		vec3 stepH = (g_passData.frustumCorner01.xyz - g_passData.frustumCorner00.xyz) * g_passData.invFrameSize.y;
+
+		vec3 rayTarget = g_passData.frustumCorner00.xyz + stepW * gl_GlobalInvocationID.x + stepH * gl_GlobalInvocationID.y;
+
+		Ray ray = createRay(g_passData.cameraPos.xyz, normalize(rayTarget - g_passData.cameraPos.xyz));
+
+		ClosestHit closestHit;
+		closestHit.t = TMAX;
+		closestHit.nid_mid = 0xFFFFffff;
+		uint rootId = g_Constants.numNodes == 1 ? 0x8000 : 0;
+
+		collideRayAgainstTileData(ray, closestHit);
+		
+		vec3 pixelColor = vec3(0,0,0);
+		if(closestHit.t < TMAX)
+		{
+			for(uint i=0 ; i<g_Constants.numLights ; ++i)
+				pixelColor += evalLighting(rootId, i, closestHit.nid_mid, ray, closestHit);
+		}
+		
+		imageStore(g_outputImage, pixelCoord, fromLinear(vec4(pixelColor, 1)));
+	}
+}
+#endif
