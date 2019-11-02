@@ -7,10 +7,10 @@ bool  bvh_isLeaf(uint _nid);
 void  bvh_getParentSiblingId(uint _nid, out uint _parentId, out uint _siblingId);
 void  bvh_getChildId(uint _nid, out uint _left, out uint _right);
 void  bvh_getNodeBoxes(uint _nid, out Box _box0, out Box _box1);
-void  bvh_collide(uint _nid, Ray r, inout Hit closestHit);
+void  bvh_collide(uint _nid, Ray r, inout ClosestHit closestHit);
 bool  bvh_collide_fast(uint _nid, Ray r, float tmax);
 
-void traverseBvh(Ray r, uint rootId, inout Hit closestHit)
+void traverseBvh(Ray r, uint rootId, inout ClosestHit closestHit)
 {
 	// MBVH2 traversal loop
 	uint nodeId = rootId;

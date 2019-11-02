@@ -10,6 +10,7 @@ public:
     RayTracingPass(tim::IRenderer* _renderer, tim::IRenderContext * _context);
     ~RayTracingPass();
     
+    void rebuildBvh(tim::u32 _maxDepth, tim::u32 _maxObjPerNode);
     void setFrameBufferSize(tim::uvec2 _res);
     void draw(tim::ImageHandle _output, const SimpleCamera& _camera);
 

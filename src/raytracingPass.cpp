@@ -7,19 +7,34 @@ using namespace tim;
 
 RayTracingPass::RayTracingPass(IRenderer* _renderer, IRenderContext* _context) : m_frameSize{ 800,600 },  m_renderer { _renderer }, m_context{ _context }
 {
-    m_bvh = std::make_unique<BVHBuilder>(5, 4);
+    m_bvh = std::make_unique<BVHBuilder>();
 
-    m_bvh->addSphere({ {  3, 3, 0.5f }, 1 });
-    m_bvh->addSphere({ { -3, 3, 0.5f }, 1 });
-    m_bvh->addSphere({ {  3,-3, 0.5f }, 1 });
-    m_bvh->addSphere({ { -3,-3, 0.5f }, 1 }, BVHBuilder::createLambertianMaterial({ 1, 1,0.5 }));
-    m_bvh->addSphere({ { -3, 0, 0.25f }, 0.5 });
-    m_bvh->addSphere({ {  3, 0, 0.25f }, 0.5 });
-    m_bvh->addSphere({ { 0,0, 1 }, 1 });
-    m_bvh->addBox(Box{ { -5, -5, -0.1f }, { 5, 5, 0.1f } });
+    const float DIMXY = 5.1f;
+    const float DIMZ = 5;
 
-    m_bvh->addSphere({ { -2, -2, 4 }, 0.19 }, BVHBuilder::createEmissiveMaterial({ 0, 1, 1 }));
-    m_bvh->addSphereLight({ { -2, -2, 4 }, 25, { 0, 1, 1 }, 0.2 });
+    m_bvh->addBox(Box{ { -DIMXY, -DIMXY, DIMZ }, {  DIMXY,          DIMXY,           DIMZ + 0.1f } });
+    m_bvh->addBox(Box{ { -DIMXY, -DIMXY, 0    }, {  DIMXY,          DIMXY,           0.1f } });
+     
+    m_bvh->addBox(Box{ { -DIMXY, -DIMXY, 0    }, { -DIMXY + 0.1f,   DIMXY,           DIMZ + 0.1f } });
+    m_bvh->addBox(Box{ {  DIMXY, -DIMXY, 0    }, {  DIMXY + 0.1f,   DIMXY,           DIMZ + 0.1f } });
+
+    m_bvh->addBox(Box{ { -DIMXY, -DIMXY, 0    }, {  DIMXY,         -DIMXY + 0.1f,    DIMZ + 0.1f } });
+    //m_bvh->addBox(Box{ { -DIMXY,  DIMXY, 0    }, {  DIMXY,          DIMXY + 0.1f,    DIMZ + 0.1f } });
+
+    const float pillarSize = 0.03f;
+    const float sphereRad = 0.05f;
+    for (u32 i = 0; i < 10; ++i)
+    {
+        for (u32 j = 0; j < 10; ++j)
+        {
+            vec3 p = { -DIMXY + i * (DIMXY / 5), -DIMXY + j * (DIMXY / 5), 0 };
+            m_bvh->addSphere({ p + vec3(0,0,1), sphereRad });
+            m_bvh->addBox(Box{ p - vec3(pillarSize, pillarSize, 0), p + vec3(pillarSize, pillarSize, 1) });
+        }
+    }
+    
+    m_bvh->addSphere({ { -2, -2, 4 }, 0.19f }, BVHBuilder::createEmissiveMaterial({ 0, 1, 1 }));
+    m_bvh->addSphereLight({ { -2, -2, 4 }, 25, { 0, 1, 1 }, 0.2f });
     //m_bvh->addPointLight({ { -3, -2, 4 }, 30, { 0, 1, 1 } });
 
     AreaLight areaLight;
@@ -30,7 +45,7 @@ RayTracingPass::RayTracingPass(IRenderer* _renderer, IRenderContext* _context) :
     areaLight.attenuationRadius = 40;
     // m_bvh->addAreaLight(areaLight);
 
-    m_bvh->build(Box{ vec3{ -5,-5,-5 }, vec3{5,5,5} });
+    m_bvh->build(8, 6, Box{ vec3{ -6,-6,-6 }, vec3{6,6,6} });
 
     u32 size = m_bvh->getBvhGpuSize();
     m_bvhBuffer = _renderer->CreateBuffer(size, MemoryType::Default, BufferUsage::Storage | BufferUsage::Transfer);
@@ -42,6 +57,21 @@ RayTracingPass::RayTracingPass(IRenderer* _renderer, IRenderContext* _context) :
 RayTracingPass::~RayTracingPass()
 {
     m_renderer->DestroyBuffer(m_bvhBuffer);
+}
+
+void RayTracingPass::rebuildBvh(u32 _maxDepth, u32 _maxObjPerNode)
+{
+    if (m_bvhBuffer.ptr != 0)
+    {
+        m_renderer->WaitForIdle();
+        m_renderer->DestroyBuffer(m_bvhBuffer);
+    }
+
+    u32 size = m_bvh->getBvhGpuSize();
+    m_bvhBuffer = m_renderer->CreateBuffer(size, MemoryType::Default, BufferUsage::Storage | BufferUsage::Transfer);
+    std::unique_ptr<ubyte[]> buffer = std::unique_ptr<ubyte[]>(new ubyte[size]);
+    m_bvh->fillGpuBuffer(buffer.get(), m_bvhPrimitiveOffsetRange, m_bvhMaterialOffsetRange, m_bvhLightOffsetRange, m_bvhNodeOffsetRange, m_bvhLeafDataOffsetRange);
+    m_renderer->UploadBuffer(m_bvhBuffer, buffer.get(), size);
 }
 
 void RayTracingPass::setFrameBufferSize(tim::uvec2 _res)
@@ -95,7 +125,7 @@ void RayTracingPass::draw(tim::ImageHandle _output, const SimpleCamera& _camera)
     arg.m_bufferBindings = bufBinds;
     arg.m_numBufferBindings = _countof(bufBinds);
 
-    u32 constants[] = { m_bvh->getPrimitivesCount(), m_bvh->getNodesCount() };
+    u32 constants[] = { m_bvh->getPrimitivesCount(), m_bvh->getLightsCount(), m_bvh->getNodesCount() };
     arg.m_constants = constants;
     arg.m_constantSize = sizeof(u32) * _countof(constants);
     arg.m_key = { TIM_HASH32(cameraPass.comp), {} };

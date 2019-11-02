@@ -20,9 +20,4 @@ struct PassData
 	mat4 invProjView;
 };
 
-struct MaterialData
-{
-	int u;
-};
-
 #endif

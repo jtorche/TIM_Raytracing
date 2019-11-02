@@ -83,11 +83,15 @@ bool hitPrimitiveFast(uint objIndex, Ray r, float tmax)
 	return false;
 }
 
-void bvh_collide(uint _nid, Ray _ray, inout Hit closestHit)
+void bvh_collide(uint _nid, Ray _ray, inout ClosestHit closestHit)
 {
 	_nid = _nid & 0x7FFF;
 	uint leafDataOffset = g_BvhNodeData[_nid].nid.z;
 	uint numObjects = g_BvhNodeData[_nid].nid.w & 0xFFFF;
+#if USE_SHARED_MEM
+	vec3 normal;
+	bool anyHit = false;
+#endif
 
 	for(uint i=0 ; i<numObjects ; ++i)
 	{
@@ -98,10 +102,20 @@ void bvh_collide(uint _nid, Ray _ray, inout Hit closestHit)
 		if(hasHit)
 		{
 			closestHit.t		= hit.t * 0.999;
-			closestHit.normal	= hit.normal;
 			closestHit.nid_mid	= _nid + (g_BvhPrimitiveData[objIndex].iparam & 0xFFFF0000);
+		#if USE_SHARED_MEM
+			normal = hit.normal;
+			anyHit = true;
+		#else
+			closestHit.normal	= hit.normal;
+		#endif	
 		}
 	}
+
+	#if USE_SHARED_MEM
+	if(anyHit)
+		g_normalHit[gl_LocalInvocationIndex] = normal;
+	#endif
 }
 
 bool bvh_collide_fast(uint _nid, Ray _ray, float tmax)
@@ -120,8 +134,10 @@ bool bvh_collide_fast(uint _nid, Ray _ray, float tmax)
 	return false;
 }
 
-void brutForceTraverse(Ray _ray, inout Hit closestHit)
+#if NO_BVH
+void brutForceTraverse(Ray _ray, inout ClosestHit closestHit)
 {
+	uint matId = 0;
 	for(uint i=0 ; i<g_Constants.numPrimitives ; ++i)
 	{
 		Hit hit;
@@ -129,7 +145,11 @@ void brutForceTraverse(Ray _ray, inout Hit closestHit)
 
 		closestHit.t =		hasHit ? hit.t * 0.999	: closestHit.t;
 		closestHit.normal = hasHit ? hit.normal		: closestHit.normal;
+		matId =				hasHit ? g_BvhPrimitiveData[i].iparam : matId;
 	}
+
+	closestHit.nid_mid = (matId & 0xFFFF0000) >> 16;
 }
+#endif
 
 #endif

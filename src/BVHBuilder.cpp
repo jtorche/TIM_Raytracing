@@ -147,10 +147,14 @@ void BVHBuilder::addAreaLight(const AreaLight& _light)
 {
     m_lights.push_back({ _light });
 }
-void BVHBuilder::build(const Box& _sceneSize)
+void BVHBuilder::build(u32 _maxDepth, u32 _maxObjPerNode, const Box& _sceneSize)
 {
+    m_maxDepth = _maxDepth;
+    m_maxObjPerNode = _maxObjPerNode;
+
     TIM_ASSERT(m_objects.size() < 0x7FFF);
 
+    m_nodes.clear();
     m_nodes.reserve(size_t(1) << (m_maxDepth + 1));
     m_nodes.push_back({});
     m_nodes.back().extent = _sceneSize;
@@ -272,13 +276,27 @@ void BVHBuilder::searchBestSplit(BVHBuilder::Node* _curNode, ObjectIt _objectsBe
 {
     const u32 NumSplit = 32;
     size_t numObjects = std::distance(_objectsBegin, _objectsEnd);
+    const bool isEven = numObjects % 2 == 0;
 
     vec3 boxDim = _curNode->extent.maxExtent - _curNode->extent.minExtent;
     vec3 boxStep = boxDim / NumSplit;
 
-    bool prevObjectRepartitioHeuristic = false;
-    u32 prevObjSum = 0xFFFFffff;
-    float prevVolumeDiff = std::numeric_limits<float>::max();
+    bool best_objectRepartitioHeuristic = false;
+    bool best_noEmptyHeuristic = false;
+    size_t best_objectSum = 0xFFFFffff;
+    float best_volumeDiff = std::numeric_limits<float>::max();
+
+    auto isBetter = [&](bool _objectRepartitioHeuristic, bool _nonEmptyHeuristic, size_t _objectSum, float _volumeDiff)
+    {
+        if (_objectRepartitioHeuristic != best_objectRepartitioHeuristic)
+            return _objectRepartitioHeuristic;
+        if (_nonEmptyHeuristic != best_noEmptyHeuristic)
+            return _nonEmptyHeuristic;
+        if (_objectSum != best_objectSum)
+            return _objectSum < best_objectSum;
+        
+        return _volumeDiff < best_volumeDiff;
+    };
 
     vec3 step = _computeStep(boxStep);
     vec3 fixedStep = _computeFixedStep(boxDim);
@@ -299,28 +317,24 @@ void BVHBuilder::searchBestSplit(BVHBuilder::Node* _curNode, ObjectIt _objectsBe
                 bool collide = boxBoxCollision(rightBox, getAABB(m_objects[_id])) != CollisionType::Disjoint;
                 return collide;
             });
+        
+        size_t objectSum = numObjInLeft + numObjInRight;
+        bool noEmptyHeuristic = numObjInLeft != 0 && numObjInRight != 0;
+        bool repartitionHeuristic = objectSum == numObjects && (isEven ? numObjInLeft == numObjInRight : numObjInRight == numObjInLeft + 1);
+        float volumeDiff = fabsf(getBoxVolume(leftBox) - getBoxVolume(rightBox));
 
-        bool isEven = numObjects % 2 == 0;
-        bool cond1 = numObjInLeft + numObjInRight == numObjects &&
-            (isEven ? numObjInLeft == numObjInRight : numObjInRight == numObjInLeft + 1);
-
-        bool repartitionHeuristic = cond1 || numObjInLeft > numObjInRight;
-
-        if (prevObjectRepartitioHeuristic && !repartitionHeuristic) // the repartitionHeuristic is no more valide, take previous split
-            break;
-
-        if (prevObjectRepartitioHeuristic && repartitionHeuristic)
+        if (isBetter(repartitionHeuristic, noEmptyHeuristic, objectSum, volumeDiff))
         {
-            if (prevVolumeDiff < fabsf(getBoxVolume(leftBox) - getBoxVolume(rightBox)))
-                break;
-        }
+            _leftBox = leftBox;
+            _rightBox = rightBox;
+            _numObjInLeft = numObjInLeft;
+            _numObjInRight = numObjInRight;
 
-        prevObjectRepartitioHeuristic = repartitionHeuristic;
-        prevVolumeDiff = fabsf(getBoxVolume(leftBox) - getBoxVolume(rightBox));
-        _leftBox = leftBox;
-        _rightBox = rightBox;
-        _numObjInLeft = numObjInLeft;
-        _numObjInRight = numObjInRight;
+            best_objectRepartitioHeuristic = repartitionHeuristic;
+            best_noEmptyHeuristic = noEmptyHeuristic;
+            best_objectSum = objectSum;
+            best_volumeDiff = volumeDiff;
+        }
     }
 }
 
@@ -424,7 +438,7 @@ void BVHBuilder::packNodeData(PackedBVHNode* _outNode, const BVHBuilder::Node& _
     auto hasParent = [](const BVHBuilder::Node* node) { return node ? node->parent != nullptr : false; };
 
     // add bit to fast check if leaf
-    siblingIndex = isLeaf(&_node) && hasParent(&_node) ? 0x8000 | siblingIndex : siblingIndex;
+    siblingIndex = isLeaf(_node.sibling) ? 0x8000 | siblingIndex : siblingIndex;
     leftIndex = isLeaf(_node.left) ? 0x8000 | leftIndex : leftIndex;
     rightIndex = isLeaf(_node.right) ? 0x8000 | rightIndex : rightIndex;
 

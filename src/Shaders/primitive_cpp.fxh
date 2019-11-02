@@ -18,7 +18,9 @@ struct Ray
 {
     vec3 from;
     vec3 dir;
+	#if !NO_RAY_INVDIR
 	vec3 invdir;
+	#endif
 };
 
 struct Box

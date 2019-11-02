@@ -5,7 +5,6 @@
 #include "system.fxh"
 #include "struct_cpp.fxh"
 #include "collision.fxh"
-#include "bvhTraversal.fxh"
 #include "lighting.fxh"
 
 layout(std430, set=0, binding = g_PassData_bind)
@@ -44,50 +43,26 @@ layout(set=0, binding = g_outputImage_bind) uniform writeonly image2D g_outputIm
 layout(push_constant) uniform pushConstants 
 {
 	uint numPrimitives;
+	uint numLights;
 	uint numNodes;
 } g_Constants;
 
+#define LOCAL_SIZE 16
+#if USE_SHARED_MEM
+shared vec3 g_normalHit[LOCAL_SIZE * LOCAL_SIZE];
+#endif
+
+#include "bvhTraversal.fxh"
 #include "bvhGetter.fxh"
 #include "bvhCollision.fxh"
+#include "bvhLighting.fxh"
 
-vec3 computeDirectLighting(uint rootId, Ray _ray, Hit _hit)
-{
-	uint nid = _hit.nid_mid & 0xFFFF;
-	uint matId = (_hit.nid_mid & 0xFFFF0000) >> 16;
-
-	uint leafDataOffset = g_BvhNodeData[nid].nid.z;
-	uint packed = g_BvhNodeData[nid].nid.w;
-	uint numObjects = packed & 0xFFFF;
-	uint numLights = (packed & 0xFFFF0000) >> 16;
-
-	vec3 totalLight = vec3(0,0,0);
-	for(uint i=0 ; i<numLights ; ++i)
-	{
-		uint lightIndex = g_BvhLeafData[leafDataOffset + numObjects + i];
-		switch(g_BvhLightData[lightIndex].iparam)
-		{
-			case Light_Point:
-			totalLight += evalPointLight(rootId, loadPointLight(lightIndex), g_BvhMaterialData[matId], _ray.from + _ray.dir * _hit.t, _hit.normal, vec3(0,0,0));
-			break;
-			case Light_Sphere:
-			totalLight += evalSphereLight(rootId, loadSphereLight(lightIndex), g_BvhMaterialData[matId], _ray.from + _ray.dir * _hit.t, _hit.normal, vec3(0,0,0));
-			break;
-			case Light_Area:
-			totalLight += evalAreaLight(rootId, loadAreaLight(lightIndex), g_BvhMaterialData[matId], _ray.from + _ray.dir * _hit.t, _hit.normal, vec3(0,0,0));
-			break;
-		}
-	}
-
-	return totalLight;
-}
-
-layout (local_size_x = 16, local_size_y = 16) in;
+layout (local_size_x = LOCAL_SIZE, local_size_y = LOCAL_SIZE) in;
 void main()
 {
 	ivec2 pixelCoord = ivec2(gl_GlobalInvocationID.x, gl_NumWorkGroups.y * 16 - gl_GlobalInvocationID.y);
 	if(pixelCoord.x < g_passData.frameSize.x && pixelCoord.y < g_passData.frameSize.y)
 	{	
-		imageStore(g_outputImage, pixelCoord, vec4(0.5, 0.5, 0.5, 1));
 		vec3 stepW = (g_passData.frustumCorner10.xyz - g_passData.frustumCorner00.xyz) * g_passData.invFrameSize.x;
 		vec3 stepH = (g_passData.frustumCorner01.xyz - g_passData.frustumCorner00.xyz) * g_passData.invFrameSize.y;
 		
@@ -95,21 +70,29 @@ void main()
 
 		Ray ray = createRay(g_passData.cameraPos.xyz, normalize(rayTarget - g_passData.cameraPos.xyz));
 
-		Hit closestHit;
+		ClosestHit closestHit;
 		closestHit.t = TMAX;
 		closestHit.nid_mid = 0xFFFFffff;
 
-		// brutForceTraverse(ray, closestHit);
 		uint rootId = g_Constants.numNodes == 1 ? 0x8000 : 0;
+	#if NO_BVH
+		brutForceTraverse(ray, closestHit);
+	#else
 		traverseBvh(ray, rootId, closestHit);
-
+	#endif
+		
+		vec3 pixelColor = vec3(0,0,0);
 		if(closestHit.t < TMAX)
 		{
-			vec3 color = computeDirectLighting(rootId, ray, closestHit);
-			imageStore(g_outputImage, pixelCoord, fromLinear(vec4(color, 1)));
+		#if NO_BVH
+			for(uint i=0 ; i<g_Constants.numLights ; ++i)
+				pixelColor += evalLighting(rootId, i, closestHit.nid_mid,  ray, closestHit);
+		#else
+			pixelColor = computeDirectLighting(rootId, ray, closestHit);
+		#endif
 		}
-		else
-		    imageStore(g_outputImage, pixelCoord, vec4(0,0,0, 1));
+		
+		imageStore(g_outputImage, pixelCoord, fromLinear(vec4(pixelColor, 1)));
 	}
 }
 

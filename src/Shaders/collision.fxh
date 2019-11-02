@@ -8,14 +8,21 @@ Ray createRay(vec3 _from, vec3 _dir)
 	Ray r;
 	r.from = _from;
 	r.dir = _dir;
+	#if !NO_RAY_INVDIR   
 	r.invdir = vec3(1,1,1) / _dir;
+	#endif
 	return r;
 }
 
 float CollideBox(Ray _ray, Box _box, float tmin, float tmax)
 {
+#if !NO_RAY_INVDIR
     vec3 t0s = (_box.minExtent - _ray.from) * _ray.invdir;
     vec3 t1s = (_box.maxExtent - _ray.from) * _ray.invdir;
+#else
+    vec3 t0s = (_box.minExtent - _ray.from) / _ray.dir;
+    vec3 t1s = (_box.maxExtent - _ray.from) / _ray.dir;
+#endif
 
     vec3 tsmaller = min(t0s, t1s);
     vec3 tbigger = max(t0s, t1s);
@@ -42,6 +49,14 @@ bool CollideSphere(Ray r, Sphere s, float tmin, float tmax)
     return false;
 }
 
+struct ClosestHit
+{
+#if !USE_SHARED_MEM
+    vec3 normal;
+#endif
+    float t;
+	uint nid_mid;
+};
 
 struct Hit
 {

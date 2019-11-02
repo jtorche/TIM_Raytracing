@@ -11,6 +11,7 @@ using namespace tim;
 tim::IRenderer * g_renderer = nullptr;
 SimpleCamera camera;
 tim::uvec2 frameResolution = { 640, 420 };
+bool g_rebuildBvh = false;
 
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
@@ -33,6 +34,9 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
         right = action == GLFW_PRESS || action == GLFW_REPEAT;
 
     camera.setDirection(left, right, forward, backward);
+
+    if (key == GLFW_KEY_R && action == GLFW_PRESS)
+        g_rebuildBvh = true;
 }
 
 void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
@@ -119,6 +123,18 @@ int main()
             glfwPollEvents();
             camera.update(float(frameTime));
 
+            if (g_rebuildBvh)
+            {
+                g_rebuildBvh = false;
+                u32 maxDepth = 5; u32 maxObjPerNode = 8;
+                std::cout << "Rebuild bvh, max depth : ";
+                std::cin >> maxDepth;
+                std::cout << "Rebuild bvh, max obj per node : ";
+                std::cin >> maxObjPerNode;
+
+                rtPass.rebuildBvh(maxDepth, maxObjPerNode);
+            }
+
             g_renderer->BeginFrame();
             ImageHandle backbuffer = g_renderer->GetBackBuffer();
 
@@ -143,8 +159,8 @@ int main()
             prevTime = curTime;
             frameIndex++;
 
-            double sleepTime = std::max<double>(0, (1.0 / 60) - frameTime);
-            Sleep(u32(1000.0 * sleepTime));
+            //double sleepTime = std::max<double>(0, (1.0 / 60) - frameTime);
+            //Sleep(u32(1000.0 * sleepTime));
         }
 
         g_renderer->WaitForIdle();

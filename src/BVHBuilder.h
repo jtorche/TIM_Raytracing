@@ -39,16 +39,17 @@ public:
     static Material createLambertianMaterial(vec3 _color);
     static Material createEmissiveMaterial(vec3 _color);
 
-    BVHBuilder(u32 _maxDepth = 5, u32 _maxObjPerNode = 4) : m_maxDepth{ _maxDepth }, m_maxObjPerNode{ _maxObjPerNode } {}
+    BVHBuilder() {}
 
     void addSphere(const Sphere&, const Material& _mat = createLambertianMaterial({ 0.7f, 0.7f, 0.7f }));
     void addBox(const Box& _box, const Material& _mat = createLambertianMaterial({ 0.7f, 0.7f, 0.7f }));
     void addPointLight(const PointLight& _light);
     void addSphereLight(const SphereLight& _light);
     void addAreaLight(const AreaLight& _light);
-    void build(const Box& _sceneSize);
+    void build(u32 _maxDepth, u32 _maxObjPerNode, const Box& _sceneSize);
 
     u32 getPrimitivesCount() const { return u32(m_objects.size()); }
+    u32 getLightsCount() const { return u32(m_lights.size()); }
     u32 getNodesCount() const { return u32(m_nodes.size()); }
 
     u32 getBvhGpuSize() const;
@@ -69,7 +70,7 @@ private:
 
 private:
     const u32 m_bufferAlignment = 32;
-    u32 m_maxDepth, m_maxObjPerNode;
+    u32 m_maxDepth = 0, m_maxObjPerNode = 0;
 
     struct Node
     {
