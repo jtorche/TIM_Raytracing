@@ -14,8 +14,6 @@ vec3 evalLighting(uint _rootId, uint lightIndex, uint _matId, in Ray _ray, in Cl
 
 	switch(g_BvhLightData[lightIndex].iparam)
 	{
-		case Light_Point:
-		return evalPointLight(_rootId, loadPointLight(lightIndex), g_BvhMaterialData[_matId], _ray.from + _ray.dir * _hit.t, normal, vec3(0,0,0));
 		case Light_Sphere:
 		return evalSphereLight(_rootId, loadSphereLight(lightIndex), g_BvhMaterialData[_matId], _ray.from + _ray.dir * _hit.t, normal, vec3(0,0,0));
 		case Light_Area:

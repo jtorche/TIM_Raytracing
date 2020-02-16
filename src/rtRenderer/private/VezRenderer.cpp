@@ -170,8 +170,9 @@ namespace tim
     {
         {
             u32 numFormat;
-            VkSurfaceFormatKHR supportedFormats[16];
-            vkGetPhysicalDeviceSurfaceFormatsKHR(m_vkPhysicalDevice, m_vkSurface, &numFormat, supportedFormats);
+            vkGetPhysicalDeviceSurfaceFormatsKHR(m_vkPhysicalDevice, m_vkSurface, &numFormat, nullptr);
+            std::vector<VkSurfaceFormatKHR> supportedFormats(numFormat);
+            vkGetPhysicalDeviceSurfaceFormatsKHR(m_vkPhysicalDevice, m_vkSurface, &numFormat, &supportedFormats[0]);
 
             VezSwapchainCreateInfo swapchainCreateInfo = {};
             swapchainCreateInfo.surface = m_vkSurface;

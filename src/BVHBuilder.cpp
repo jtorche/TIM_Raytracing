@@ -90,8 +90,6 @@ namespace
     {
         switch (_light.type)
         {
-        case Light_Point:
-            return Sphere{ _light.m_point.pos, _light.m_point.radius, 1.f / _light.m_point.radius };
         case Light_Sphere:
             return Sphere{ _light.m_sphere.pos, _light.m_sphere.radius, 1.f / _light.m_sphere.radius };
         case Light_Area:
@@ -133,11 +131,6 @@ void BVHBuilder::addBox(const Box& _box, const Material& _mat)
     m_objects.push_back({ _box, _mat });
 }
 
-void BVHBuilder::addPointLight(const PointLight& _light)
-{
-    m_lights.push_back({ _light });
-}
-
 void BVHBuilder::addSphereLight(const SphereLight& _light)
 {
     m_lights.push_back({ _light });
@@ -147,6 +140,7 @@ void BVHBuilder::addAreaLight(const AreaLight& _light)
 {
     m_lights.push_back({ _light });
 }
+
 void BVHBuilder::build(u32 _maxDepth, u32 _maxObjPerNode, const Box& _sceneSize)
 {
     m_maxDepth = _maxDepth;
@@ -373,19 +367,6 @@ namespace
         prim->fparam[5] = _box.maxExtent.z;
     }
 
-    void packPointLight(PackedLight* light, const PointLight& _pl)
-    {
-        light->iparam = Light_Point;
-        light->fparam[0] = _pl.pos.x;
-        light->fparam[1] = _pl.pos.y;
-        light->fparam[2] = _pl.pos.z;
-        light->fparam[3] = _pl.radius;
-
-        light->fparam[4] = _pl.color.x;
-        light->fparam[5] = _pl.color.y;
-        light->fparam[6] = _pl.color.z;
-    }
-
     void packSphereLight(PackedLight* light, const SphereLight& _pl)
     {
         light->iparam = Light_Sphere;
@@ -512,9 +493,6 @@ void BVHBuilder::fillGpuBuffer(void* _data, uvec2& _primitiveOffsetRange, uvec2&
         PackedLight* lightDat = reinterpret_cast<PackedLight*>(out);
         switch (m_lights[i].type)
         {
-        case Light_Point:
-            packPointLight(lightDat, m_lights[i].m_point);
-            break;
         case Light_Sphere:
             packSphereLight(lightDat, m_lights[i].m_sphere);
             break;

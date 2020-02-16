@@ -7,35 +7,12 @@
 #include "collision.fxh"
 #include "lighting.fxh"
 
+#include "bvhBindings.fxh"
+
 layout(std430, set=0, binding = g_PassData_bind)
 uniform PassData_block
 {
 	PassData g_passData;
-};
-
-layout(std430, set = 0, binding = g_BvhPrimitives_bind) buffer BvhPrimitives
-{
-	PackedPrimitive g_BvhPrimitiveData[];
-};
-
-layout(std430, set = 0, binding = g_BvhMaterials_bind) buffer BvhMaterials
-{	
-	Material g_BvhMaterialData[];
-};
-
-layout(std430, set = 0, binding = g_BvhLights_bind) buffer BvhLights
-{
-	PackedLight g_BvhLightData[];
-};
-
-layout(std430, set = 0, binding = g_BvhNodes_bind) buffer BvhNodes
-{
-	PackedBVHNode g_BvhNodeData[];
-};
-
-layout(std430, set = 0, binding = g_BvhLeafData_bind) buffer BvhLeafData
-{
-	uint g_BvhLeafData[];
 };
 
 layout(set=0, binding = g_outputImage_bind) uniform writeonly image2D g_outputImage;
@@ -122,8 +99,8 @@ void main()
 		vec3 pixelColor = vec3(0,0,0);
 		if(closestHit.t < TMAX)
 		{
-			for(uint i=0 ; i<g_Constants.numLights ; ++i)
-				pixelColor += evalLighting(rootId, i, closestHit.nid_mid, ray, closestHit);
+			for(uint i=0 ; i<g_lightCount ; ++i)
+				pixelColor += evalLighting(rootId, g_lights[i], closestHit.nid_mid, ray, closestHit);
 		}
 		
 		imageStore(g_outputImage, pixelCoord, fromLinear(vec4(pixelColor, 1)));

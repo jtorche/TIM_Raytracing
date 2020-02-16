@@ -5,9 +5,8 @@
 #define Primitive_AABB		2
 #define Primitive_OBB		3
 
-#define Light_Point			1
-#define Light_Sphere		2
-#define Light_Area			3
+#define Light_Sphere		1
+#define Light_Area			2
 
 #define Material_Emissive		1
 #define Material_Lambert		2
@@ -55,13 +54,6 @@ struct PackedBVHNode
 	vec4 n0xy;
 	vec4 n1xy;
 	vec4 nz;
-};
-
-struct PointLight
-{
-	vec3 pos;
-	float radius;
-	vec3 color;
 };
 
 struct SphereLight

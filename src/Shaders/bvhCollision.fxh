@@ -20,15 +20,6 @@ Box loadBox(uint objIndex)
 	return box;
 }
 
-PointLight loadPointLight(uint lightIndex)
-{
-	PointLight l;
-	l.pos = vec3(g_BvhLightData[lightIndex].fparam[0], g_BvhLightData[lightIndex].fparam[1], g_BvhLightData[lightIndex].fparam[2]);
-	l.radius = g_BvhLightData[lightIndex].fparam[3];
-	l.color = vec3(g_BvhLightData[lightIndex].fparam[4], g_BvhLightData[lightIndex].fparam[5], g_BvhLightData[lightIndex].fparam[6]);
-	return l;
-}
-
 SphereLight loadSphereLight(uint lightIndex)
 {
 	SphereLight l;
@@ -39,7 +30,7 @@ SphereLight loadSphereLight(uint lightIndex)
 	return l;
 }
 
-Sphere loadSphereFromPointOrSphereLight(uint lightIndex)
+Sphere loadSphereFromSphereLight(uint lightIndex)
 {
 	Sphere sphere;
 	sphere.center = vec3(g_BvhLightData[lightIndex].fparam[0], g_BvhLightData[lightIndex].fparam[1], g_BvhLightData[lightIndex].fparam[2]);
@@ -58,7 +49,6 @@ AreaLight loadAreaLight(uint lightIndex)
 	l.attenuationRadius = g_BvhLightData[lightIndex].fparam[12];
 	return l;
 }
-
 
 bool hitPrimitive(uint objIndex, Ray r, float tmax, out Hit hit)
 {

@@ -28,14 +28,7 @@ bool primitiveFrustumCollision(uint objIndex, in vec4 _plans[4])
 
 bool lightFrustumCollision(uint lightIndex, in vec4 _plans[4])
 {
-	switch(g_BvhLightData[lightIndex].iparam)
-	{
-		case Light_Point:
-		case Light_Sphere:
-			return sphereFrustum4Collision(loadSphereFromPointOrSphereLight(lightIndex), _plans);
-	}
-
-	return false;
+	return sphereFrustum4Collision(loadSphereFromSphereLight(lightIndex), _plans);
 }
 
 #define MAX_PRIMITIVES_PER_TILE LOCAL_SIZE * LOCAL_SIZE

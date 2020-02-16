@@ -20,14 +20,12 @@ struct Primitive
 
 struct Light
 {
-    Light(const PointLight& _light) : type{ Light_Point }, m_point{ _light } {}
     Light(const SphereLight& _light) : type{ Light_Sphere }, m_sphere{ _light } {}
     Light(const AreaLight& _light) : type{ Light_Area }, m_area{ _light } {}
 
     u32 type = 0;
     union
     {
-        PointLight  m_point = { {0,0,4}, 5, vec3(1,1,1) };
         SphereLight m_sphere;
         AreaLight   m_area;
     };
@@ -43,7 +41,6 @@ public:
 
     void addSphere(const Sphere&, const Material& _mat = createLambertianMaterial({ 0.7f, 0.7f, 0.7f }));
     void addBox(const Box& _box, const Material& _mat = createLambertianMaterial({ 0.7f, 0.7f, 0.7f }));
-    void addPointLight(const PointLight& _light);
     void addSphereLight(const SphereLight& _light);
     void addAreaLight(const AreaLight& _light);
     void build(u32 _maxDepth, u32 _maxObjPerNode, const Box& _sceneSize);

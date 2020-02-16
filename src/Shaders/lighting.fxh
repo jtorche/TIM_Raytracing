@@ -21,30 +21,20 @@ vec3 computeLighting(uint rootId, in Material _mat, vec3 lightColor, vec3 P, vec
 
 	float dotL = clamp(dot(N, L), 0, 1);
 
+	#if USE_SHADOW && COMPUTE_SHADOW_ON_THE_FLY
 	if(att * dotL > 0.001)
 	{
-	#if NO_SHADOW
-		float shadow =  1;
-	#else
 		Ray shadowRay; shadowRay.from = P; shadowRay.dir = L; 
 		#if !NO_RAY_INVDIR   
 		shadowRay.invdir = vec3(1,1,1) / L;
 		#endif
 		float shadow = traverseBvhFast(shadowRay, rootId, shadowRayLength) ? 0 : 1;
-	#endif
-
+	
 		return shadow * att * dotL * lightColor * _mat.color.xyz;
 	}
-
-	return vec3(0,0,0);
-}
-
-vec3 evalPointLight(uint _rootId, in PointLight _pl, in Material _mat, vec3 _pos, vec3 _normal, vec3 _eye)
-{
-	float d = length(_pl.pos - _pos);
-	vec3 L = (_pl.pos - _pos) / d;
-
-	return computeLighting(_rootId, _mat, _pl.color, _pos, L, _normal, _eye, computeAttenuation(d, _pl.radius), d);
+	#else
+	return att * dotL * lightColor * _mat.color.xyz;
+	#endif
 }
 
 vec3 evalSphereLight(uint _rootId, in SphereLight _sl, in Material _mat, vec3 _pos, vec3 _normal, vec3 _eye)

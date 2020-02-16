@@ -35,19 +35,19 @@ RayTracingPass::RayTracingPass(IRenderer* _renderer, IRenderContext* _context) :
     
     m_bvh->addSphere({ { -2, -2, 4 }, 0.19f }, BVHBuilder::createEmissiveMaterial({ 0, 1, 1 }));
     m_bvh->addSphereLight({ { -2, -2, 4 }, 25, { 0, 1, 1 }, 0.2f });
-
+    
     m_bvh->addSphere({ { 2, 2, 4 }, 0.19f }, BVHBuilder::createEmissiveMaterial({ 1, 1, 0 }));
     m_bvh->addSphereLight({ { 2, 2, 4 }, 15, { 1, 1, 0 }, 0.2f });
 
     //m_bvh->addPointLight({ { -3, -2, 4 }, 30, { 0, 1, 1 } });
 
-    AreaLight areaLight;
-    areaLight.pos = { 0, 0, 3 };
-    areaLight.width = { -1, 0, 0 };
-    areaLight.height = { 0, 1, 0 };
-    areaLight.color = { 1,1,1 };
-    areaLight.attenuationRadius = 40;
-    // m_bvh->addAreaLight(areaLight);
+    //AreaLight areaLight;
+    //areaLight.pos = { 0, 0, 3 };
+    //areaLight.width = { -0.3, 0, 0 };
+    //areaLight.height = { 0, 0.3, 0 };
+    //areaLight.color = { 1,1,1 };
+    //areaLight.attenuationRadius = 40;
+    //m_bvh->addAreaLight(areaLight);
 
     m_bvh->build(8, 6, Box{ vec3{ -6,-6,-6 }, vec3{6,6,6} });
 
