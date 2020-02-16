@@ -1,8 +1,9 @@
+#pragma once
 #include "timCore/type.h"
 #include <vector>
 
 using namespace tim;
-#include "Shaders/primitive_cpp.fxh"
+#include "Shaders/primitive_cpp.glsl"
 
 struct Primitive
 {
@@ -36,6 +37,7 @@ class BVHBuilder
 public:
     static Material createLambertianMaterial(vec3 _color);
     static Material createEmissiveMaterial(vec3 _color);
+    static Material createMirrorMaterial(vec3 _color);
 
     BVHBuilder() {}
 

@@ -1,7 +1,7 @@
 #ifndef H_BVH_COLLISION_FXH_
 #define H_BVH_COLLISION_FXH_
 
-#include "collision.fxh"
+#include "collision.glsl"
 
 Sphere loadSphere(uint objIndex)
 {

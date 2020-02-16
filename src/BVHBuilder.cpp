@@ -120,6 +120,15 @@ Material BVHBuilder::createEmissiveMaterial(vec3 _color)
     return mat;
 }
 
+Material BVHBuilder::createMirrorMaterial(vec3 _color)
+{
+    Material mat;
+    mat.type_ids = { Material_Mirror,0,0,0 };
+    mat.color = { _color.x, _color.y, _color.z, 0 };
+
+    return mat;
+}
+
 void BVHBuilder::addSphere(const Sphere& _sphere, const Material& _mat)
 {
     m_objects.push_back({ _sphere, _mat });

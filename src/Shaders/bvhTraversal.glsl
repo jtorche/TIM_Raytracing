@@ -1,7 +1,7 @@
 #ifndef H_BVHTRAVERSAL_FXH_
 #define H_BVHTRAVERSAL_FXH_
 
-#include "collision.fxh"
+#include "collision.glsl"
 
 bool  bvh_isLeaf(uint _nid);
 void  bvh_getParentSiblingId(uint _nid, out uint _parentId, out uint _siblingId);

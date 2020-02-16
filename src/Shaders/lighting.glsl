@@ -1,8 +1,8 @@
 #ifndef H_LIGHTING_FXH_
 #define H_LIGHTING_FXH_
 
-#include "math.fxh"
-#include "primitive_cpp.fxh"
+#include "math.glsl"
+#include "primitive_cpp.glsl"
 
 bool traverseBvhFast(Ray r, uint rootId, float tmax);
 
@@ -16,8 +16,13 @@ float computeAttenuation(float _dist, float _lightRadius)
 
 vec3 computeLighting(uint rootId, in Material _mat, vec3 lightColor, vec3 P, vec3 L, vec3 N, vec3 E, float att, float shadowRayLength)
 {
-	if(_mat.type_ids.x == Material_Emissive)
+	switch(_mat.type_ids.x)
+	{
+	case Material_Mirror:
+		return vec3(0,0,0);
+	case Material_Emissive:
 		return _mat.color.xyz;
+	}
 
 	float dotL = clamp(dot(N, L), 0, 1);
 

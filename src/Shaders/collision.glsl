@@ -1,7 +1,7 @@
 #ifndef H_COLLISION_FXH_
 #define H_COLLISION_FXH_
 
-#include "primitive_cpp.fxh"
+#include "primitive_cpp.glsl"
 
 Ray createRay(vec3 _from, vec3 _dir)
 {
@@ -57,6 +57,11 @@ struct ClosestHit
     float t;
 	uint nid_mid;
 };
+
+uint getMaterialId(in ClosestHit _hit)
+{
+	return (_hit.nid_mid & 0xFFFF0000) >> 16;
+}
 
 struct Hit
 {

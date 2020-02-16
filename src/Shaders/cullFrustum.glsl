@@ -1,7 +1,7 @@
 #ifndef H_CULLFRUSTUM_FXH_
 #define H_CULLFRUSTUM_FXH_
 
-#include "struct_cpp.fxh"
+#include "struct_cpp.glsl"
 
 #if TILE_FRUSTUM_CULL
 
@@ -103,18 +103,37 @@ void cullWithFrustumTile(in PassData _passData, in PushConstants _constants)
 void collideRayAgainstTileData(in Ray _ray, inout ClosestHit _closestHit)
 {
 	uint matId = 0;
+	#if USE_SHARED_MEM
+	vec3 normal;
+	bool anyHit = false;
+	#endif
+
 	for(uint i=0 ; i<g_primitiveCount ; ++i)
 	{
 		uint primIndex = g_primitives[i];
 		Hit hit;
 		bool hasHit = hitPrimitive(primIndex, _ray, _closestHit.t, hit);
 
-		_closestHit.t =		 hasHit ? hit.t * 0.999					: _closestHit.t;
-		_closestHit.normal = hasHit ? hit.normal					: _closestHit.normal;
+		_closestHit.t =		 hasHit ? hit.t * 0.999	: _closestHit.t;
+
+		#if USE_SHARED_MEM
+		if(hasHit)
+		{
+			normal = hit.normal;
+			anyHit = true;
+		}
+		#else
+		_closestHit.normal = hasHit ? hit.normal : _closestHit.normal;
+		#endif	
+
 		matId =				 hasHit ? g_BvhPrimitiveData[primIndex].iparam	: matId;
 	}
 
 	_closestHit.nid_mid = (matId & 0xFFFF0000) >> 16;
+	#if USE_SHARED_MEM
+	if(anyHit)
+		g_normalHit[gl_LocalInvocationIndex] = normal;
+	#endif
 }
 
 vec3 evalLightWithTileData(uint rootId, in Ray _ray, in ClosestHit _closestHit)

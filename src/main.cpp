@@ -3,6 +3,7 @@
 #include <GLFW/glfw3native.h>
 #include "raytracingPass.h"
 #include "SimpleCamera.h"
+#include "shaderMacros.h"
 
 #include <iostream>
 
@@ -78,7 +79,6 @@ void window_size_callback(GLFWwindow* window, int width, int height)
 
 int main()
 {
-    system("pause");
 	GLFWwindow* window;
 
 	/* Initialize the library */
@@ -101,12 +101,7 @@ int main()
 
     g_renderer = tim::createRenderer();
 
-    std::array<const char*, 64> macros =
-    {
-        "NO_BVH"
-    };
-
-    ShaderCompiler shaderCompiler("../src/Shaders/", macros);
+    ShaderCompiler shaderCompiler("../src/Shaders/", getShaderMacros());
     g_renderer->Init(shaderCompiler , &winHandle, frameResolution.x, frameResolution.y, false);
 
     IRenderContext* context = g_renderer->CreateRenderContext(RenderContextType::Graphics);
@@ -143,6 +138,7 @@ int main()
             context->ClearImage(backbuffer, Color{ 0, 0, 0, 0 });
 
             rtPass.setFrameBufferSize(frameResolution);
+            rtPass.beginRender();
             rtPass.draw(backbuffer, camera);
 
             context->EndRender();

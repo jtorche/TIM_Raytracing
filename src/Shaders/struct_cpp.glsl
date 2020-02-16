@@ -8,6 +8,9 @@
 #define g_BvhLeafData_bind 4
 #define g_BvhLights_bind 5
 #define g_BvhMaterials_bind 6
+#define g_InRayBuffer_bind 7
+#define g_OutReflexionRayBuffer_bind 8
+#define g_inputImage_bind 9
 
 #define LOCAL_SIZE 16
 #define TMAX 100
@@ -30,6 +33,13 @@ struct PushConstants
 	uint numPrimitives;
 	uint numLights;
 	uint numNodes;
+};
+
+struct IndirectLightRay
+{
+	vec4 pos;
+	vec4 dir;
+	vec4 lit;
 };
 
 #endif

@@ -39,4 +39,27 @@ vec3 sampleSphere(vec2 rands)
     return vec3(sin(phi) * cos(theta), sin(phi) * sin(theta), cos(phi));
 }
 
+// Quaternion multiplication
+// http://mathworld.wolfram.com/Quaternion.html
+vec4 qmul(vec4 q1, vec4 q2) {
+	return vec4(
+		q2.xyz * q1.w + q1.xyz * q2.w + cross(q1.xyz, q2.xyz),
+		q1.w * q2.w - dot(q1.xyz, q2.xyz)
+	);
+}
+
+// Vector rotation with a quaternion
+// http://mathworld.wolfram.com/Quaternion.html
+vec3 rotate_vector(vec3 v, vec4 r) {
+	vec4 r_c = r * vec4(-1, -1, -1, 1);
+	return qmul(r, qmul(vec4(v, 0), r_c)).xyz;
+}
+
+// A given angle of rotation about a given axis
+vec4 rotate_angle_axis(float angle, vec3 axis) {
+	float sn = sin(angle * 0.5);
+	float cs = cos(angle * 0.5);
+	return vec4(axis * sn, cs);
+}
+
 #endif

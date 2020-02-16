@@ -1,0 +1,26 @@
+#version 450
+#extension GL_EXT_scalar_block_layout : enable
+
+#include "system.glsl"
+
+layout(set = 0, binding = 0) uniform readOnly image2D g_inputImage0;
+layout(set = 0, binding = 1) uniform readOnly image2D g_inputImage1;
+layout(set=0, binding = 2) uniform writeonly image2D g_outputImage;
+
+layout(push_constant) uniform pushConstantBlock
+{
+    ivec4 g_frameSize;
+};
+
+layout (local_size_x = LOCAL_SIZE, local_size_y = LOCAL_SIZE) in;
+void main()
+{
+    ivec2 pixelCoord = ivec2(gl_GlobalInvocationID.x, gl_NumWorkGroups.y * LOCAL_SIZE - gl_GlobalInvocationID.y);
+    if (pixelCoord.x < g_frameSize.x && pixelCoord.y < g_frameSize.y)
+    {
+        vec4 img0 = imageLoad(g_inputImage0, pixelCoord);
+        vec4 img1 = imageLoad(g_inputImage1, pixelCoord);
+
+        imageStore(g_outputImage, pixelCoord, fromLinear(vec4(lit, 1)));
+    }
+}

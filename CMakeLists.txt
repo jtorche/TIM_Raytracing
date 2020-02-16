@@ -25,7 +25,7 @@ target_link_libraries(shaderCompiler timCore)
 set_property(TARGET shaderCompiler PROPERTY CXX_STANDARD 17)
 
 #Shaders
-file(GLOB_RECURSE SC_FXH src/Shaders/*.fxh)
+file(GLOB_RECURSE SC_FXH src/Shaders/*.glsl)
 file(GLOB_RECURSE SC_COMP src/Shaders/*.comp)
 ADD_LIBRARY(shaders src/dummy.cpp ${SC_FXH} ${SC_COMP})
 

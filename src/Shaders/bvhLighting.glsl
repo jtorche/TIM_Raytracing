@@ -1,8 +1,8 @@
 #ifndef H_BVHLIGHTING_FXH_
 #define H_BVHLIGHTING_FXH_
 
-#include "bvhGetter.fxh"
-#include "lighting.fxh"
+#include "bvhGetter.glsl"
+#include "lighting.glsl"
 
 vec3 evalLighting(uint _rootId, uint lightIndex, uint _matId, in Ray _ray, in ClosestHit _hit)
 {
@@ -26,7 +26,7 @@ vec3 evalLighting(uint _rootId, uint lightIndex, uint _matId, in Ray _ray, in Cl
 vec3 computeDirectLighting(uint rootId, in Ray _ray, in ClosestHit _hit)
 {
 	uint nid = _hit.nid_mid & 0xFFFF;
-	uint matId = (_hit.nid_mid & 0xFFFF0000) >> 16;
+	uint matId = getMaterialId(_hit);
 
 	uint leafDataOffset = g_BvhNodeData[nid].nid.z;
 	uint packed = g_BvhNodeData[nid].nid.w;

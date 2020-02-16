@@ -1,3 +1,4 @@
+#pragma once
 #include "timCore/type.h"
 
 class SimpleCamera

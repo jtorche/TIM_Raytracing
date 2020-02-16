@@ -1,0 +1,47 @@
+#version 450
+
+#extension GL_EXT_scalar_block_layout : enable
+
+#include "system.glsl"
+#include "struct_cpp.glsl"
+
+layout(set = 0, binding = g_outputImage_bind) uniform writeonly image2D g_outputImage;
+layout(set = 0, binding = g_inputImage_bind, rgba8) uniform readonly image2D g_inputImage;
+
+layout(push_constant) uniform pushConstantBlock
+{
+    PushConstants g_Constants;
+};
+
+layout(std430, set = 0, binding = g_PassData_bind)
+uniform PassData_block
+{
+    PassData g_passData;
+};
+
+layout(std430, binding = g_InRayBuffer_bind) readonly buffer g_InReflexionRayBuffer_bind_layout
+{
+    IndirectLightRay g_inReflexionRays[];
+};
+
+#include "baseRaytracingPass.glsl"
+#include "rayStorageHelpers.glsl"
+
+layout(local_size_x = LOCAL_SIZE, local_size_y = LOCAL_SIZE) in;
+void main()
+{
+    ivec2 pixelCoord = ivec2(gl_GlobalInvocationID.x, gl_NumWorkGroups.y * LOCAL_SIZE - gl_GlobalInvocationID.y);
+    if (pixelCoord.x < g_passData.frameSize.x && pixelCoord.y < g_passData.frameSize.y)
+    {
+        if (g_inReflexionRays[rayIndexFromCoord()].pos.w > 0)
+        {
+            ClosestHit closestHit;
+            Ray ray = createRay(g_inReflexionRays[rayIndexFromCoord()].pos.xyz, normalize(g_inReflexionRays[rayIndexFromCoord()].dir.xyz));
+            vec3 lit = rayTrace(ray, closestHit) * g_inReflexionRays[rayIndexFromCoord()].lit.xyz;
+
+            vec4 curFrag = imageLoad(g_inputImage, pixelCoord);
+            imageStore(g_outputImage, pixelCoord, vec4(lit + curFrag.xyz, 1));
+            nextBounce(getMaterialId(closestHit), lit, getHitNormal(closestHit), ray, closestHit.t);
+        }
+    }
+}
