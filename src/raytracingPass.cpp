@@ -92,6 +92,11 @@ void RayTracingPass::setFrameBufferSize(tim::uvec2 _res)
             m_renderer->DestroyBuffer(handle);
 
         m_allocatedRayStorageBuffer.clear();
+
+		for (auto handle : m_allocatedColorBuffer)
+			m_renderer->DestroyImage(handle);
+
+        m_allocatedColorBuffer.clear();
     }
     m_frameSize = _res;
 }
@@ -170,6 +175,8 @@ void RayTracingPass::draw(tim::ImageHandle _output, const SimpleCamera& _camera)
     memcpy(passDataPtr, &passData, sizeof(PassData));
 
     tim::BufferHandle reflexionRayBuffer = getRayStorageBuffer();
+    m_context->ClearBuffer(reflexionRayBuffer, 0);
+
     ImageHandle linearColorBuffer = getColorBuffer();
 
     DrawArguments arg = {};
@@ -249,6 +256,7 @@ void RayTracingPass::drawBounce(u32 _depth, BufferView _passData, tim::BufferHan
     {
         flags.set(C_CONTINUE_RECURSION);
         reflexionRayBuffer = getRayStorageBuffer();
+        m_context->ClearBuffer(reflexionRayBuffer, 0);
         bufBinds.push_back({ { reflexionRayBuffer, 0, getRayStorageBufferSize() }, { 0, g_OutReflexionRayBuffer_bind } });
     }
 

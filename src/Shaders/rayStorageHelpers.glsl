@@ -34,11 +34,6 @@ void nextBounce(uint _matId, vec3 _rayLit, vec3 _normal, in Ray _ray, float _t)
 		// n += randAxis * 0.1;//rotate_vector(n, q);
         g_outReflexionRays[outRayIndex].dir = vec4(n, 0);
     }
-	//else
-	//{
-	//	g_outReflexionRays[outRayIndex].pos = vec4(0,0,0,0);
-	//}
-
 #endif
 }
 

@@ -62,6 +62,7 @@ namespace tim
         virtual void BeginRender() = 0;
         virtual void EndRender() = 0;
 
+        virtual void ClearBuffer(BufferHandle _image, u32 _data) = 0;
         virtual void ClearImage(ImageHandle _image, const Color& _color) = 0;
         virtual void ClearImage(ImageHandle _image, const ColorInteger& _color) = 0;
 

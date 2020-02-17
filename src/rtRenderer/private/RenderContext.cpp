@@ -43,6 +43,11 @@ namespace tim
         }
     }
 
+    void RenderContext::ClearBuffer(BufferHandle _buffer, u32 _data)
+    {
+        vezCmdFillBuffer(toBuffer(_buffer)->getVkBuffer(), 0, VK_WHOLE_SIZE, _data);
+    }
+
     void RenderContext::ClearImage(ImageHandle _image, const Color& _color)
     {
         VezImageSubresourceRange range;

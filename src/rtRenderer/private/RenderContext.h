@@ -14,6 +14,7 @@ namespace tim
         void BeginRender() override;
         void EndRender() override;
 
+        void ClearBuffer(BufferHandle _buffer, u32 _data);
         void ClearImage(ImageHandle _image, const Color& _color) override;
         void ClearImage(ImageHandle _image, const ColorInteger& _color) override;
 
