@@ -35,6 +35,8 @@ struct Sphere
     float invRadius;
 };
 
+// Material_Mirror: x:mirrorness
+
 struct Material
 {
 	uvec4	type_ids;

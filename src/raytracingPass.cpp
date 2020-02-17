@@ -14,8 +14,11 @@ RayTracingPass::RayTracingPass(IRenderer* _renderer, IRenderContext* _context) :
     const float DIMXY = 5.1f;
     const float DIMZ = 5;
 
+    auto groundMirror = BVHBuilder::createMirrorMaterial({ 0,1,1 }, 0.3);
+    auto ballMirror = BVHBuilder::createMirrorMaterial({ 0,1,1 }, 1);
+
     m_bvh->addBox(Box{ { -DIMXY, -DIMXY, DIMZ }, {  DIMXY,          DIMXY,           DIMZ + 0.1f } });
-    m_bvh->addBox(Box{ { -DIMXY, -DIMXY, 0    }, {  DIMXY,          DIMXY,           0.1f } });
+    m_bvh->addBox(Box{ { -DIMXY, -DIMXY, 0    }, {  DIMXY,          DIMXY,           0.1f } }, groundMirror);
      
     m_bvh->addBox(Box{ { -DIMXY, -DIMXY, 0    }, { -DIMXY + 0.1f,   DIMXY,           DIMZ + 0.1f } });
     m_bvh->addBox(Box{ {  DIMXY, -DIMXY, 0    }, {  DIMXY + 0.1f,   DIMXY,           DIMZ + 0.1f } });
@@ -30,7 +33,7 @@ RayTracingPass::RayTracingPass(IRenderer* _renderer, IRenderContext* _context) :
         for (u32 j = 0; j < 10; ++j)
         {
             vec3 p = { -DIMXY + i * (DIMXY / 5), -DIMXY + j * (DIMXY / 5), 0 };
-            m_bvh->addSphere({ p + vec3(0,0,1), sphereRad }, BVHBuilder::createMirrorMaterial({ 0,1,1 }));
+            m_bvh->addSphere({ p + vec3(0,0,1), sphereRad }, ballMirror);
             m_bvh->addBox(Box{ p - vec3(pillarSize, pillarSize, 0), p + vec3(pillarSize, pillarSize, 1) });
         }
     }
@@ -51,7 +54,7 @@ RayTracingPass::RayTracingPass(IRenderer* _renderer, IRenderContext* _context) :
     //areaLight.attenuationRadius = 40;
     //m_bvh->addAreaLight(areaLight);
 
-    m_bvh->build(8, 6, Box{ vec3{ -6,-6,-6 }, vec3{6,6,6} });
+    m_bvh->build(8, 6, Box{ vec3{ -6,-6,-6 }, vec3{ 6,6,6 } });
 
     u32 size = m_bvh->getBvhGpuSize();
     m_bvhBuffer = _renderer->CreateBuffer(size, MemoryType::Default, BufferUsage::Storage | BufferUsage::Transfer);
@@ -116,7 +119,7 @@ tim::BufferHandle RayTracingPass::getRayStorageBuffer()
 {
     if (m_availableRayStorageBuffer.empty())
     {
-        tim::BufferHandle handle = m_renderer->CreateBuffer(getRayStorageBufferSize(), MemoryType::Default, BufferUsage::Storage);
+        tim::BufferHandle handle = m_renderer->CreateBuffer(getRayStorageBufferSize(), MemoryType::Default, BufferUsage::Storage | BufferUsage::Transfer);
         m_allocatedRayStorageBuffer.push_back(handle);
         return handle;
     }

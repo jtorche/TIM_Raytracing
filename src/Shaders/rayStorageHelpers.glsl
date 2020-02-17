@@ -18,13 +18,12 @@ uint rayIndexFromCoord()
 void nextBounce(uint _matId, vec3 _rayLit, vec3 _normal, in Ray _ray, float _t)
 {
 #ifdef CONTINUE_RECURSION
-
 	uint outRayIndex = rayIndexFromCoord();
     if (g_BvhMaterialData[_matId].type_ids.x == Material_Mirror)
     {
 		vec3 p = _ray.from + _ray.dir * _t;
         g_outReflexionRays[outRayIndex].pos = vec4(p + _normal * 0.001, 1);
-        g_outReflexionRays[outRayIndex].lit = vec4(g_BvhMaterialData[_matId].color.xyz, 0);
+        g_outReflexionRays[outRayIndex].lit = vec4(g_BvhMaterialData[_matId].color.xyz * g_BvhMaterialData[_matId].params.x, 0);
 
 		vec3 n = reflect(_ray.dir, _normal);
 		//const float roughness =  0.5;

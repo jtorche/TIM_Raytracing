@@ -37,7 +37,7 @@ class BVHBuilder
 public:
     static Material createLambertianMaterial(vec3 _color);
     static Material createEmissiveMaterial(vec3 _color);
-    static Material createMirrorMaterial(vec3 _color);
+    static Material createMirrorMaterial(vec3 _color, float _mirrorness);
 
     BVHBuilder() {}
 

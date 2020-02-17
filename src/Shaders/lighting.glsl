@@ -16,16 +16,15 @@ float computeAttenuation(float _dist, float _lightRadius)
 
 vec3 computeLighting(uint rootId, in Material _mat, vec3 lightColor, vec3 P, vec3 L, vec3 N, vec3 E, float att, float shadowRayLength)
 {
-	switch(_mat.type_ids.x)
-	{
-	case Material_Mirror:
-		return vec3(0,0,0);
-	case Material_Emissive:
+	if(_mat.type_ids.x == Material_Emissive)
 		return _mat.color.xyz;
-	}
 
 	float dotL = clamp(dot(N, L), 0, 1);
 
+	if(_mat.type_ids.x == Material_Mirror)
+		dotL = (1.0 - _mat.params.x) * dotL;
+
+	vec3 lit = vec3(0,0,0);
 	#if USE_SHADOW && COMPUTE_SHADOW_ON_THE_FLY
 	if(att * dotL > 0.001)
 	{
@@ -35,11 +34,13 @@ vec3 computeLighting(uint rootId, in Material _mat, vec3 lightColor, vec3 P, vec
 		#endif
 		float shadow = traverseBvhFast(shadowRay, rootId, shadowRayLength) ? 0 : 1;
 	
-		return shadow * att * dotL * lightColor * _mat.color.xyz;
+		lit = shadow * att * dotL * lightColor * _mat.color.xyz;
 	}
 	#else
-	return att * dotL * lightColor * _mat.color.xyz;
+	lit =  att * dotL * lightColor * _mat.color.xyz;
 	#endif
+
+	return lit;
 }
 
 vec3 evalSphereLight(uint _rootId, in SphereLight _sl, in Material _mat, vec3 _pos, vec3 _normal, vec3 _eye)
