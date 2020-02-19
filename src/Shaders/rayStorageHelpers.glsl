@@ -35,19 +35,21 @@ void nextBounce(uint _objectId, uint _matId, vec3 _rayLit, vec3 _normal, in Ray 
     }
 	else if(g_BvhMaterialData[_matId].type_ids.x == Material_Transparent)
 	{
+		const float refractionIndice = g_BvhMaterialData[_matId].params.y;
 		vec3 p = _ray.from + _ray.dir * _t;
-		vec3 inRefractionRay = normalize(refract(_ray.dir, _normal, 1.1));
-		inRefractionRay = inRefractionRay == vec3(0,0,0) ? _ray.dir : inRefractionRay;
-
+		vec3 inRefractionRay = refract(_ray.dir, normalize(_normal), refractionIndice);
+		inRefractionRay = normalize(inRefractionRay == vec3(0,0,0) ? _ray.dir : inRefractionRay);
+	
 		Ray inRay = createRay(p, inRefractionRay);
 		Hit hit;
 		if(hitPrimitiveThrough(_objectId, inRay, 100, hit))
 		{
-		//	vec3 outRefractionRay = refract(inRay.dir, hit.normal, 1.0 / g_BvhMaterialData[_matId].params.y);
+			vec3 outRefractionRay = refract(inRay.dir, -hit.normal, 1.0 / g_BvhMaterialData[_matId].params.y);
+			outRefractionRay = normalize(outRefractionRay == vec3(0,0,0) ? inRay.dir : outRefractionRay);
 			p = inRay.from + inRay.dir * hit.t;
 			g_outReflexionRays[outRayIndex].pos = vec4(p + hit.normal * 0.001, 1);
 			g_outReflexionRays[outRayIndex].lit = vec4(g_BvhMaterialData[_matId].color.xyz /* * g_BvhMaterialData[_matId].params.x*/, 0);
-			g_outReflexionRays[outRayIndex].dir = vec4(inRay.dir, 0);
+			g_outReflexionRays[outRayIndex].dir = vec4(outRefractionRay, 0);
 		}
 	}
 #endif
