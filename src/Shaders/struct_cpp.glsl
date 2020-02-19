@@ -10,7 +10,9 @@
 #define g_BvhMaterials_bind 6
 #define g_InRayBuffer_bind 7
 #define g_OutReflexionRayBuffer_bind 8
-#define g_inputImage_bind 9
+#define g_OutRayBuffer_bind 8
+#define g_OutRefractionRayBuffer_bind 9
+#define g_inputImage_bind 10
 
 #define LOCAL_SIZE 16
 #define TMAX 100

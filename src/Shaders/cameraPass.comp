@@ -38,7 +38,7 @@ void main()
         vec3 lit = rayTrace(ray, closestHit);
 		
 		imageStore(g_outputImage, pixelCoord, vec4(lit, 1));
-        nextBounce(closestHit.objectId, getMaterialId(closestHit), lit, getHitNormal(closestHit), ray, closestHit.t);
+        nextBounce(closestHit.objectId, getMaterialId(closestHit), vec3(1,1,1), getHitNormal(closestHit), ray, closestHit.t);
 	}
 #else
 
@@ -69,7 +69,7 @@ void main()
 		}
 		
 		imageStore(g_outputImage, pixelCoord, vec4(lit, 1));
-        nextBounce(closestHit.objectId, closestHit.nid_mid, lit, getHitNormal(closestHit), ray, closestHit.t);
+        nextBounce(closestHit.objectId, closestHit.nid_mid, vec3(1,1,1), getHitNormal(closestHit), ray, closestHit.t);
 	}
 #endif
 }

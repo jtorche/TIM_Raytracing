@@ -39,6 +39,39 @@ vec3 sampleSphere(vec2 rands)
     return vec3(sin(phi) * cos(theta), sin(phi) * sin(theta), cos(phi));
 }
 
+vec3 refractRay(vec3 D, vec3 N, float n)
+{
+	float cos_i = dot(N,-D);
+	float sin_t2 = n*n*(1-cos_i*cos_i);
+	return n*D + (n*cos_i - sqrt(1-sin_t2))*N;
+}
+
+float computeFresnelReflexion(vec3 I, vec3 N, float refractionIndex) 
+{ 
+    float cosi = clamp(dot(I, N), -1, 1); 
+    float etai = 1, etat = refractionIndex; 
+    if (cosi > 0) 
+	{ 
+		etai=refractionIndex; 
+		etat=1; 
+	} 
+    // Compute sini using Snell's law
+    float sint = etai / etat * sqrt(max(0, 1.0 - cosi * cosi)); 
+    // Total internal reflection
+    if (sint >= 1)
+        return 1;
+    else 
+	{ 
+        float cost = sqrt(max(0, 1.0 - sint * sint)); 
+        cosi = abs(cosi); 
+        float Rs = ((etat * cosi) - (etai * cost)) / ((etat * cosi) + (etai * cost)); 
+        float Rp = ((etai * cosi) - (etat * cost)) / ((etai * cosi) + (etat * cost)); 
+        return (Rs * Rs + Rp * Rp) / 2; 
+    } 
+    // As a consequence of the conservation of energy, transmittance is given by:
+    // kt = 1 - kr;
+} 
+
 // Quaternion multiplication
 // http://mathworld.wolfram.com/Quaternion.html
 vec4 qmul(vec4 q1, vec4 q2) {

@@ -3,10 +3,20 @@
 
 #include "struct_cpp.glsl"
 
-#ifdef CONTINUE_RECURSION
+#if defined(FIRST_RECURSION_STEP)
 layout(std430, binding = g_OutReflexionRayBuffer_bind) writeonly buffer g_OutReflexionRayBuffer_bind_layout
 {
     IndirectLightRay g_outReflexionRays[];
+};
+layout(std430, binding = g_OutRefractionRayBuffer_bind) writeonly buffer g_OutRefractionRayBuffer_bind_layout
+{
+    IndirectLightRay g_outRefractionRays[];
+};
+
+#elif defined(CONTINUE_RECURSION)
+layout(std430, binding = g_OutRayBuffer_bind) writeonly buffer g_OutRayBuffer_bind_layout
+{
+    IndirectLightRay g_outRays[];
 };
 #endif
 
@@ -15,44 +25,81 @@ uint rayIndexFromCoord()
 	return LOCAL_SIZE * LOCAL_SIZE * (gl_WorkGroupID.y * gl_NumWorkGroups.x + gl_WorkGroupID.x) + gl_LocalInvocationIndex;
 }
 
-void nextBounce(uint _objectId, uint _matId, vec3 _rayLit, vec3 _normal, in Ray _ray, float _t)
+void writeReflexionRay(in IndirectLightRay _ray)
 {
-#ifdef CONTINUE_RECURSION
-	uint outRayIndex = rayIndexFromCoord();
+#if defined(FIRST_RECURSION_STEP)
+	g_outReflexionRays[rayIndexFromCoord()] = _ray;
+#endif
+#if defined(CONTINUE_RECURSION)
+	g_outRays[rayIndexFromCoord()] = _ray;
+#endif
+}
+
+void writeRefractionRay(in IndirectLightRay _ray)
+{
+#if defined(FIRST_RECURSION_STEP)
+	g_outRefractionRays[rayIndexFromCoord()] = _ray;
+#endif
+#if defined(CONTINUE_RECURSION)
+	g_outRays[rayIndexFromCoord()] = _ray;
+#endif
+}
+
+void computeReflexionRay(uint _objectId, vec3 _lit, vec3 _normal, in Ray _ray, float _t);
+
+void nextBounce(uint _objectId, uint _matId, vec3 _lightAbsorbdeByPreBounce, vec3 _normal, in Ray _ray, float _t)
+{
+#if defined(FIRST_RECURSION_STEP) || defined(CONTINUE_RECURSION)
     if (g_BvhMaterialData[_matId].type_ids.x == Material_Mirror)
     {
-		vec3 p = _ray.from + _ray.dir * _t;
-        g_outReflexionRays[outRayIndex].pos = vec4(p + _normal * 0.001, 1);
-        g_outReflexionRays[outRayIndex].lit = vec4(g_BvhMaterialData[_matId].color.xyz * g_BvhMaterialData[_matId].params.x, 0);
-
-		vec3 n = reflect(_ray.dir, _normal);
-		//const float roughness =  0.5;
-		//float randAngle = rand(p + vec3(1,2,3))*roughness-roughness*0.5;
-		//vec3 randAxis = normalize(vec3(rand(p + vec3(1,0,0)), rand(p+vec3(0,1,0)), rand(p+vec3(0,0,1)))*2-1);
-		//vec4 q = rotate_angle_axis( randAngle, normalize(vec3(rand(p + vec3(1,0,0)), rand(p+vec3(0,1,0)), rand(p+vec3(0,0,1)))*2-1) );
-		// n += randAxis * 0.1;//rotate_vector(n, q);
-        g_outReflexionRays[outRayIndex].dir = vec4(normalize(n), 0);
+		vec3 lit = _lightAbsorbdeByPreBounce * g_BvhMaterialData[_matId].color.xyz * g_BvhMaterialData[_matId].params.x;
+		computeReflexionRay(_objectId, lit, _normal, _ray, _t);
     }
-	else if(g_BvhMaterialData[_matId].type_ids.x == Material_Transparent)
+#endif
+
+#if defined(FIRST_RECURSION_STEP) || defined(CONTINUE_RECURSION)
+	if(g_BvhMaterialData[_matId].type_ids.x == Material_Transparent)
 	{
 		const float refractionIndice = g_BvhMaterialData[_matId].params.y;
+		float fresnelReflexion = computeFresnelReflexion(_ray.dir, _normal, refractionIndice);
+
+		#if defined(FIRST_RECURSION_STEP)
+		computeReflexionRay(_objectId, _lightAbsorbdeByPreBounce * g_BvhMaterialData[_matId].color.xyz * fresnelReflexion, _normal, _ray, _t);
+		#endif
+
 		vec3 p = _ray.from + _ray.dir * _t;
 		vec3 inRefractionRay = refract(_ray.dir, normalize(_normal), refractionIndice);
-		inRefractionRay = normalize(inRefractionRay == vec3(0,0,0) ? _ray.dir : inRefractionRay);
-	
-		Ray inRay = createRay(p, inRefractionRay);
-		Hit hit;
-		if(hitPrimitiveThrough(_objectId, inRay, 100, hit))
+		// inRefractionRay = normalize(inRefractionRay == vec3(0,0,0) ? _ray.dir : inRefractionRay);
+		if(inRefractionRay != vec3(0,0,0))
 		{
-			vec3 outRefractionRay = refract(inRay.dir, -hit.normal, 1.0 / g_BvhMaterialData[_matId].params.y);
-			outRefractionRay = normalize(outRefractionRay == vec3(0,0,0) ? inRay.dir : outRefractionRay);
-			p = inRay.from + inRay.dir * hit.t;
-			g_outReflexionRays[outRayIndex].pos = vec4(p + hit.normal * 0.001, 1);
-			g_outReflexionRays[outRayIndex].lit = vec4(g_BvhMaterialData[_matId].color.xyz /* * g_BvhMaterialData[_matId].params.x*/, 0);
-			g_outReflexionRays[outRayIndex].dir = vec4(outRefractionRay, 0);
+			Ray inRay = createRay(p, inRefractionRay);
+			Hit hit;
+			if(hitPrimitiveThrough(_objectId, inRay, 100, hit))
+			{
+				vec3 outRefractionRay = refract(inRay.dir, -hit.normal, 1.0 / g_BvhMaterialData[_matId].params.y);
+				outRefractionRay = normalize(outRefractionRay == vec3(0,0,0) ? inRay.dir : outRefractionRay);
+				p = inRay.from + inRay.dir * hit.t;
+				IndirectLightRay outRay;
+				outRay.pos = vec4(p + hit.normal * 0.001, 1);
+				outRay.lit = vec4(_lightAbsorbdeByPreBounce * g_BvhMaterialData[_matId].color.xyz * (1-fresnelReflexion), 0);
+				outRay.dir = vec4(outRefractionRay, 0);
+				writeRefractionRay(outRay);
+			}
 		}
 	}
 #endif
+}
+
+void computeReflexionRay(uint _objectId, vec3 _lit, vec3 _normal, in Ray _ray, float _t)
+{
+	vec3 p = _ray.from + _ray.dir * _t;
+	vec3 n = reflect(_ray.dir, _normal);
+
+	IndirectLightRay outRay;
+    outRay.pos = vec4(p + _normal * 0.001, 1);
+    outRay.lit = vec4(_lit, 0);
+    outRay.dir = vec4(normalize(n), 0);
+	writeReflexionRay(outRay);
 }
 
 #endif

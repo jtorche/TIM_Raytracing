@@ -73,7 +73,7 @@ bool hitPrimitiveThrough(uint objIndex, Ray r, float tmax, out Hit hit)
 	switch(type)
 	{
 		case Primitive_Sphere: 
-		return false;
+		return HitSphereThrough(r, loadSphere(objIndex), 0, tmax, hit);
 
 		case Primitive_AABB: 
 		return HitBoxThrough(r, loadBox(objIndex), 0, tmax, hit);
