@@ -114,7 +114,7 @@ void collideRayAgainstTileData(in Ray _ray, inout ClosestHit _closestHit)
 		Hit hit;
 		bool hasHit = hitPrimitive(primIndex, _ray, _closestHit.t, hit);
 
-		_closestHit.t =		 hasHit ? hit.t * 0.999	: _closestHit.t;
+		_closestHit.t =			hasHit ? hit.t * 0.999	: _closestHit.t;
 
 		#if USE_SHARED_MEM
 		if(hasHit)
@@ -123,10 +123,11 @@ void collideRayAgainstTileData(in Ray _ray, inout ClosestHit _closestHit)
 			anyHit = true;
 		}
 		#else
-		_closestHit.normal = hasHit ? hit.normal : _closestHit.normal;
+		_closestHit.normal =	hasHit ? hit.normal : _closestHit.normal;
 		#endif	
 
-		matId =				 hasHit ? g_BvhPrimitiveData[primIndex].iparam	: matId;
+		matId =					hasHit ? g_BvhPrimitiveData[primIndex].iparam	: matId;
+		_closestHit.objectId =	hasHit ? primIndex : _closestHit.objectId;
 	}
 
 	_closestHit.nid_mid = (matId & 0xFFFF0000) >> 16;

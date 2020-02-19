@@ -15,7 +15,7 @@ uint rayIndexFromCoord()
 	return LOCAL_SIZE * LOCAL_SIZE * (gl_WorkGroupID.y * gl_NumWorkGroups.x + gl_WorkGroupID.x) + gl_LocalInvocationIndex;
 }
 
-void nextBounce(uint _matId, vec3 _rayLit, vec3 _normal, in Ray _ray, float _t)
+void nextBounce(uint _objectId, uint _matId, vec3 _rayLit, vec3 _normal, in Ray _ray, float _t)
 {
 #ifdef CONTINUE_RECURSION
 	uint outRayIndex = rayIndexFromCoord();
@@ -31,8 +31,25 @@ void nextBounce(uint _matId, vec3 _rayLit, vec3 _normal, in Ray _ray, float _t)
 		//vec3 randAxis = normalize(vec3(rand(p + vec3(1,0,0)), rand(p+vec3(0,1,0)), rand(p+vec3(0,0,1)))*2-1);
 		//vec4 q = rotate_angle_axis( randAngle, normalize(vec3(rand(p + vec3(1,0,0)), rand(p+vec3(0,1,0)), rand(p+vec3(0,0,1)))*2-1) );
 		// n += randAxis * 0.1;//rotate_vector(n, q);
-        g_outReflexionRays[outRayIndex].dir = vec4(n, 0);
+        g_outReflexionRays[outRayIndex].dir = vec4(normalize(n), 0);
     }
+	else if(g_BvhMaterialData[_matId].type_ids.x == Material_Transparent)
+	{
+		vec3 p = _ray.from + _ray.dir * _t;
+		vec3 inRefractionRay = normalize(refract(_ray.dir, _normal, 1.1));
+		inRefractionRay = inRefractionRay == vec3(0,0,0) ? _ray.dir : inRefractionRay;
+
+		Ray inRay = createRay(p, inRefractionRay);
+		Hit hit;
+		if(hitPrimitiveThrough(_objectId, inRay, 100, hit))
+		{
+		//	vec3 outRefractionRay = refract(inRay.dir, hit.normal, 1.0 / g_BvhMaterialData[_matId].params.y);
+			p = inRay.from + inRay.dir * hit.t;
+			g_outReflexionRays[outRayIndex].pos = vec4(p + hit.normal * 0.001, 1);
+			g_outReflexionRays[outRayIndex].lit = vec4(g_BvhMaterialData[_matId].color.xyz /* * g_BvhMaterialData[_matId].params.x*/, 0);
+			g_outReflexionRays[outRayIndex].dir = vec4(inRay.dir, 0);
+		}
+	}
 #endif
 }
 

@@ -14,7 +14,7 @@ Ray createRay(vec3 _from, vec3 _dir)
 	return r;
 }
 
-float CollideBox(Ray _ray, Box _box, float tmin, float tmax)
+float CollideBox(Ray _ray, Box _box, float tmin, float tmax, bool returnTmin)
 {
 #if !NO_RAY_INVDIR
     vec3 t0s = (_box.minExtent - _ray.from) * _ray.invdir;
@@ -30,7 +30,7 @@ float CollideBox(Ray _ray, Box _box, float tmin, float tmax)
     tmin = max(tmin, max(tsmaller[0], max(tsmaller[1], tsmaller[2])));
     tmax = min(tmax, min(tbigger[0], min(tbigger[1], tbigger[2])));
 
-    return (tmin < tmax) ? tmin : -1;
+    return (tmin < tmax) ? (returnTmin ? tmin : tmax) : -1;
 }
 
 bool CollideSphere(Ray r, Sphere s, float tmin, float tmax)
@@ -56,6 +56,7 @@ struct ClosestHit
 #endif
     float t;
 	uint nid_mid;
+	uint objectId;
 };
 
 uint getMaterialId(in ClosestHit _hit)
@@ -102,7 +103,7 @@ bool HitSphere(Ray r, Sphere s, float tMin, float tmax, out Hit outHit)
 
 bool HitBox(Ray r, Box box, float tMin, float tmax, out Hit outHit)
 {
-	float t = CollideBox(r, box, tMin, tmax).x;
+	float t = CollideBox(r, box, tMin, tmax, true).x;
 	if(t >= tMin)
 	{
 		vec3 pos = r.from + r.dir * t;
@@ -115,6 +116,29 @@ bool HitBox(Ray r, Box box, float tMin, float tmax, out Hit outHit)
 
 		outHit.t = t;
 		outHit.normal = vec3(int(normal.x), int(normal.y), int(normal.z));
+
+		return true;
+	}
+
+	return false;
+}
+
+bool HitBoxThrough(Ray r, Box box, float tMin, float tmax, out Hit outHit)
+{
+	float t = CollideBox(r, box, tMin, tmax, false).x;
+	if(t >= tMin)
+	{
+		vec3 pos = r.from + r.dir * t;
+		vec3 center = (box.maxExtent + box.minExtent) * 0.5;
+
+		vec3 p = pos - center;
+		vec3 d = (box.maxExtent - box.minExtent) * 0.5;
+
+		vec3 normal = 1.0001 * (p / d);
+
+		outHit.t = t;
+		outHit.normal = vec3(int(normal.x), int(normal.y), int(normal.z));
+
 		return true;
 	}
 

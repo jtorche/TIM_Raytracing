@@ -130,6 +130,16 @@ Material BVHBuilder::createMirrorMaterial(vec3 _color, float _mirrorness)
     return mat;
 }
 
+Material BVHBuilder::createTransparentMaterial(vec3 _color, float _refractionIndice)
+{
+    Material mat;
+    mat.type_ids = { Material_Transparent,0,0,0 };
+    mat.color = { _color.x, _color.y, _color.z, 0 };
+    mat.params.y = _refractionIndice;
+
+    return mat;
+}
+
 void BVHBuilder::addSphere(const Sphere& _sphere, const Material& _mat)
 {
     m_objects.push_back({ _sphere, _mat });

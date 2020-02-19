@@ -17,6 +17,7 @@ vec3 rayTrace(in Ray _ray, out ClosestHit _hitResult)
 	ClosestHit closestHit;
 	closestHit.t = TMAX;
 	closestHit.nid_mid = 0xFFFFffff;
+	closestHit.objectId = 0xFFFFffff;
 	uint rootId = g_Constants.numNodes == 1 ? 0x8000 : 0;
 
 #if NO_BVH

@@ -66,6 +66,22 @@ bool hitPrimitive(uint objIndex, Ray r, float tmax, out Hit hit)
 	return false;
 }
 
+bool hitPrimitiveThrough(uint objIndex, Ray r, float tmax, out Hit hit)
+{
+	uint type =  g_BvhPrimitiveData[objIndex].iparam & 0xFFFF;
+
+	switch(type)
+	{
+		case Primitive_Sphere: 
+		return false;
+
+		case Primitive_AABB: 
+		return HitBoxThrough(r, loadBox(objIndex), 0, tmax, hit);
+	}
+
+	return false;
+}
+
 bool hitPrimitiveFast(uint objIndex, Ray r, float tmax)
 {
 	uint type =  g_BvhPrimitiveData[objIndex].iparam & 0xFFFF;
@@ -76,7 +92,7 @@ bool hitPrimitiveFast(uint objIndex, Ray r, float tmax)
 		return CollideSphere(r, loadSphere(objIndex), 0, tmax);
 
 		case Primitive_AABB: 
-		return CollideBox(r, loadBox(objIndex), 0, tmax) >= 0;
+		return CollideBox(r, loadBox(objIndex), 0, tmax, true) >= 0;
 	}
 
 	return false;
@@ -102,6 +118,7 @@ void bvh_collide(uint _nid, Ray _ray, inout ClosestHit closestHit)
 		{
 			closestHit.t		= hit.t * 0.999;
 			closestHit.nid_mid	= _nid + (g_BvhPrimitiveData[objIndex].iparam & 0xFFFF0000);
+			closestHit.objectId = objIndex;
 		#if USE_SHARED_MEM
 			normal = hit.normal;
 			anyHit = true;
@@ -136,7 +153,8 @@ bool bvh_collide_fast(uint _nid, Ray _ray, float tmax)
 #if NO_BVH
 void brutForceTraverse(Ray _ray, inout ClosestHit closestHit)
 {
-	uint matId = 0;
+	uint matId = 0xFFFFffff;
+	uint objId = 0xFFFFffff;
 	for(uint i=0 ; i<g_Constants.numPrimitives ; ++i)
 	{
 		Hit hit;
@@ -145,9 +163,11 @@ void brutForceTraverse(Ray _ray, inout ClosestHit closestHit)
 		closestHit.t =		hasHit ? hit.t * 0.999	: closestHit.t;
 		closestHit.normal = hasHit ? hit.normal		: closestHit.normal;
 		matId =				hasHit ? g_BvhPrimitiveData[i].iparam : matId;
+		objId =				hasHit ? i : objId;
 	}
 
 	closestHit.nid_mid = (matId & 0xFFFF0000) >> 16;
+	closestHit.objectId = objId;
 }
 #endif
 

@@ -35,8 +35,8 @@ struct Sphere
     float invRadius;
 };
 
-// Material_Mirror: x:mirrorness
-
+// Material_Mirror:			x:mirrorness
+// Material_Transparent:	x:opacity, y:refraction_index	
 struct Material
 {
 	uvec4	type_ids;

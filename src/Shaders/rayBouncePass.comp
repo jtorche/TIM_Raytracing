@@ -41,7 +41,7 @@ void main()
 
             vec4 curFrag = imageLoad(g_inputImage, pixelCoord);
             imageStore(g_outputImage, pixelCoord, vec4(lit + curFrag.xyz, 1));
-            nextBounce(getMaterialId(closestHit), lit, getHitNormal(closestHit), ray, closestHit.t);
+            nextBounce(closestHit.objectId, getMaterialId(closestHit), lit, getHitNormal(closestHit), ray, closestHit.t);
         }
     }
 }

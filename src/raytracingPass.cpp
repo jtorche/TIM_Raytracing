@@ -16,6 +16,7 @@ RayTracingPass::RayTracingPass(IRenderer* _renderer, IRenderContext* _context) :
 
     auto groundMirror = BVHBuilder::createMirrorMaterial({ 0,1,1 }, 0.3);
     auto ballMirror = BVHBuilder::createMirrorMaterial({ 0,1,1 }, 1);
+    auto glassMat = BVHBuilder::createTransparentMaterial({ 0.8,0.8,0.8 }, 2);
 
     m_bvh->addBox(Box{ { -DIMXY, -DIMXY, DIMZ }, {  DIMXY,          DIMXY,           DIMZ + 0.1f } });
     m_bvh->addBox(Box{ { -DIMXY, -DIMXY, 0    }, {  DIMXY,          DIMXY,           0.1f } }, groundMirror);
@@ -34,7 +35,7 @@ RayTracingPass::RayTracingPass(IRenderer* _renderer, IRenderContext* _context) :
         {
             vec3 p = { -DIMXY + i * (DIMXY / 5), -DIMXY + j * (DIMXY / 5), 0 };
             m_bvh->addSphere({ p + vec3(0,0,1), sphereRad }, ballMirror);
-            m_bvh->addBox(Box{ p - vec3(pillarSize, pillarSize, 0), p + vec3(pillarSize, pillarSize, 1) });
+            m_bvh->addBox(Box{ p - vec3(pillarSize, pillarSize, 0), p + vec3(pillarSize, pillarSize, 1) }, glassMat);
         }
     }
     

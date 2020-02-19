@@ -27,7 +27,7 @@ vec4 toLinear(vec4 sRGB)
 #define NO_RAY_INVDIR				0
 
 #define NO_BVH				0
-#define TILE_FRUSTUM_CULL	1
+#define TILE_FRUSTUM_CULL	0
 #define USE_SHARED_MEM		0
 
 #define g_AreaLightShadowUniformSampling	0

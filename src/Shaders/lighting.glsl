@@ -16,6 +16,9 @@ float computeAttenuation(float _dist, float _lightRadius)
 
 vec3 computeLighting(uint rootId, in Material _mat, vec3 lightColor, vec3 P, vec3 L, vec3 N, vec3 E, float att, float shadowRayLength)
 {
+	if(_mat.type_ids.x == Material_Transparent)
+		return vec3(0,0,0);
+
 	if(_mat.type_ids.x == Material_Emissive)
 		return _mat.color.xyz;
 
