@@ -58,18 +58,24 @@ float computeFresnelReflexion(vec3 I, vec3 N, float refractionIndex)
     // Compute sini using Snell's law
     float sint = etai / etat * sqrt(max(0, 1.0 - cosi * cosi)); 
     // Total internal reflection
+
+    float kr;
+
     if (sint >= 1)
-        return 1;
+        kr = 1;
     else 
 	{ 
         float cost = sqrt(max(0, 1.0 - sint * sint)); 
         cosi = abs(cosi); 
         float Rs = ((etat * cosi) - (etai * cost)) / ((etat * cosi) + (etai * cost)); 
         float Rp = ((etai * cosi) - (etat * cost)) / ((etai * cosi) + (etat * cost)); 
-        return (Rs * Rs + Rp * Rp) / 2; 
+        kr = (Rs * Rs + Rp * Rp) / 2; 
     } 
+
     // As a consequence of the conservation of energy, transmittance is given by:
     // kt = 1 - kr;
+
+    return kr;
 } 
 
 // Quaternion multiplication

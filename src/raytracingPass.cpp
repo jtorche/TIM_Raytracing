@@ -20,7 +20,7 @@ RayTracingPass::RayTracingPass(IRenderer* _renderer, IRenderContext* _context) :
     auto redGlassMat = BVHBuilder::createTransparentMaterial({ 1,0,0 }, 1.1f, 1);
 
     m_bvh->addBox(Box{ { -DIMXY, -DIMXY, DIMZ }, {  DIMXY,          DIMXY,           DIMZ + 0.1f } });
-    m_bvh->addBox(Box{ { -DIMXY, -DIMXY, 0    }, {  DIMXY,          DIMXY,           0.1f } });
+    m_bvh->addBox(Box{ { -DIMXY, -DIMXY, 0    }, {  DIMXY,          DIMXY,           0.1f } }, groundMirror);
      
     m_bvh->addBox(Box{ { -DIMXY, -DIMXY, 0    }, { -DIMXY + 0.1f,   DIMXY,           DIMZ + 0.1f } });
     m_bvh->addBox(Box{ {  DIMXY, -DIMXY, 0    }, {  DIMXY + 0.1f,   DIMXY,           DIMZ + 0.1f } });
@@ -41,12 +41,12 @@ RayTracingPass::RayTracingPass(IRenderer* _renderer, IRenderContext* _context) :
     }
     
     m_bvh->addSphere({ { -2, -2, 4 }, 0.19f }, BVHBuilder::createEmissiveMaterial({ 0, 1, 1 }));
-    m_bvh->addSphereLight({ { -2, -2, 4 }, 25, { 0.5, 1, 1 }, 0.2f });
+    m_bvh->addSphereLight({ { -2, -2, 4 }, 25, { 1, 2, 2 }, 0.2f });
     
     m_bvh->addSphere({ { 2, 2, 4 }, 0.19f }, BVHBuilder::createEmissiveMaterial({ 1, 1, 0 }));
-    m_bvh->addSphereLight({ { 2, 2, 4 }, 15, { 1, 1, 0.5 }, 0.2f });
+    m_bvh->addSphereLight({ { 2, 2, 4 }, 15, { 2, 2, 1 }, 0.2f });
 
-    m_bvh->addSphere({ { 0, 0, 2 }, 0.5 }, BVHBuilder::createTransparentMaterial({ 1,0.6f,0.6f }, 1.2f, 1));
+    m_bvh->addSphere({ { 0, 0, 2 }, 0.5 }, BVHBuilder::createTransparentMaterial({ 1,0.6f,0.6f }, 1.05f, 0.05f));
 
     //m_bvh->addPointLight({ { -3, -2, 4 }, 30, { 0, 1, 1 } });
 

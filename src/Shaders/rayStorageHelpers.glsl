@@ -63,6 +63,9 @@ void nextBounce(uint _objectId, uint _matId, vec3 _lightAbsorbdeByPreBounce, vec
 		const float refractionIndice = g_BvhMaterialData[_matId].params.y;
 		float fresnelReflexion = computeFresnelReflexion(_ray.dir, _normal, refractionIndice);
 
+		float objectReflectivity = g_BvhMaterialData[_matId].params.x;
+		fresnelReflexion = (objectReflectivity + (1.0-objectReflectivity) * fresnelReflexion);
+
 		#if defined(FIRST_RECURSION_STEP)
 		computeReflexionRay(_objectId, _lightAbsorbdeByPreBounce * g_BvhMaterialData[_matId].color.xyz * fresnelReflexion, _normal, _ray, _t);
 		#endif
