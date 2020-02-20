@@ -10,7 +10,7 @@ uniform PassData_block
 	PassData g_passData;
 };
 
-layout(set=0, binding = g_outputImage_bind, rgba8) uniform writeonly image2D g_outputImage;
+layout(set=0, binding = g_outputImage_bind, rgba16f) uniform writeonly image2D g_outputImage;
 
 layout(push_constant) uniform pushConstantBlock
 {

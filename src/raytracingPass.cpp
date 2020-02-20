@@ -6,7 +6,7 @@
 using namespace tim;
 #include "Shaders/struct_cpp.glsl"
 
-RayTracingPass::RayTracingPass(IRenderer* _renderer, IRenderContext* _context) : m_frameSize{ 800,600 },  m_renderer { _renderer }, m_context{ _context }
+RayTracingPass::RayTracingPass(IRenderer* _renderer, IRenderContext* _context, ResourceAllocator& _allocator) : m_frameSize{ 800,600 }, m_renderer{ _renderer }, m_context{ _context }, m_resourceAllocator{ _allocator }
 {
     m_rayBounceRecursionDepth = 3;
     m_bvh = std::make_unique<BVHBuilder>();
@@ -16,11 +16,11 @@ RayTracingPass::RayTracingPass(IRenderer* _renderer, IRenderContext* _context) :
 
     auto groundMirror = BVHBuilder::createMirrorMaterial({ 0,1,1 }, 0.3f);
     auto ballMirror = BVHBuilder::createMirrorMaterial({ 0,1,1 }, 1);
-    auto glassMat = BVHBuilder::createTransparentMaterial({ 0.8f,0.8f,0.8f }, 1.1f, 1);
-    auto redGlassMat = BVHBuilder::createTransparentMaterial({ 1,0,0 }, 1.1f, 1);
+    auto glassMat = BVHBuilder::createTransparentMaterial({ 0.8f,0.8f,0.8f }, 1.1f, 0);
+    auto redGlassMat = BVHBuilder::createTransparentMaterial({ 1,0,0 }, 1.1f, 0);
 
     m_bvh->addBox(Box{ { -DIMXY, -DIMXY, DIMZ }, {  DIMXY,          DIMXY,           DIMZ + 0.1f } });
-    m_bvh->addBox(Box{ { -DIMXY, -DIMXY, 0    }, {  DIMXY,          DIMXY,           0.1f } }, groundMirror);
+    m_bvh->addBox(Box{ { -DIMXY, -DIMXY, 0    }, {  DIMXY,          DIMXY,           0.1f } });
      
     m_bvh->addBox(Box{ { -DIMXY, -DIMXY, 0    }, { -DIMXY + 0.1f,   DIMXY,           DIMZ + 0.1f } });
     m_bvh->addBox(Box{ {  DIMXY, -DIMXY, 0    }, {  DIMXY + 0.1f,   DIMXY,           DIMZ + 0.1f } });
@@ -41,10 +41,10 @@ RayTracingPass::RayTracingPass(IRenderer* _renderer, IRenderContext* _context) :
     }
     
     m_bvh->addSphere({ { -2, -2, 4 }, 0.19f }, BVHBuilder::createEmissiveMaterial({ 0, 1, 1 }));
-    m_bvh->addSphereLight({ { -2, -2, 4 }, 25, { 1, 2, 2 }, 0.2f });
+    m_bvh->addSphereLight({ { -2, -2, 4 }, 25, { 2, 2, 2 }, 0.2f });
     
     m_bvh->addSphere({ { 2, 2, 4 }, 0.19f }, BVHBuilder::createEmissiveMaterial({ 1, 1, 0 }));
-    m_bvh->addSphereLight({ { 2, 2, 4 }, 15, { 2, 2, 1 }, 0.2f });
+    m_bvh->addSphereLight({ { 2, 2, 4 }, 15, { 2, 2, 2 }, 0.2f });
 
     m_bvh->addSphere({ { 0, 0, 2 }, 0.5 }, BVHBuilder::createTransparentMaterial({ 1,0.6f,0.6f }, 1.05f, 0.05f));
 
@@ -72,8 +72,6 @@ RayTracingPass::~RayTracingPass()
     m_renderer->DestroyBuffer(m_bvhBuffer);
     for(auto handle : m_allocatedRayStorageBuffer)
         m_renderer->DestroyBuffer(handle);
-    for (auto handle : m_allocatedColorBuffer)
-        m_renderer->DestroyImage(handle);
 }
 
 void RayTracingPass::rebuildBvh(u32 _maxDepth, u32 _maxObjPerNode)
@@ -99,11 +97,6 @@ void RayTracingPass::setFrameBufferSize(tim::uvec2 _res)
             m_renderer->DestroyBuffer(handle);
 
         m_allocatedRayStorageBuffer.clear();
-
-		for (auto handle : m_allocatedColorBuffer)
-			m_renderer->DestroyImage(handle);
-
-        m_allocatedColorBuffer.clear();
     }
     m_frameSize = _res;
 }
@@ -111,7 +104,6 @@ void RayTracingPass::setFrameBufferSize(tim::uvec2 _res)
 void RayTracingPass::beginRender()
 {
     m_availableRayStorageBuffer = m_allocatedRayStorageBuffer;
-    m_availableColorBuffer = m_allocatedColorBuffer;
 }
 
 u32 RayTracingPass::getRayStorageBufferSize() const
@@ -135,24 +127,7 @@ tim::BufferHandle RayTracingPass::getRayStorageBuffer()
     }
 }
 
-tim::ImageHandle RayTracingPass::getColorBuffer()
-{
-    if (m_availableColorBuffer.empty())
-    {
-        ImageCreateInfo imgInfo(ImageFormat::RGBA8, m_frameSize.x, m_frameSize.y, 1, ImageType::Image2D, MemoryType::Default);
-        tim::ImageHandle handle = m_renderer->CreateImage(imgInfo);
-        m_allocatedColorBuffer.push_back(handle);
-        return handle;
-    }
-    else
-    {
-        tim::ImageHandle handle = m_availableColorBuffer.back();
-        m_availableColorBuffer.pop_back();
-        return handle;
-    }
-}
-
-void RayTracingPass::draw(tim::ImageHandle _output, const SimpleCamera& _camera)
+void RayTracingPass::draw(tim::ImageHandle _outputBuffer, const SimpleCamera& _camera)
 {
     const float fov = 70.f * 3.14f / 180;
 
@@ -186,11 +161,9 @@ void RayTracingPass::draw(tim::ImageHandle _output, const SimpleCamera& _camera)
     m_context->ClearBuffer(reflexionRayBuffer, 0);
     m_context->ClearBuffer(refractionRayBuffer, 0);
 
-    ImageHandle linearColorBuffer = getColorBuffer();
-
     DrawArguments arg = {};
     ImageBinding imgBinds[] = {
-        { linearColorBuffer, ImageViewType::Storage, 0, g_outputImage_bind }
+        { _outputBuffer, ImageViewType::Storage, 0, g_outputImage_bind }
     };
     BufferBinding bufBinds[] = {
         { passDataBuffer, { 0, g_PassData_bind } },
@@ -220,31 +193,14 @@ void RayTracingPass::draw(tim::ImageHandle _output, const SimpleCamera& _camera)
 
     if(m_rayBounceRecursionDepth > 0)
     {
-        drawBounce(1, passDataBuffer, reflexionRayBuffer, linearColorBuffer);
-        drawBounce(1, passDataBuffer, refractionRayBuffer, linearColorBuffer);
-    }
-
-    // Linear to srgb
-    {
-        DrawArguments arg = {};
-        ImageBinding imgBinds[] = { 
-            { linearColorBuffer, ImageViewType::Storage, 0, 0 },
-            { _output, ImageViewType::Storage, 0, 1 }
-        };
-        arg.m_imageBindings = imgBinds;
-        arg.m_numImageBindings = _countof(imgBinds);
-
-        ivec4 cst = { (int)m_frameSize.x, (int)m_frameSize.y, 0, 0 };
-        arg.m_constants = &cst;
-        arg.m_constantSize = sizeof(cst);
-        arg.m_key = { TIM_HASH32(linearToSrgb.comp), {} };
-        m_context->Dispatch(arg, alignUp<u32>(m_frameSize.x, localSize) / localSize, alignUp<u32>(m_frameSize.y, localSize) / localSize);
+        drawBounce(1, passDataBuffer, reflexionRayBuffer, _outputBuffer);
+        drawBounce(1, passDataBuffer, refractionRayBuffer, _outputBuffer);
     }
 }
 
 void RayTracingPass::drawBounce(u32 _depth, BufferView _passData, tim::BufferHandle _inputRayBuffer, tim::ImageHandle _curImage)
 {
-    ImageHandle mainColorBuffer = _curImage;// getColorBuffer();
+    ImageHandle mainColorBuffer = _curImage;
 
     DrawArguments arg = {};
     ImageBinding imgBinds[] = {
@@ -286,7 +242,6 @@ void RayTracingPass::drawBounce(u32 _depth, BufferView _passData, tim::BufferHan
 
     if (_depth + 1 < m_rayBounceRecursionDepth)
     {
-        // ImageHandle reflexionColorBuffer = getColorBuffer();
         drawBounce(_depth + 1, _passData, outRayBuffer, _curImage);
     }
 }

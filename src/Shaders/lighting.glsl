@@ -21,7 +21,7 @@ vec3 computeLighting(uint rootId, in Material _mat, vec3 lightColor, vec3 P, vec
 
 	if(_mat.type_ids.x == Material_Transparent)
 	    return vec3(0,0,0);
-
+	
 	float dotL = clamp(dot(N, L), 0, 1);
 
 	if(_mat.type_ids.x == Material_Mirror)

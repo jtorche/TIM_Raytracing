@@ -2,6 +2,7 @@
 #define GLFW_EXPOSE_NATIVE_WIN32
 #include <GLFW/glfw3native.h>
 #include "raytracingPass.h"
+#include "postprocessPass.h"
 #include "SimpleCamera.h"
 #include "shaderMacros.h"
 
@@ -100,6 +101,7 @@ int main()
     glfwSetWindowSizeCallback(window, window_size_callback);
 
     g_renderer = tim::createRenderer();
+    ResourceAllocator resourceAllocator(g_renderer);
 
     ShaderCompiler shaderCompiler("../src/Shaders/", getShaderMacros());
     g_renderer->Init(shaderCompiler , &winHandle, frameResolution.x, frameResolution.y, false);
@@ -107,7 +109,8 @@ int main()
     IRenderContext* context = g_renderer->CreateRenderContext(RenderContextType::Graphics);
     
     {
-        RayTracingPass rtPass(g_renderer, context);
+        RayTracingPass rtPass(g_renderer, context, resourceAllocator);
+        PostprocessPass postprocessPass(g_renderer, context);
 
         double prevTime = glfwGetTime();
         double frameTime = 0.01;
@@ -137,9 +140,16 @@ int main()
             context->BeginRender();
             context->ClearImage(backbuffer, Color{ 0, 0, 0, 0 });
 
+            postprocessPass.setFrameBufferSize(frameResolution);
             rtPass.setFrameBufferSize(frameResolution);
             rtPass.beginRender();
-            rtPass.draw(backbuffer, camera);
+
+            ImageCreateInfo imgInfo(ImageFormat::RGBA16F, frameResolution.x, frameResolution.y, 1, ImageType::Image2D, MemoryType::Default);
+            ImageHandle outputColorBuffer = resourceAllocator.allocTexture(imgInfo);
+            rtPass.draw(outputColorBuffer, camera);
+
+            postprocessPass.linearToSrgb(outputColorBuffer, backbuffer);
+            resourceAllocator.releaseTexture(outputColorBuffer);
 
             context->EndRender();
 
@@ -163,6 +173,7 @@ int main()
         g_renderer->WaitForIdle();
     }
 
+    resourceAllocator.clear();
     g_renderer->Deinit();
 	tim::destroyRenderer(g_renderer);
 

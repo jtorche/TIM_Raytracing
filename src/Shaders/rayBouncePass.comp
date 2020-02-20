@@ -5,8 +5,8 @@
 #include "system.glsl"
 #include "struct_cpp.glsl"
 
-layout(set = 0, binding = g_outputImage_bind) uniform writeonly image2D g_outputImage;
-layout(set = 0, binding = g_inputImage_bind, rgba8) uniform readonly image2D g_inputImage;
+layout(set = 0, binding = g_outputImage_bind, rgba16f) uniform writeonly image2D g_outputImage;
+layout(set = 0, binding = g_inputImage_bind, rgba16f) uniform readonly image2D g_inputImage;
 
 layout(push_constant) uniform pushConstantBlock
 {

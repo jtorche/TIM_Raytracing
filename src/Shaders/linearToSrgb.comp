@@ -4,7 +4,7 @@
 #include "system.glsl"
 #include "struct_cpp.glsl"
 
-layout(set = 0, binding = 0, rgba8) uniform image2D g_input;
+layout(set = 0, binding = 0, rgba16f) uniform image2D g_input;
 layout(set = 0, binding = 1, rgba8) uniform writeonly image2D g_output;
 
 layout(push_constant) uniform pushConstantBlock

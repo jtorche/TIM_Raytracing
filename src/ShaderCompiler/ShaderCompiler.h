@@ -1,3 +1,4 @@
+#pragma once
 #include "timCore/type.h"
 #include "timCore/hash.h"
 #include "timCore/flat_hash_map.h"
