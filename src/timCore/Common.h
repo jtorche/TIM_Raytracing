@@ -3,7 +3,7 @@
 
 #ifdef _DEBUG
 #define TIM_ASSERT(cond) \
-    do { if(!(cond)) { tim::handleAssert(__LINE__, __FILE__, ""); } }while(0) 
+    do { if(!(cond)) { handleAssert(__LINE__, __FILE__, ""); } }while(0) 
 
 #else
 #define TIM_ASSERT(cond)

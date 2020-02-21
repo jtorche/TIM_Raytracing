@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.0)
 
 project(RayTracingProject)
 add_definitions(-DVK_USE_PLATFORM_WIN32_KHR)
+add_definitions(-DNOMINMAX)
 
 link_directories("extern/glfw/lib/win64/")
 link_directories("extern/V-EZ/")
@@ -31,9 +32,9 @@ ADD_LIBRARY(shaders src/dummy.cpp ${SC_FXH} ${SC_COMP})
 
 #VezRenderer
 find_package(Vulkan REQUIRED)
-file(GLOB_RECURSE VEZRENDERER_HDRS src/rtRenderer/*.h)
-#file(GLOB_RECURSE VEZRENDERER_HDRS src/rtRenderer/*.hpp)
-file(GLOB_RECURSE VEZRENDERER_SRCS src/rtRenderer/*.cpp)
+file(GLOB_RECURSE VEZRENDERER_HDRS src/rtDevice/*.h)
+#file(GLOB_RECURSE VEZRENDERER_HDRS src/rtDevice/*.hpp)
+file(GLOB_RECURSE VEZRENDERER_SRCS src/rtDevice/*.cpp)
 
 ADD_LIBRARY(VezRenderer ${VEZRENDERER_SRCS} ${VEZRENDERER_HDRS})
 target_include_directories(VezRenderer PRIVATE "extern/V-EZ")
@@ -45,10 +46,12 @@ target_link_libraries(VezRenderer optimized VEZ)
 set_property(TARGET VezRenderer PROPERTY CXX_STANDARD 17)
 
 # Main exe
-file(GLOB MAIN_HDRS src/*.h)
-file(GLOB MAIN_SRCS src/*.cpp)
+file(GLOB RENDERER_HDRS src/*.h)
+file(GLOB RENDERER_SRCS src/*.cpp)
+file(GLOB_RECURSE MAIN_HDRS src/Renderer/*.cpp)
+file(GLOB_RECURSE MAIN_SRCS src/Renderer/*.h)
 
-ADD_EXECUTABLE(Program ${MAIN_SRCS} ${MAIN_HDRS})
+ADD_EXECUTABLE(Program ${MAIN_SRCS} ${RENDERER_HDRS} ${RENDERER_SRCS} ${MAIN_HDRS})
 target_include_directories(Program PRIVATE "extern/glfw/include")
 target_include_directories(Program PRIVATE "src/")
 target_include_directories(Program PRIVATE ${Vulkan_INCLUDE_DIR})

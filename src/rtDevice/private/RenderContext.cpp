@@ -70,7 +70,7 @@ namespace tim
 
     void RenderContext::Dispatch(const DrawArguments& _drawArgs, u32 _sizeX, u32 _sizeY, u32 _sizeZ)
     {
-        VezPipeline pipeline = tim::VezRenderer::get().m_psoCache->getComputePipeline(_drawArgs.m_key);
+        VezPipeline pipeline = VezRenderer::get().m_psoCache->getComputePipeline(_drawArgs.m_key);
         vezCmdBindPipeline(pipeline);
 
         if (_drawArgs.m_constantSize > 0)

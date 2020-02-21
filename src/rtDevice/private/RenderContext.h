@@ -1,5 +1,5 @@
 #pragma once
-#include "rtRenderer/public/IRenderContext.h"
+#include "rtDevice/public/IRenderContext.h"
 #include "Common.h"
 #include <VEZ.h>
 

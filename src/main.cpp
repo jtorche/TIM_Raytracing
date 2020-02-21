@@ -1,18 +1,18 @@
 #include <GLFW/glfw3.h>
 #define GLFW_EXPOSE_NATIVE_WIN32
 #include <GLFW/glfw3native.h>
-#include "raytracingPass.h"
-#include "postprocessPass.h"
-#include "SimpleCamera.h"
-#include "shaderMacros.h"
+#include "Renderer/raytracingPass.h"
+#include "Renderer/postprocessPass.h"
+#include "Renderer/SimpleCamera.h"
+#include "Renderer/shaderMacros.h"
 
 #include <iostream>
 
 using namespace tim;
 
-tim::IRenderer * g_renderer = nullptr;
+IRenderer * g_renderer = nullptr;
 SimpleCamera camera;
-tim::uvec2 frameResolution = { 640, 420 };
+uvec2 frameResolution = { 640, 420 };
 bool g_rebuildBvh = false;
 
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
@@ -100,7 +100,7 @@ int main()
     glfwSetMouseButtonCallback(window, mouse_button_callback);
     glfwSetWindowSizeCallback(window, window_size_callback);
 
-    g_renderer = tim::createRenderer();
+    g_renderer = createRenderer();
     ResourceAllocator resourceAllocator(g_renderer);
 
     ShaderCompiler shaderCompiler("../src/Shaders/", getShaderMacros());
@@ -142,7 +142,6 @@ int main()
 
             postprocessPass.setFrameBufferSize(frameResolution);
             rtPass.setFrameBufferSize(frameResolution);
-            rtPass.beginRender();
 
             ImageCreateInfo imgInfo(ImageFormat::RGBA16F, frameResolution.x, frameResolution.y, 1, ImageType::Image2D, MemoryType::Default);
             ImageHandle outputColorBuffer = resourceAllocator.allocTexture(imgInfo);
@@ -175,7 +174,7 @@ int main()
 
     resourceAllocator.clear();
     g_renderer->Deinit();
-	tim::destroyRenderer(g_renderer);
+	destroyRenderer(g_renderer);
 
 	glfwTerminate();
 	return 0;

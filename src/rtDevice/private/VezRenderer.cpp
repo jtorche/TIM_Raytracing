@@ -344,6 +344,12 @@ namespace tim
         vezBufferSubData(m_vkDevice, buf->getVkBuffer(), 0, _dataSize, _data);
     }
 
+    void VezRenderer::UploadBuffer(BufferHandle _handle, u32 _destOffset, void* _data, u32 _dataSize)
+    {
+		Buffer* buf = reinterpret_cast<Buffer*>(_handle.ptr);
+		vezBufferSubData(m_vkDevice, buf->getVkBuffer(), _destOffset, _dataSize, _data);
+    }
+
     ubyte * VezRenderer::GetDynamicBuffer(u32 _size, BufferView& _buffer)
     {
         u64 offset = m_scratchBufferCursor.fetch_add(_size);

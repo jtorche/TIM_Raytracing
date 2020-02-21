@@ -30,6 +30,7 @@ namespace tim
         virtual BufferHandle CreateBuffer(u32 _size, MemoryType _memType, BufferUsage _usage) = 0;
         virtual void DestroyBuffer(BufferHandle& _buffer) = 0;
         virtual void UploadBuffer(BufferHandle _handle, void * _data, u32 _dataSize) = 0;
+        virtual void UploadBuffer(BufferHandle _handle, u32 _destOffset, void* _data, u32 _dataSize) = 0;
 
         virtual ubyte * GetDynamicBuffer(u32 _size, BufferView& _buffer) = 0;
 

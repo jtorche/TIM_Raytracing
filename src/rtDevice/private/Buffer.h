@@ -1,6 +1,6 @@
 #pragma once
 #include <VEZ.h>
-#include "rtRenderer/public/Resource.h"
+#include "rtDevice/public/Resource.h"
 
 namespace tim
 {

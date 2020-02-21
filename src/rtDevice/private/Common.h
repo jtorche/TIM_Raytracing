@@ -5,10 +5,10 @@
 
 #ifdef _DEBUG
 #define TIM_VK_ASSERT(result) \
-    do { if((result) != VK_SUCCESS) { tim::handleAssert(__LINE__, __FILE__, toString(result)); } }while(0)
+    do { if((result) != VK_SUCCESS) { handleAssert(__LINE__, __FILE__, toString(result)); } }while(0)
 
 #define TIM_VK_VERIFY(result) \
-    do { if((result) != VK_SUCCESS) { tim::handleAssert(__LINE__, __FILE__, toString(result)); } }while(0)
+    do { if((result) != VK_SUCCESS) { handleAssert(__LINE__, __FILE__, toString(result)); } }while(0)
 
 #else
 #define TIM_VK_ASSERT(result)

@@ -1,4 +1,4 @@
-#include "rtRenderer/public/IRenderer.h"
+#include "rtDevice/public/IRenderer.h"
 #include "PipelineStateCache.h"
 #include <VEZ.h>
 #include <vector>
@@ -36,6 +36,7 @@ namespace tim
         BufferHandle CreateBuffer(u32 _size, MemoryType _memType, BufferUsage _usage) override;
         void DestroyBuffer(BufferHandle& _buffer) override;
         void UploadBuffer(BufferHandle _handle, void* _data, u32 _dataSize) override;
+        void UploadBuffer(BufferHandle _handle, u32 _destOffset, void* _data, u32 _dataSize) override;
 
         ubyte* GetDynamicBuffer(u32 _size, BufferView& _buffer) override;
 

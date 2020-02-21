@@ -30,6 +30,20 @@ layout(std430, set = 0, binding = g_BvhLeafData_bind) buffer BvhLeafData
 	uint g_BvhLeafData[];
 };
 
+// Geometry data
+layout(std430, set = 1, binding = 0) buffer GeometryData_Position
+{
+	float g_positionData[];
+};
+layout(std430, set = 1, binding = 1) buffer GeometryData_Normal
+{
+	float g_normalData[];
+};
+layout(std430, set = 1, binding = 2) buffer GeometryData_TexCoord
+{
+	float g_texCoordData[];
+};
+
 #if USE_SHARED_MEM
 shared vec3 g_normalHit[LOCAL_SIZE * LOCAL_SIZE];
 #endif
