@@ -11,13 +11,15 @@ namespace tim
     {
         Primitive(const Sphere& _sphere, const Material& _mat) : type{ Primitive_Sphere }, material{ _mat }, m_sphere{ _sphere } {}
         Primitive(const Box& _box, const Material& _mat) : type{ Primitive_AABB }, material{ _mat }, m_aabb{ _box } {}
+        Primitive(const Triangle& _triangle, const Material& _mat) : type{ Primitive_Triangle }, material{ _mat }, m_triangle{ _triangle } {}
 
         u32 type = 0;
         Material material;
         union
         {
-            Sphere  m_sphere = { {0,0,0}, 1, 1 };
-            Box     m_aabb;
+            Sphere      m_sphere = { {0,0,0}, 1, 1 };
+            Box         m_aabb;
+            Triangle    m_triangle;
         };
     };
 
@@ -34,6 +36,8 @@ namespace tim
         };
     };
 
+    enum class CollisionType { Disjoint, Intersect, Contained };
+
     class BVHBuilder
     {
     public:
@@ -42,10 +46,11 @@ namespace tim
         static Material createMirrorMaterial(vec3 _color, float _mirrorness);
         static Material createTransparentMaterial(vec3 _color, float _refractionIndice, float _reflectivity);
 
-        BVHBuilder() {}
+        BVHBuilder(const BVHGeometry& _geometry) : m_geometryBuffer{ _geometry } {}
 
         void addSphere(const Sphere&, const Material& _mat = createLambertianMaterial({ 0.7f, 0.7f, 0.7f }));
         void addBox(const Box& _box, const Material& _mat = createLambertianMaterial({ 0.7f, 0.7f, 0.7f }));
+        void addTriangle(const BVHGeometry::TriangleData& _box, const Material& _mat = createLambertianMaterial({ 0.7f, 0.7f, 0.7f }));
         void addSphereLight(const SphereLight& _light);
         void addAreaLight(const AreaLight& _light);
         void build(u32 _maxDepth, u32 _maxObjPerNode, const Box& _sceneSize);
@@ -70,9 +75,15 @@ namespace tim
 
         void packNodeData(PackedBVHNode* _outNode, const BVHBuilder::Node& _node, u32 _leafDataOffset);
 
+        Box getAABB(const Primitive& _prim) const;
+        CollisionType primitiveBoxCollision(const Primitive& _prim, const Box& _box) const;
+        CollisionType primitiveSphereCollision(const Primitive& _prim, const Sphere& _sphere) const;
+
     private:
         const u32 m_bufferAlignment = 32;
         u32 m_maxDepth = 0, m_maxObjPerNode = 0;
+
+        const BVHGeometry& m_geometryBuffer;
 
         struct Node
         {

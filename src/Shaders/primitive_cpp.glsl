@@ -4,6 +4,7 @@
 #define Primitive_Sphere	1
 #define Primitive_AABB		2
 #define Primitive_OBB		3
+#define Primitive_Triangle  4
 
 #define Light_Sphere		1
 #define Light_Area			2
@@ -33,6 +34,13 @@ struct Sphere
     vec3 center;
     float radius;
     float invRadius;
+};
+
+struct Triangle
+{
+	uint vertexOffset;
+	uint index01;
+	uint index2;
 };
 
 // Material_Mirror:			x:mirrorness

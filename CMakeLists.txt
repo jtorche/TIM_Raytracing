@@ -48,7 +48,7 @@ set_property(TARGET VezRenderer PROPERTY CXX_STANDARD 17)
 # Main exe
 file(GLOB RENDERER_HDRS src/*.h)
 file(GLOB RENDERER_SRCS src/*.cpp)
-file(GLOB_RECURSE MAIN_HDRS src/Renderer/*.cpp)
+file(GLOB_RECURSE MAIN_HDRS src/Renderer/*.cpp src/Renderer/*.hpp)
 file(GLOB_RECURSE MAIN_SRCS src/Renderer/*.h)
 
 ADD_EXECUTABLE(Program ${MAIN_SRCS} ${RENDERER_HDRS} ${RENDERER_SRCS} ${MAIN_HDRS})

@@ -7,7 +7,7 @@ namespace tim
 	BVHGeometry::BVHGeometry(IRenderer* _renderer, u32 _numVertexInBuffer) : m_renderer{ _renderer }, m_maxVertexCount{ _numVertexInBuffer }
 	{
 		u32 totalBufferSize = (sizeof(vec3) + sizeof(vec3) + sizeof(vec2)) * m_maxVertexCount;
-		m_gpuBuffer = m_renderer->CreateBuffer(totalBufferSize, MemoryType::Default, BufferUsage::Storage);
+		m_gpuBuffer = m_renderer->CreateBuffer(totalBufferSize, MemoryType::Default, BufferUsage::Storage | BufferUsage::Transfer);
 	}
 
 	BVHGeometry::~BVHGeometry()
@@ -43,6 +43,11 @@ namespace tim
 		return triangle;
 	}
 
+    vec3 BVHGeometry::getVertexPosition(u32 _vertexOffet, u32 _index) const
+    {
+        return m_cpuBufferPosition[_vertexOffet + _index];
+    }
+
 	void BVHGeometry::flush(IRenderer* _renderer)
 	{
 		_renderer->UploadBuffer(m_gpuBuffer, 0, &m_cpuBufferPosition[0], (u32)m_cpuBufferPosition.size() * sizeof(vec3));
@@ -50,4 +55,10 @@ namespace tim
 		_renderer->UploadBuffer(m_gpuBuffer, m_maxVertexCount * (sizeof(vec3) + sizeof(vec3)), &m_cpuBufferUv[0], (u32)m_cpuBufferUv.size() * sizeof(vec2));
 	}
 
+    void BVHGeometry::generateGeometryBufferBindings(BufferBinding& _positions, BufferBinding& _normals, BufferBinding& _texcoords)
+    {
+        _positions = { { m_gpuBuffer, 0, m_maxVertexCount * sizeof(vec3) }, { 1, 0 } };
+        _normals = { { m_gpuBuffer, m_maxVertexCount * sizeof(vec3), m_maxVertexCount * sizeof(vec3) }, { 1, 1 } };
+        _texcoords = { { m_gpuBuffer, m_maxVertexCount * (sizeof(vec3) + sizeof(vec3)), m_maxVertexCount * sizeof(vec2) }, { 1, 2 } };
+    }
 }

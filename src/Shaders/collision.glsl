@@ -49,6 +49,38 @@ bool CollideSphere(Ray r, Sphere s, float tmin, float tmax)
     return false;
 }
 
+float CollideTriangle(Ray r, vec3 p0, vec3 p1, vec3 p2, float tmax)
+{
+	// https://fr.wikipedia.org/wiki/Algorithme_d%27intersection_de_M%C3%B6ller%E2%80%93Trumbore
+
+    const float EPSILON = 0.00001;
+    vec3 edge1 = p1 - p0;
+    vec3 edge2 = p2 - p0;
+    vec3 h = cross(r.dir, edge2);
+    float a = dot(edge1, h);
+    if (abs(a) < EPSILON)
+        return -1;
+
+    float f = 1.0 / a;
+    vec3 s = r.from - p0;
+    float u = f * dot(s, h);
+    if (clamp(u, 0.0, 1.0) != u)
+        return -1;
+
+    vec3 q = cross(s, edge1);
+    float v = f * dot(r.dir, q);
+    if (v < 0.0 || u + v > 1.0)
+        return -1;
+
+    float t = f * dot(edge2, q);
+    if (t > EPSILON)
+    {
+        return t;
+    }
+    else // On a bien une intersection de droite, mais pas de rayon.
+        return -1;
+}
+
 struct ClosestHit
 {
 #if !USE_SHARED_MEM

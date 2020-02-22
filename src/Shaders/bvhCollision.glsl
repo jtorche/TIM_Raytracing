@@ -20,6 +20,15 @@ Box loadBox(uint objIndex)
 	return box;
 }
 
+Triangle loadTriangle(uint objIndex)
+{
+	Triangle triangle;
+	triangle.vertexOffset = floatBitsToUint(g_BvhPrimitiveData[objIndex].fparam[0]);
+	triangle.index01 = floatBitsToUint(g_BvhPrimitiveData[objIndex].fparam[1]);
+	triangle.index2 = floatBitsToUint(g_BvhPrimitiveData[objIndex].fparam[2]);
+	return triangle;
+}
+
 SphereLight loadSphereLight(uint lightIndex)
 {
 	SphereLight l;
@@ -50,12 +59,42 @@ AreaLight loadAreaLight(uint lightIndex)
 	return l;
 }
 
+void loadTriangleVertices(out vec3 p0, out vec3 p1, out vec3 p2, Triangle triangle)
+{
+	uint v0Offset = triangle.vertexOffset + (triangle.index01 & 0x0000FFFF);
+	p0 = vec3(g_positionData[v0Offset * 3], g_positionData[v0Offset * 3 + 1], g_positionData[v0Offset * 3 + 2]);
+
+	uint v1Offset = triangle.vertexOffset + ((triangle.index01 & 0xFFFF0000) >> 16);
+	p1 = vec3(g_positionData[v1Offset * 3], g_positionData[v1Offset * 3 + 1], g_positionData[v1Offset * 3 + 2]);
+
+	uint v2Offset = triangle.vertexOffset + (triangle.index2 & 0x0000FFFF);
+	p2 = vec3(g_positionData[v2Offset * 3], g_positionData[v2Offset * 3 + 1], g_positionData[v2Offset * 3 + 2]);
+}
+
+bool HitTriangle(Ray r, Triangle triangle, float tMin, float tmax, out Hit outHit)
+{
+	vec3 p0,p1,p2; 
+	loadTriangleVertices(p0, p1, p2, triangle);
+
+	float t = CollideTriangle(r, p0, p1, p2, tmax);
+	if(t > 0)
+	{
+		outHit.t = t;
+		outHit.normal = vec3(0,0,1);
+		return true;
+	}
+	return false;
+}
+
 bool hitPrimitive(uint objIndex, Ray r, float tmax, out Hit hit)
 {
 	uint type =  g_BvhPrimitiveData[objIndex].iparam & 0xFFFF;
 
 	switch(type)
 	{
+		case Primitive_Triangle: 
+		return HitTriangle(r, loadTriangle(objIndex), 0, tmax, hit);
+
 		case Primitive_Sphere: 
 		return HitSphere(r, loadSphere(objIndex), 0, tmax, hit);
 
@@ -93,6 +132,11 @@ bool hitPrimitiveFast(uint objIndex, Ray r, float tmax)
 
 		case Primitive_AABB: 
 		return CollideBox(r, loadBox(objIndex), 0, tmax, true) >= 0;
+
+		case Primitive_Triangle: 
+		vec3 p0, p1, p2;
+		loadTriangleVertices(p0, p1, p2, loadTriangle(objIndex));
+		return CollideTriangle(r, p0, p1, p2, tmax) > 0; 
 	}
 
 	return false;

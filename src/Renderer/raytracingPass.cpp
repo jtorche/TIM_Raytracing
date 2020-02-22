@@ -10,8 +10,8 @@ namespace tim
     RayTracingPass::RayTracingPass(IRenderer* _renderer, IRenderContext* _context, ResourceAllocator& _allocator) : m_frameSize{ 800,600 }, m_renderer{ _renderer }, m_context{ _context }, m_resourceAllocator{ _allocator }
     {
         m_rayBounceRecursionDepth = 3;
-        m_bvh = std::make_unique<BVHBuilder>();
         m_geometryBuffer = std::make_unique<BVHGeometry>(_renderer, 128 * 1024);
+        m_bvh = std::make_unique<BVHBuilder>(*m_geometryBuffer);
 
         const float DIMXY = 5.1f;
         const float DIMZ = 5;
@@ -43,10 +43,10 @@ namespace tim
         }
 
         m_bvh->addSphere({ { -2, -2, 4 }, 0.19f }, BVHBuilder::createEmissiveMaterial({ 0, 1, 1 }));
-        m_bvh->addSphereLight({ { -2, -2, 4 }, 25, { 2, 2, 2 }, 0.2f });
+        m_bvh->addSphereLight({ { -2, -2, 4 }, 25, { 2, 1, 2 }, 0.2f });
 
         m_bvh->addSphere({ { 2, 2, 4 }, 0.19f }, BVHBuilder::createEmissiveMaterial({ 1, 1, 0 }));
-        m_bvh->addSphereLight({ { 2, 2, 4 }, 15, { 2, 2, 2 }, 0.2f });
+        m_bvh->addSphereLight({ { 2, 2, 4 }, 15, { 2, 2, 1 }, 0.2f });
 
         m_bvh->addSphere({ { 0, 0, 2 }, 0.5 }, BVHBuilder::createTransparentMaterial({ 1,0.6f,0.6f }, 1.05f, 0.05f));
 
@@ -59,6 +59,10 @@ namespace tim
         //areaLight.color = { 1,1,1 };
         //areaLight.attenuationRadius = 40;
         //m_bvh->addAreaLight(areaLight);
+
+        auto triangleData = m_geometryBuffer->addTriangle({ 3,3,2 }, { 1,1,2 }, { 3,1,2.5 }); 
+        m_bvh->addTriangle(triangleData, BVHBuilder::createEmissiveMaterial({ 1, 1, 0 }));
+        m_geometryBuffer->flush(m_renderer);
 
         m_bvh->build(8, 6, Box{ vec3{ -6,-6,-6 }, vec3{ 6,6,6 } });
 
@@ -137,6 +141,10 @@ namespace tim
         ImageBinding imgBinds[] = {
             { _outputBuffer, ImageViewType::Storage, 0, g_outputImage_bind }
         };
+
+        BufferBinding geometryPos, geometryNormals, geometryTexcoords;
+        m_geometryBuffer->generateGeometryBufferBindings(geometryPos, geometryNormals, geometryTexcoords);
+
         BufferBinding bufBinds[] = {
             { passDataBuffer, { 0, g_PassData_bind } },
             { { m_bvhBuffer, m_bvhPrimitiveOffsetRange.x, m_bvhPrimitiveOffsetRange.y }, { 0, g_BvhPrimitives_bind } },
@@ -146,6 +154,7 @@ namespace tim
             { { m_bvhBuffer, m_bvhLeafDataOffsetRange.x, m_bvhLeafDataOffsetRange.y }, { 0, g_BvhLeafData_bind } },
             { { reflexionRayBuffer, 0, getRayStorageBufferSize() }, { 0, g_OutReflexionRayBuffer_bind } },
             { { refractionRayBuffer, 0, getRayStorageBufferSize() }, { 0, g_OutRefractionRayBuffer_bind } },
+            geometryPos, geometryNormals, geometryTexcoords
         };
 
         arg.m_imageBindings = imgBinds;
@@ -182,6 +191,10 @@ namespace tim
             { mainColorBuffer, ImageViewType::Storage, 0, g_outputImage_bind },
             { mainColorBuffer, ImageViewType::Storage, 0, g_inputImage_bind }
         };
+
+        BufferBinding geometryPos, geometryNormals, geometryTexcoords;
+        m_geometryBuffer->generateGeometryBufferBindings(geometryPos, geometryNormals, geometryTexcoords);
+
         std::vector<BufferBinding> bufBinds = {
             { _passData, { 0, g_PassData_bind } },
             { { m_bvhBuffer, m_bvhPrimitiveOffsetRange.x, m_bvhPrimitiveOffsetRange.y }, { 0, g_BvhPrimitives_bind } },
@@ -190,6 +203,7 @@ namespace tim
             { { m_bvhBuffer, m_bvhNodeOffsetRange.x, m_bvhNodeOffsetRange.y }, { 0, g_BvhNodes_bind } },
             { { m_bvhBuffer, m_bvhLeafDataOffsetRange.x, m_bvhLeafDataOffsetRange.y }, { 0, g_BvhLeafData_bind } },
             { { _inputRayBuffer, 0, getRayStorageBufferSize() }, { 0, g_InRayBuffer_bind } },
+            geometryPos, geometryNormals, geometryTexcoords
         };
 
         BufferHandle outRayBuffer;

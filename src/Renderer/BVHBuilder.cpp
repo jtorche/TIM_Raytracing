@@ -1,11 +1,12 @@
 #include "BVHBuilder.h"
 #include "timCore/Common.h"
 
+#include "TriBoxCollision.hpp"
+
 namespace tim
 {
     namespace
     {
-        enum class CollisionType { Disjoint, Intersect, Contained };
         CollisionType sphereBoxCollision(const Sphere& _sphere, const Box& _box)
         {
             vec3 closestPointInAabb = linalg::min_(linalg::max_(_sphere.center, _box.minExtent), _box.maxExtent);
@@ -31,52 +32,26 @@ namespace tim
             return CollisionType::Intersect;
         }
 
-        CollisionType primitiveBoxCollision(const Primitive& _prim, const Box& _box)
+        bool pointBoxCollision(const vec3& _p, const Box& _box)
         {
-            switch (_prim.type)
-            {
-            case Primitive_Sphere:
-                return sphereBoxCollision(_prim.m_sphere, _box);
-            case Primitive_AABB:
-                return boxBoxCollision(_prim.m_aabb, _box);
-            default:
-                TIM_ASSERT(false);
-                return {};
-            }
+            return _p.x < _box.minExtent.x || _p.y < _box.minExtent.y || _p.z < _box.minExtent.z ||
+                   _p.x > _box.maxExtent.x || _p.y > _box.maxExtent.y || _p.z > _box.maxExtent.z
+                ? false : true;
         }
 
-        CollisionType primitiveSphereCollision(const Primitive& _prim, const Sphere& _sphere)
+        CollisionType triangleBoxCollision(vec3 p0, vec3 p1, vec3 p2, const Box& _box)
         {
-            switch (_prim.type)
+            if(pointBoxCollision(p0, _box) || pointBoxCollision(p1, _box), pointBoxCollision(p2, _box))
+                return CollisionType::Intersect;
+            else
             {
-            case Primitive_Sphere:
-            {
-                float dist2 = _prim.m_sphere.radius + _sphere.radius;
-                dist2 *= dist2;
-                return linalg::length2(_prim.m_sphere.center - _sphere.center) < dist2 ? CollisionType::Intersect : CollisionType::Disjoint;
-            }
-            case Primitive_AABB:
-                return sphereBoxCollision(_sphere, _prim.m_aabb);
-            default:
-                TIM_ASSERT(false);
-                return {};
-            }
-        }
+                vec3 boxCenter = (_box.minExtent + _box.maxExtent) * 0.5f;
+                vec3 boxHalf = (_box.maxExtent - _box.minExtent) * 0.5f;
 
-        Box getAABB(const Primitive& _prim)
-        {
-            switch (_prim.type)
-            {
-            case Primitive_Sphere:
-            {
-                vec3 splatRadius = { _prim.m_sphere.radius, _prim.m_sphere.radius, _prim.m_sphere.radius };
-                return Box{ _prim.m_sphere.center - splatRadius, _prim.m_sphere.center + splatRadius };
-            }
-            case Primitive_AABB:
-                return _prim.m_aabb;
-            default:
-                TIM_ASSERT(false);
-                return {};
+                float boxCenter3f[3] = { boxCenter.x, boxCenter.y, boxCenter.z };
+                float boxHalf3f[3] = { boxHalf.x, boxHalf.y, boxHalf.z };
+                float vec3f3f[3][3] = { { p0.x,p0.y,p0.z }, { p1.x,p1.y,p1.z }, { p2.x,p2.y,p2.z } };
+                return triBoxOverlap(boxCenter3f, boxHalf3f, vec3f3f) == 0 ? CollisionType::Disjoint : CollisionType::Intersect;
             }
         }
 
@@ -99,6 +74,73 @@ namespace tim
                 TIM_ASSERT(false);
                 return {};
             }
+        }
+    }
+
+    CollisionType BVHBuilder::primitiveBoxCollision(const Primitive& _prim, const Box& _box) const
+    {
+        switch (_prim.type)
+        {
+        case Primitive_Sphere:
+            return sphereBoxCollision(_prim.m_sphere, _box);
+        case Primitive_AABB:
+            return boxBoxCollision(_prim.m_aabb, _box);
+        case Primitive_Triangle:
+        {
+            vec3 p0 = m_geometryBuffer.getVertexPosition(_prim.m_triangle.vertexOffset, _prim.m_triangle.index01 & 0x0000FFFF);
+            vec3 p1 = m_geometryBuffer.getVertexPosition(_prim.m_triangle.vertexOffset, (_prim.m_triangle.index01 & 0xFFFF0000) >> 16);
+            vec3 p2 = m_geometryBuffer.getVertexPosition(_prim.m_triangle.vertexOffset, _prim.m_triangle.index2 & 0x0000FFFF);
+            return triangleBoxCollision(p0, p1, p2, _box);
+        }
+        default:
+            TIM_ASSERT(false);
+            return {};
+        }
+    }
+
+    CollisionType BVHBuilder::primitiveSphereCollision(const Primitive& _prim, const Sphere& _sphere) const
+    {
+        switch (_prim.type)
+        {
+        case Primitive_Sphere:
+        {
+            float dist2 = _prim.m_sphere.radius + _sphere.radius;
+            dist2 *= dist2;
+            return linalg::length2(_prim.m_sphere.center - _sphere.center) < dist2 ? CollisionType::Intersect : CollisionType::Disjoint;
+        }
+        case Primitive_AABB:
+            return sphereBoxCollision(_sphere, _prim.m_aabb);
+        default:
+            TIM_ASSERT(false);
+            return {};
+        }
+    }
+
+    Box BVHBuilder::getAABB(const Primitive& _prim) const
+    {
+        switch (_prim.type)
+        {
+        case Primitive_Sphere:
+        {
+            vec3 splatRadius = { _prim.m_sphere.radius, _prim.m_sphere.radius, _prim.m_sphere.radius };
+            return Box{ _prim.m_sphere.center - splatRadius, _prim.m_sphere.center + splatRadius };
+        }
+        case Primitive_AABB:
+            return _prim.m_aabb;
+        case Primitive_Triangle:
+        {
+            vec3 p0 = m_geometryBuffer.getVertexPosition(_prim.m_triangle.vertexOffset, _prim.m_triangle.index01 & 0x0000FFFF);
+            vec3 p1 = m_geometryBuffer.getVertexPosition(_prim.m_triangle.vertexOffset, (_prim.m_triangle.index01 & 0xFFFF0000) >> 16);
+            vec3 p2 = m_geometryBuffer.getVertexPosition(_prim.m_triangle.vertexOffset, _prim.m_triangle.index2 & 0x0000FFFF);
+            Box box;
+            box.minExtent = { std::min({ p0.x, p1.x, p2.x }), std::min({ p0.y, p1.y, p2.y }), std::min({ p0.z, p1.z, p2.z }) };
+            box.maxExtent = { std::max({ p0.x, p1.x, p2.x }), std::max({ p0.y, p1.y, p2.y }), std::max({ p0.z, p1.z, p2.z }) };
+
+            return box;
+        }
+        default:
+            TIM_ASSERT(false);
+            return {};
         }
     }
 
@@ -150,6 +192,15 @@ namespace tim
     void BVHBuilder::addBox(const Box& _box, const Material& _mat)
     {
         m_objects.push_back({ _box, _mat });
+    }
+
+    void BVHBuilder::addTriangle(const BVHGeometry::TriangleData& _triangle, const Material& _mat)
+    {
+        Triangle triangle;
+        triangle.vertexOffset = _triangle.vertexOffset;
+        triangle.index01 = _triangle.index[0] + (_triangle.index[1] << 16);
+        triangle.index2 = _triangle.index[2];
+        m_objects.push_back({ triangle, _mat });
     }
 
     void BVHBuilder::addSphereLight(const SphereLight& _light)
@@ -323,13 +374,13 @@ namespace tim
 
             size_t numObjInLeft = std::count_if(_objectsBegin, _objectsEnd, [&](u32 _id)
                 {
-                    bool collide = boxBoxCollision(leftBox, getAABB(m_objects[_id])) != CollisionType::Disjoint;
+                    bool collide = primitiveBoxCollision(m_objects[_id], leftBox) != CollisionType::Disjoint;
                     return collide;
                 });
 
             size_t numObjInRight = std::count_if(_objectsBegin, _objectsEnd, [&](u32 _id)
                 {
-                    bool collide = boxBoxCollision(rightBox, getAABB(m_objects[_id])) != CollisionType::Disjoint;
+                    bool collide = primitiveBoxCollision(m_objects[_id], rightBox) != CollisionType::Disjoint;
                     return collide;
                 });
 
@@ -386,6 +437,13 @@ namespace tim
             prim->fparam[3] = _box.maxExtent.x;
             prim->fparam[4] = _box.maxExtent.y;
             prim->fparam[5] = _box.maxExtent.z;
+        }
+
+        void packTriangle(PackedPrimitive* prim, const Triangle& _triangle)
+        {
+            prim->fparam[0] = union_cast<float>(_triangle.vertexOffset);
+            prim->fparam[1] = union_cast<float>(_triangle.index01);
+            prim->fparam[2] = union_cast<float>(_triangle.index2);
         }
 
         void packSphereLight(PackedLight* light, const SphereLight& _pl)
@@ -483,6 +541,9 @@ namespace tim
                 break;
             case Primitive_AABB:
                 packAabb(prim, m_objects[i].m_aabb);
+                break;
+            case Primitive_Triangle:
+                packTriangle(prim, m_objects[i].m_triangle);
                 break;
             default:
             case Primitive_OBB:
