@@ -5,12 +5,14 @@
 
 #include "Shaders/struct_cpp.glsl"
 
+#include "OBJLoader.h"
+
 namespace tim
 {
     RayTracingPass::RayTracingPass(IRenderer* _renderer, IRenderContext* _context, ResourceAllocator& _allocator) : m_frameSize{ 800,600 }, m_renderer{ _renderer }, m_context{ _context }, m_resourceAllocator{ _allocator }
     {
-        m_rayBounceRecursionDepth = 3;
-        m_geometryBuffer = std::make_unique<BVHGeometry>(_renderer, 128 * 1024);
+        m_rayBounceRecursionDepth = 2;
+        m_geometryBuffer = std::make_unique<BVHGeometry>(_renderer, 1024 * 1024);
         m_bvh = std::make_unique<BVHBuilder>(*m_geometryBuffer);
 
 #if 1
@@ -38,8 +40,8 @@ namespace tim
             for (u32 j = 0; j < 10; ++j)
             {
                 vec3 p = { -DIMXY + i * (DIMXY / 5), -DIMXY + j * (DIMXY / 5), 0 };
-                //m_bvh->addSphere({ p + vec3(0,0,1), sphereRad }, ballMirror);
-                m_bvh->addSphere({ p + vec3(0,0,1), sphereRad });
+                m_bvh->addSphere({ p + vec3(0,0,1), sphereRad }, ballMirror);
+                //m_bvh->addSphere({ p + vec3(0,0,1), sphereRad });
                 m_bvh->addBox(Box{ p - vec3(pillarSize, pillarSize, 0), p + vec3(pillarSize, pillarSize, 1) }, (i + j) % 2 == 0 ? glassMat : redGlassMat);
             }
         }
@@ -52,6 +54,25 @@ namespace tim
 
         m_bvh->addSphere({ { 0, 0, 2 }, 0.5 }, BVHBuilder::createTransparentMaterial({ 1,0.6f,0.6f }, 1.05f, 0.05f));
 #endif
+
+        m_bvh->addSphereLight({ { 0, 0, 1.5 }, 10, { 2, 2, 1 }, 0.2f });
+        objl::Loader loader;
+        if (loader.LoadFile("../data/mesh.obj"))
+        {
+            const objl::Mesh& curMesh = loader.LoadedMeshes[0];
+            std::vector<vec3> posData(curMesh.Vertices.size());
+            std::vector<vec3> normalData(curMesh.Vertices.size());
+            for (u32 i = 0; i < curMesh.Vertices.size(); ++i)
+            {
+                posData[i] = { curMesh.Vertices[i].Position.X, curMesh.Vertices[i].Position.Y, curMesh.Vertices[i].Position.Z };
+                posData[i] += vec3(-2, -0.5 ,2);
+                normalData[i] = { curMesh.Vertices[i].Normal.X, curMesh.Vertices[i].Normal.Y, curMesh.Vertices[i].Normal.Z };
+            }
+
+            u32 vertexOffset = m_geometryBuffer->addTriangleList((u32)curMesh.Vertices.size(), &posData[0], &normalData[0]);
+
+            m_bvh->addTriangleList(vertexOffset, curMesh.Vertices.size() / 3, &curMesh.Indices[0]);
+        }
 
         //m_bvh->addSphere({ { 2, 2, 2 }, 2 }, BVHBuilder::createEmissiveMaterial({ 1, 1, 0 }));
 
@@ -69,7 +90,7 @@ namespace tim
         m_bvh->addTriangle(triangleData);
         m_geometryBuffer->flush(m_renderer);
 
-        m_bvh->build(8, 6, Box{ vec3{ -6,-6,-6 }, vec3{ 6,6,6 } });
+        m_bvh->build(12, 8, Box{ vec3{ -10,-10,-2 }, vec3{ 10,10,10 } });
 
         u32 size = m_bvh->getBvhGpuSize();
         m_bvhBuffer = _renderer->CreateBuffer(size, MemoryType::Default, BufferUsage::Storage | BufferUsage::Transfer);

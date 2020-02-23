@@ -55,6 +55,7 @@ namespace tim
         void addSphere(const Sphere&, const Material& _mat = createLambertianMaterial({ 0.7f, 0.7f, 0.7f }));
         void addBox(const Box& _box, const Material& _mat = createLambertianMaterial({ 0.7f, 0.7f, 0.7f }));
         void addTriangle(const BVHGeometry::TriangleData& _box, const Material& _mat = createLambertianMaterial({ 0.7f, 0.7f, 0.7f }));
+        void addTriangleList(u32 _vertexOffset, u32 _numTriangle, const u32 * _indexData, const Material& _mat = createLambertianMaterial({ 0.7f, 0.7f, 0.7f }));
         void addSphereLight(const SphereLight& _light);
         void addAreaLight(const AreaLight& _light);
         void build(u32 _maxDepth, u32 _maxObjPerNode, const Box& _sceneSize);

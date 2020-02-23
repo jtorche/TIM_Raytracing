@@ -73,7 +73,7 @@ float CollideTriangle(Ray r, vec3 p0, vec3 p1, vec3 p2, float tmax)
         return -1;
 
     float t = f * dot(edge2, q);
-    if (t > EPSILON)
+    if (t > EPSILON && t < tmax)
     {
         return t;
     }

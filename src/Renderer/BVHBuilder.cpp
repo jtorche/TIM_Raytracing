@@ -205,6 +205,20 @@ namespace tim
         m_triangles.push_back({ triangle, _mat });
     }
 
+    void BVHBuilder::addTriangleList(u32 _vertexOffset, u32 _numTriangle, const u32 * _indexData, const Material& _mat)
+    {
+        BVHGeometry::TriangleData triangle;
+        triangle.vertexOffset = _vertexOffset;
+        for (u32 i = 0; i < _numTriangle; ++i)
+        {
+            triangle.index[0] = _indexData[i * 3];
+            triangle.index[1] = _indexData[i * 3 + 1];
+            triangle.index[2] = _indexData[i * 3 + 2];
+
+            addTriangle(triangle, _mat);
+        }
+    }
+
     void BVHBuilder::addSphereLight(const SphereLight& _light)
     {
         m_lights.push_back({ _light });
@@ -228,7 +242,7 @@ namespace tim
         m_nodes.back().extent = _sceneSize;
 
         // Compute true AABB of the scene
-        Box tightBox = getAABB(m_objects[0]);
+        Box tightBox = m_objects.empty() ? getAABB(m_triangles[0].m_triangle) : getAABB(m_objects[0]);
         for (u32 i = 1; i < m_objects.size(); ++i)
         {
             Box box = getAABB(m_objects[i]);
@@ -275,10 +289,7 @@ namespace tim
                 const Light& light = m_lights[i];
                 Sphere sphere = getBoundingSphere(light);
 
-                if (std::any_of(_objectsBegin, _objectsEnd, [&](u32 _objIndex)
-                    {
-                        return primitiveSphereCollision(m_objects[_objIndex], sphere) != CollisionType::Disjoint;
-                    }))
+                if(sphereBoxCollision(sphere, _curNode->extent) != CollisionType::Disjoint)
                 {
                     _curNode->lightList.push_back(u32(i));
                 }

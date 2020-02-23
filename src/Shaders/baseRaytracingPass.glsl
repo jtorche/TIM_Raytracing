@@ -31,7 +31,7 @@ vec3 rayTrace(in Ray _ray, out ClosestHit _hitResult)
 	{
 	#if NO_BVH
 		for(uint i=0 ; i<g_Constants.numLights ; ++i)
-			lit += evalLighting(rootId, i, closestHit.nid_mid, _ray, closestHit);
+			lit += evalLighting(rootId, i, (closestHit.nid_mid & 0xFFFF0000) >> 16, _ray, closestHit);
 	#else
            lit = computeDirectLighting(rootId, _ray, closestHit);
 	#endif

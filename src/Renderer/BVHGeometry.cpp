@@ -43,6 +43,23 @@ namespace tim
 		return triangle;
 	}
 
+    u32 BVHGeometry::addTriangleList(u32 _numVertex, const vec3 * _positions, const vec3 * _normals, const vec2 * _texCoords)
+    {
+        u32 vertexOffset = (u32)m_cpuBufferPosition.size() / 3;
+
+        for (u32 i = 0; i < _numVertex; ++i)
+        {
+            m_cpuBufferPosition.push_back(_positions[i]);
+            m_cpuBufferNormal.push_back(_normals[i]);
+            if (_texCoords)
+                m_cpuBufferUv.push_back(_texCoords[i]);
+            else
+                m_cpuBufferUv.push_back({ 0,0 });
+        }
+
+        return vertexOffset;
+    }
+
     vec3 BVHGeometry::getVertexPosition(u32 _vertexOffet, u32 _index) const
     {
         return m_cpuBufferPosition[_vertexOffet + _index];

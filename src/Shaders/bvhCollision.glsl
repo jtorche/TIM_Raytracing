@@ -140,11 +140,6 @@ bool hitPrimitiveFast(uint objIndex, Ray r, float tmax)
 
 		case Primitive_AABB: 
 		return CollideBox(r, loadBox(objIndex), 0, tmax, true) >= 0;
-
-		//case Primitive_Triangle: 
-		//vec3 p0, p1, p2;
-		//loadTriangleVertices(p0, p1, p2, loadTriangle(objIndex));
-		//return CollideTriangle(r, p0, p1, p2, tmax) > 0; 
 	}
 
 	return false;
@@ -249,7 +244,6 @@ bool bvh_collide_fast(uint _nid, Ray _ray, float tmax)
 #if NO_BVH
 void brutForceTraverse(Ray _ray, inout ClosestHit closestHit)
 {
-	uint matId = 0xFFFFffff;
 	uint objId = 0xFFFFffff;
 	for(uint i=0 ; i<g_Constants.numPrimitives ; ++i)
 	{
@@ -258,7 +252,7 @@ void brutForceTraverse(Ray _ray, inout ClosestHit closestHit)
 
 		closestHit.t =		hasHit ? hit.t * OFFSET_RAY_COLLISION	: closestHit.t;
 		closestHit.normal = hasHit ? hit.normal						: closestHit.normal;
-		matId =				hasHit ? g_BvhPrimitiveData[i].iparam	: matId;
+		closestHit.nid_mid =hasHit ? g_BvhPrimitiveData[i].iparam	: closestHit.nid_mid;
 		objId =				hasHit ? i								: objId;
 	}
 
@@ -269,11 +263,10 @@ void brutForceTraverse(Ray _ray, inout ClosestHit closestHit)
 
 		closestHit.t =		hasHit ? hit.t * OFFSET_RAY_COLLISION		: closestHit.t;
 		closestHit.normal = hasHit ? hit.normal							: closestHit.normal;
-		matId =				hasHit ? g_BvhTriangleData[i].index2_matId	: matId;
+		closestHit.nid_mid =hasHit ? g_BvhTriangleData[i].index2_matId	: closestHit.nid_mid;
 		objId =				hasHit ? 0xFFFFffff							: objId;
 	}
 
-	closestHit.nid_mid = (matId & 0xFFFF0000) >> 16;
 	closestHit.objectId = objId;
 }
 #endif
