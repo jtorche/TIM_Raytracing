@@ -4,7 +4,6 @@
 #define Primitive_Sphere	1
 #define Primitive_AABB		2
 #define Primitive_OBB		3
-#define Primitive_Triangle  4
 
 #define Light_Sphere		1
 #define Light_Area			2
@@ -13,6 +12,11 @@
 #define Material_Lambert		2
 #define Material_Mirror			3
 #define Material_Transparent	4
+
+// used to pack node data
+#define TriangleBitCount 14
+#define PrimitiveBitCount 10
+#define LightBitCount 8
 
 struct Ray
 {
@@ -40,7 +44,7 @@ struct Triangle
 {
 	uint vertexOffset;
 	uint index01;
-	uint index2;
+	uint index2_matId;
 };
 
 // Material_Mirror:			x:mirrorness

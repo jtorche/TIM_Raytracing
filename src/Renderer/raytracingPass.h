@@ -33,6 +33,7 @@ namespace tim
         std::unique_ptr<BVHBuilder> m_bvh;
         std::unique_ptr<BVHGeometry> m_geometryBuffer;
         BufferHandle m_bvhBuffer;
+        uvec2 m_bvhTriangleOffsetRange;
         uvec2 m_bvhPrimitiveOffsetRange;
         uvec2 m_bvhMaterialOffsetRange;
         uvec2 m_bvhLightOffsetRange;

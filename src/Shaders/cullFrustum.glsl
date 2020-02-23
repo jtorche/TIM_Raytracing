@@ -23,13 +23,13 @@ bool primitiveFrustumCollision(uint objIndex, in vec4 _plans[4])
 		case Primitive_AABB: 
 		return boxFrustum4Collision(loadBox(objIndex), _plans);
 
-		case Primitive_Triangle: 
-		vec3 p0, p1, p2;
-		loadTriangleVertices(p0, p1, p2, loadTriangle(objIndex));
-		Box box;
-		box.minExtent = min(min(p0,p1), p2);
-		box.maxExtent = max(max(p0,p1), p2);
-		return boxFrustum4Collision(box, _plans);
+		//case Primitive_Triangle: 
+		//vec3 p0, p1, p2;
+		//loadTriangleVertices(p0, p1, p2, loadTriangle(objIndex));
+		//Box box;
+		//box.minExtent = min(min(p0,p1), p2);
+		//box.maxExtent = max(max(p0,p1), p2);
+		//return boxFrustum4Collision(box, _plans);
 	}
 
 	return false;

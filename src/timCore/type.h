@@ -18,6 +18,7 @@ using vec3 = linalg::aliases::float3;
 using vec2 = linalg::aliases::float2;
 using mat4 = linalg::aliases::float4x4;
 using uvec2 = linalg::aliases::uint2;
+using uvec3 = linalg::aliases::uint3;
 using uvec4 = linalg::aliases::uint4;
 
 namespace tim

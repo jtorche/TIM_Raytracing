@@ -13,6 +13,7 @@ namespace tim
         m_geometryBuffer = std::make_unique<BVHGeometry>(_renderer, 128 * 1024);
         m_bvh = std::make_unique<BVHBuilder>(*m_geometryBuffer);
 
+#if 1
         const float DIMXY = 5.1f;
         const float DIMZ = 5;
 
@@ -37,7 +38,8 @@ namespace tim
             for (u32 j = 0; j < 10; ++j)
             {
                 vec3 p = { -DIMXY + i * (DIMXY / 5), -DIMXY + j * (DIMXY / 5), 0 };
-                m_bvh->addSphere({ p + vec3(0,0,1), sphereRad }, ballMirror);
+                //m_bvh->addSphere({ p + vec3(0,0,1), sphereRad }, ballMirror);
+                m_bvh->addSphere({ p + vec3(0,0,1), sphereRad });
                 m_bvh->addBox(Box{ p - vec3(pillarSize, pillarSize, 0), p + vec3(pillarSize, pillarSize, 1) }, (i + j) % 2 == 0 ? glassMat : redGlassMat);
             }
         }
@@ -49,6 +51,9 @@ namespace tim
         m_bvh->addSphereLight({ { 2, 2, 4 }, 15, { 2, 2, 1 }, 0.2f });
 
         m_bvh->addSphere({ { 0, 0, 2 }, 0.5 }, BVHBuilder::createTransparentMaterial({ 1,0.6f,0.6f }, 1.05f, 0.05f));
+#endif
+
+        //m_bvh->addSphere({ { 2, 2, 2 }, 2 }, BVHBuilder::createEmissiveMaterial({ 1, 1, 0 }));
 
         //m_bvh->addPointLight({ { -3, -2, 4 }, 30, { 0, 1, 1 } });
 
@@ -60,16 +65,16 @@ namespace tim
         //areaLight.attenuationRadius = 40;
         //m_bvh->addAreaLight(areaLight);
 
-        auto triangleData = m_geometryBuffer->addTriangle({ 3,3,2 }, { 1,1,2 }, { 3,1,2.5 }); 
-        m_bvh->addTriangle(triangleData, BVHBuilder::createEmissiveMaterial({ 1, 1, 0 }));
-        m_geometryBuffer->flush(m_renderer);
+        //auto triangleData = m_geometryBuffer->addTriangle({ 3,3,2 }, { 1,1,2 }, { 3,1,2.5 }); 
+        //m_bvh->addTriangle(triangleData, BVHBuilder::createEmissiveMaterial({ 1, 1, 0 }));
+        //m_geometryBuffer->flush(m_renderer);
 
         m_bvh->build(8, 6, Box{ vec3{ -6,-6,-6 }, vec3{ 6,6,6 } });
 
         u32 size = m_bvh->getBvhGpuSize();
         m_bvhBuffer = _renderer->CreateBuffer(size, MemoryType::Default, BufferUsage::Storage | BufferUsage::Transfer);
         std::unique_ptr<ubyte[]> buffer = std::unique_ptr<ubyte[]>(new ubyte[size]);
-        m_bvh->fillGpuBuffer(buffer.get(), m_bvhPrimitiveOffsetRange, m_bvhMaterialOffsetRange, m_bvhLightOffsetRange, m_bvhNodeOffsetRange, m_bvhLeafDataOffsetRange);
+        m_bvh->fillGpuBuffer(buffer.get(), m_bvhTriangleOffsetRange, m_bvhPrimitiveOffsetRange, m_bvhMaterialOffsetRange, m_bvhLightOffsetRange, m_bvhNodeOffsetRange, m_bvhLeafDataOffsetRange);
         _renderer->UploadBuffer(m_bvhBuffer, buffer.get(), size);
     }
 
@@ -89,7 +94,7 @@ namespace tim
         u32 size = m_bvh->getBvhGpuSize();
         m_bvhBuffer = m_renderer->CreateBuffer(size, MemoryType::Default, BufferUsage::Storage | BufferUsage::Transfer);
         std::unique_ptr<ubyte[]> buffer = std::unique_ptr<ubyte[]>(new ubyte[size]);
-        m_bvh->fillGpuBuffer(buffer.get(), m_bvhPrimitiveOffsetRange, m_bvhMaterialOffsetRange, m_bvhLightOffsetRange, m_bvhNodeOffsetRange, m_bvhLeafDataOffsetRange);
+        m_bvh->fillGpuBuffer(buffer.get(), m_bvhTriangleOffsetRange, m_bvhPrimitiveOffsetRange, m_bvhMaterialOffsetRange, m_bvhLightOffsetRange, m_bvhNodeOffsetRange, m_bvhLeafDataOffsetRange);
         m_renderer->UploadBuffer(m_bvhBuffer, buffer.get(), size);
     }
 
@@ -172,7 +177,7 @@ namespace tim
         const u32 localSize = LOCAL_SIZE;
         m_context->Dispatch(arg, alignUp<u32>(m_frameSize.x, localSize) / localSize, alignUp<u32>(m_frameSize.y, localSize) / localSize);
 
-        if (m_rayBounceRecursionDepth > 0)
+        if (m_rayBounceRecursionDepth > 1)
         {
             drawBounce(1, passDataBuffer, reflexionRayBuffer, _outputBuffer);
             drawBounce(1, passDataBuffer, refractionRayBuffer, _outputBuffer);

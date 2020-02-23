@@ -20,15 +20,6 @@ Box loadBox(uint objIndex)
 	return box;
 }
 
-Triangle loadTriangle(uint objIndex)
-{
-	Triangle triangle;
-	triangle.vertexOffset = floatBitsToUint(g_BvhPrimitiveData[objIndex].fparam[0]);
-	triangle.index01 = floatBitsToUint(g_BvhPrimitiveData[objIndex].fparam[1]);
-	triangle.index2 = floatBitsToUint(g_BvhPrimitiveData[objIndex].fparam[2]);
-	return triangle;
-}
-
 SphereLight loadSphereLight(uint lightIndex)
 {
 	SphereLight l;
@@ -67,7 +58,7 @@ void loadTriangleVertices(out vec3 p0, out vec3 p1, out vec3 p2, Triangle triang
 	uint v1Offset = triangle.vertexOffset + ((triangle.index01 & 0xFFFF0000) >> 16);
 	p1 = vec3(g_positionData[v1Offset * 3], g_positionData[v1Offset * 3 + 1], g_positionData[v1Offset * 3 + 2]);
 
-	uint v2Offset = triangle.vertexOffset + (triangle.index2 & 0x0000FFFF);
+	uint v2Offset = triangle.vertexOffset + (triangle.index2_matId & 0x0000FFFF);
 	p2 = vec3(g_positionData[v2Offset * 3], g_positionData[v2Offset * 3 + 1], g_positionData[v2Offset * 3 + 2]);
 }
 
@@ -92,9 +83,6 @@ bool hitPrimitive(uint objIndex, Ray r, float tmax, out Hit hit)
 
 	switch(type)
 	{
-		case Primitive_Triangle: 
-		return HitTriangle(r, loadTriangle(objIndex), 0, tmax, hit);
-
 		case Primitive_Sphere: 
 		return HitSphere(r, loadSphere(objIndex), 0, tmax, hit);
 
@@ -133,20 +121,31 @@ bool hitPrimitiveFast(uint objIndex, Ray r, float tmax)
 		case Primitive_AABB: 
 		return CollideBox(r, loadBox(objIndex), 0, tmax, true) >= 0;
 
-		case Primitive_Triangle: 
-		vec3 p0, p1, p2;
-		loadTriangleVertices(p0, p1, p2, loadTriangle(objIndex));
-		return CollideTriangle(r, p0, p1, p2, tmax) > 0; 
+		//case Primitive_Triangle: 
+		//vec3 p0, p1, p2;
+		//loadTriangleVertices(p0, p1, p2, loadTriangle(objIndex));
+		//return CollideTriangle(r, p0, p1, p2, tmax) > 0; 
 	}
 
 	return false;
+}
+
+uvec3 unpackObjectCount(uint _packed)
+{
+	uvec3 v;
+	v.x = _packed & ((1 << TriangleBitCount) - 1);
+	v.y = (_packed >> TriangleBitCount) & ((1 << PrimitiveBitCount) - 1);
+	v.z = (_packed >> (TriangleBitCount + PrimitiveBitCount)) & ((1 << LightBitCount) - 1);
+	return v;
 }
 
 void bvh_collide(uint _nid, Ray _ray, inout ClosestHit closestHit)
 {
 	_nid = _nid & 0x7FFF;
 	uint leafDataOffset = g_BvhNodeData[_nid].nid.z;
-	uint numObjects = g_BvhNodeData[_nid].nid.w & 0xFFFF;
+	uvec3 unpackedLeafDat = unpackObjectCount(g_BvhNodeData[_nid].nid.w);
+	uint numTriangles = unpackedLeafDat.x;
+	uint numObjects = unpackedLeafDat.y;
 #if USE_SHARED_MEM
 	vec3 normal;
 	bool anyHit = false;
@@ -154,7 +153,7 @@ void bvh_collide(uint _nid, Ray _ray, inout ClosestHit closestHit)
 
 	for(uint i=0 ; i<numObjects ; ++i)
 	{
-		uint objIndex = g_BvhLeafData[leafDataOffset + i];
+		uint objIndex = g_BvhLeafData[numTriangles + leafDataOffset + i];
 		Hit hit;
 		bool hasHit = hitPrimitive(objIndex, _ray, closestHit.t, hit);
 
@@ -182,11 +181,13 @@ bool bvh_collide_fast(uint _nid, Ray _ray, float tmax)
 {
 	_nid = _nid & 0x7FFF;
 	uint leafDataOffset = g_BvhNodeData[_nid].nid.z;
-	uint numObjects = g_BvhNodeData[_nid].nid.w & 0xFFFF;
+	uvec3 unpackedLeafDat = unpackObjectCount(g_BvhNodeData[_nid].nid.w);
+	uint numTriangles = unpackedLeafDat.x;
+	uint numObjects = unpackedLeafDat.y;
 
 	for(uint i=0 ; i<numObjects ; ++i)
 	{
-		uint objIndex = g_BvhLeafData[leafDataOffset + i];
+		uint objIndex = g_BvhLeafData[leafDataOffset + numTriangles + i];
 		if(hitPrimitiveFast(objIndex, _ray, tmax))
 			return true;
 	}
