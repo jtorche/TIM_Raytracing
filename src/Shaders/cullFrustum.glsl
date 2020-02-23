@@ -35,15 +35,28 @@ bool primitiveFrustumCollision(uint objIndex, in vec4 _plans[4])
 	return false;
 }
 
+bool triangleFrustumCollision(uint triIndex, in vec4 _plans[4])
+{
+	vec3 p0, p1, p2;
+	loadTriangleVertices(p0, p1, p2, g_BvhTriangleData[triIndex]);
+	Box box;
+	box.minExtent = min(min(p0,p1), p2);
+	box.maxExtent = max(max(p0,p1), p2);
+	return boxFrustum4Collision(box, _plans);
+}
+
 bool lightFrustumCollision(uint lightIndex, in vec4 _plans[4])
 {
 	return sphereFrustum4Collision(loadSphereFromSphereLight(lightIndex), _plans);
 }
 
+#define MAX_TRIANGLES_PER_TILE LOCAL_SIZE * LOCAL_SIZE
 #define MAX_PRIMITIVES_PER_TILE LOCAL_SIZE * LOCAL_SIZE
 #define MAX_LIGHTS_PER_TILE 16
 shared uint g_primitives[MAX_PRIMITIVES_PER_TILE];
 shared uint g_primitiveCount;
+shared uint g_triangles[MAX_TRIANGLES_PER_TILE];
+shared uint g_triangleCount;
 shared uint g_lights[MAX_LIGHTS_PER_TILE];
 shared uint g_lightCount;
 
@@ -72,6 +85,7 @@ void cullWithFrustumTile(in PassData _passData, in PushConstants _constants)
 	{
 		g_primitiveCount = 0;
 		g_lightCount = 0;
+		g_triangleCount = 0;
 	}
 		
 	barrier();
@@ -88,6 +102,21 @@ void cullWithFrustumTile(in PassData _passData, in PushConstants _constants)
 		{
 		    safe_i = atomicAdd(g_primitiveCount, 1);
 			g_primitives[safe_i] = i;
+		}
+	}
+
+	// Cull triangles
+	localRange = 1 + (_constants.numTriangles / (LOCAL_SIZE * LOCAL_SIZE));
+	start = gl_LocalInvocationIndex * localRange;
+	end = min(start+localRange, _constants.numTriangles);
+
+	safe_i=0;
+	for(uint i=start ; i<end && safe_i < MAX_TRIANGLES_PER_TILE ; ++i)
+	{
+		if(triangleFrustumCollision(i, plans))
+		{
+		    safe_i = atomicAdd(g_triangleCount, 1);
+			g_triangles[safe_i] = i;
 		}
 	}
 
@@ -123,7 +152,7 @@ void collideRayAgainstTileData(in Ray _ray, inout ClosestHit _closestHit)
 		Hit hit;
 		bool hasHit = hitPrimitive(primIndex, _ray, _closestHit.t, hit);
 
-		_closestHit.t =			hasHit ? hit.t * 0.999	: _closestHit.t;
+		_closestHit.t =			hasHit ? hit.t * OFFSET_RAY_COLLISION	: _closestHit.t;
 
 		#if USE_SHARED_MEM
 		if(hasHit)
@@ -137,6 +166,28 @@ void collideRayAgainstTileData(in Ray _ray, inout ClosestHit _closestHit)
 
 		matId =					hasHit ? g_BvhPrimitiveData[primIndex].iparam	: matId;
 		_closestHit.objectId =	hasHit ? primIndex : _closestHit.objectId;
+	}
+
+	for(uint i=0 ; i<g_triangleCount ; ++i)
+	{
+		uint triIndex = g_triangles[i];
+		Hit hit;
+		bool hasHit = HitTriangle(_ray, g_BvhTriangleData[triIndex], 0, _closestHit.t, hit);
+
+		_closestHit.t =			hasHit ? hit.t * OFFSET_RAY_COLLISION : _closestHit.t;
+
+		#if USE_SHARED_MEM
+		if(hasHit)
+		{
+			normal = hit.normal;
+			anyHit = true;
+		}
+		#else
+		_closestHit.normal =	hasHit ? hit.normal : _closestHit.normal;
+		#endif	
+
+		matId =					hasHit ? g_BvhTriangleData[triIndex].index2_matId : matId;
+		_closestHit.objectId =	hasHit ? 0xFFFFffff : _closestHit.objectId;
 	}
 
 	_closestHit.nid_mid = (matId & 0xFFFF0000) >> 16;

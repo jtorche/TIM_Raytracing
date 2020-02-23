@@ -4,6 +4,7 @@
 #define g_PassData_bind 0
 #define g_outputImage_bind 1
 #define g_BvhPrimitives_bind 2
+#define g_BvhTriangles_bind 11
 #define g_BvhNodes_bind 3
 #define g_BvhLeafData_bind 4
 #define g_BvhLights_bind 5
@@ -32,6 +33,7 @@ struct PassData
 
 struct PushConstants
 {
+	uint numTriangles;
 	uint numPrimitives;
 	uint numLights;
 	uint numNodes;

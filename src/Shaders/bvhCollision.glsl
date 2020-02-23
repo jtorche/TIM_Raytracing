@@ -62,6 +62,18 @@ void loadTriangleVertices(out vec3 p0, out vec3 p1, out vec3 p2, Triangle triang
 	p2 = vec3(g_positionData[v2Offset * 3], g_positionData[v2Offset * 3 + 1], g_positionData[v2Offset * 3 + 2]);
 }
 
+void loadNormalVertices(out vec3 n0, out vec3 n1, out vec3 n2, Triangle triangle)
+{
+	uint v0Offset = triangle.vertexOffset + (triangle.index01 & 0x0000FFFF);
+	n0 = vec3(g_normalData[v0Offset * 3], g_normalData[v0Offset * 3 + 1], g_normalData[v0Offset * 3 + 2]);
+
+	uint v1Offset = triangle.vertexOffset + ((triangle.index01 & 0xFFFF0000) >> 16);
+	n1 = vec3(g_normalData[v1Offset * 3], g_normalData[v1Offset * 3 + 1], g_normalData[v1Offset * 3 + 2]);
+
+	uint v2Offset = triangle.vertexOffset + (triangle.index2_matId & 0x0000FFFF);
+	n2 = vec3(g_normalData[v2Offset * 3], g_normalData[v2Offset * 3 + 1], g_normalData[v2Offset * 3 + 2]);
+}
+
 bool HitTriangle(Ray r, Triangle triangle, float tMin, float tmax, out Hit outHit)
 {
 	vec3 p0,p1,p2; 
@@ -71,7 +83,15 @@ bool HitTriangle(Ray r, Triangle triangle, float tMin, float tmax, out Hit outHi
 	if(t > 0)
 	{
 		outHit.t = t;
-		outHit.normal = vec3(0,0,1);
+
+		vec3 colP = r.from + r.dir * t;
+		float l0 = length(colP - p0);
+		float l1 = length(colP - p1);
+		float l2 = length(colP - p2);
+
+		vec3 n0,n1,n2; 
+		loadNormalVertices(n0, n1, n2, triangle);
+		outHit.normal = (n0 * l0 + n1 * l1 + n2 * l2) / (l0 + l1 + l2);
 		return true;
 	}
 	return false;
@@ -159,9 +179,30 @@ void bvh_collide(uint _nid, Ray _ray, inout ClosestHit closestHit)
 
 		if(hasHit)
 		{
-			closestHit.t		= hit.t * 0.999;
+			closestHit.t		= hit.t * OFFSET_RAY_COLLISION;
 			closestHit.nid_mid	= _nid + (g_BvhPrimitiveData[objIndex].iparam & 0xFFFF0000);
 			closestHit.objectId = objIndex;
+		#if USE_SHARED_MEM
+			normal = hit.normal;
+			anyHit = true;
+		#else
+			closestHit.normal	= hit.normal;
+		#endif	
+		}
+	}
+
+	for(uint i=0 ; i<numTriangles ; ++i)
+	{
+		uint triIndex = g_BvhLeafData[leafDataOffset + i];
+		Triangle triangle = g_BvhTriangleData[triIndex];
+		Hit hit;
+		bool hasHit = HitTriangle(_ray, triangle, 0, closestHit.t, hit);
+
+		if(hasHit)
+		{
+			closestHit.t		= hit.t * OFFSET_RAY_COLLISION;
+			closestHit.nid_mid	= _nid + (triangle.index2_matId & 0xFFFF0000);
+			closestHit.objectId = 0xFFFFffff;
 		#if USE_SHARED_MEM
 			normal = hit.normal;
 			anyHit = true;
@@ -192,6 +233,16 @@ bool bvh_collide_fast(uint _nid, Ray _ray, float tmax)
 			return true;
 	}
 
+	for(uint i=0 ; i<numTriangles ; ++i)
+	{
+		uint triIndex = g_BvhLeafData[leafDataOffset + i];
+		vec3 p0,p1,p2; 
+		loadTriangleVertices(p0, p1, p2, g_BvhTriangleData[triIndex]);
+
+		if(CollideTriangle(_ray, p0, p1, p2, tmax) > 0)
+			return true;
+	}
+
 	return false;
 }
 
@@ -205,10 +256,21 @@ void brutForceTraverse(Ray _ray, inout ClosestHit closestHit)
 		Hit hit;
 		bool hasHit = hitPrimitive(i, _ray, closestHit.t, hit);
 
-		closestHit.t =		hasHit ? hit.t * 0.999	: closestHit.t;
-		closestHit.normal = hasHit ? hit.normal		: closestHit.normal;
-		matId =				hasHit ? g_BvhPrimitiveData[i].iparam : matId;
-		objId =				hasHit ? i : objId;
+		closestHit.t =		hasHit ? hit.t * OFFSET_RAY_COLLISION	: closestHit.t;
+		closestHit.normal = hasHit ? hit.normal						: closestHit.normal;
+		matId =				hasHit ? g_BvhPrimitiveData[i].iparam	: matId;
+		objId =				hasHit ? i								: objId;
+	}
+
+	for(uint i=0 ; i<g_Constants.numTriangles ; ++i)
+	{
+		Hit hit;
+		bool hasHit = HitTriangle(_ray, g_BvhTriangleData[i], 0, closestHit.t, hit);
+
+		closestHit.t =		hasHit ? hit.t * OFFSET_RAY_COLLISION		: closestHit.t;
+		closestHit.normal = hasHit ? hit.normal							: closestHit.normal;
+		matId =				hasHit ? g_BvhTriangleData[i].index2_matId	: matId;
+		objId =				hasHit ? 0xFFFFffff							: objId;
 	}
 
 	closestHit.nid_mid = (matId & 0xFFFF0000) >> 16;

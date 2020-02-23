@@ -44,10 +44,10 @@ namespace tim
             }
         }
 
-        m_bvh->addSphere({ { -2, -2, 4 }, 0.19f }, BVHBuilder::createEmissiveMaterial({ 0, 1, 1 }));
+        m_bvh->addSphere({ { -2, -2, 4 }, 0.19f }, BVHBuilder::createEmissiveMaterial({ 1, 0.5, 1 }));
         m_bvh->addSphereLight({ { -2, -2, 4 }, 25, { 2, 1, 2 }, 0.2f });
 
-        m_bvh->addSphere({ { 2, 2, 4 }, 0.19f }, BVHBuilder::createEmissiveMaterial({ 1, 1, 0 }));
+        m_bvh->addSphere({ { 2, 2, 4 }, 0.19f }, BVHBuilder::createEmissiveMaterial({ 1, 1, 0.5 }));
         m_bvh->addSphereLight({ { 2, 2, 4 }, 15, { 2, 2, 1 }, 0.2f });
 
         m_bvh->addSphere({ { 0, 0, 2 }, 0.5 }, BVHBuilder::createTransparentMaterial({ 1,0.6f,0.6f }, 1.05f, 0.05f));
@@ -65,9 +65,9 @@ namespace tim
         //areaLight.attenuationRadius = 40;
         //m_bvh->addAreaLight(areaLight);
 
-        //auto triangleData = m_geometryBuffer->addTriangle({ 3,3,2 }, { 1,1,2 }, { 3,1,2.5 }); 
-        //m_bvh->addTriangle(triangleData, BVHBuilder::createEmissiveMaterial({ 1, 1, 0 }));
-        //m_geometryBuffer->flush(m_renderer);
+        auto triangleData = m_geometryBuffer->addTriangle({ 3,3,2 }, { 1,1,2 }, { 3,1,2.5 }); 
+        m_bvh->addTriangle(triangleData);
+        m_geometryBuffer->flush(m_renderer);
 
         m_bvh->build(8, 6, Box{ vec3{ -6,-6,-6 }, vec3{ 6,6,6 } });
 
@@ -153,6 +153,7 @@ namespace tim
         BufferBinding bufBinds[] = {
             { passDataBuffer, { 0, g_PassData_bind } },
             { { m_bvhBuffer, m_bvhPrimitiveOffsetRange.x, m_bvhPrimitiveOffsetRange.y }, { 0, g_BvhPrimitives_bind } },
+            { { m_bvhBuffer, m_bvhTriangleOffsetRange.x, m_bvhTriangleOffsetRange.y }, { 0, g_BvhTriangles_bind } },
             { { m_bvhBuffer, m_bvhMaterialOffsetRange.x, m_bvhMaterialOffsetRange.y }, { 0, g_BvhMaterials_bind } },
             { { m_bvhBuffer, m_bvhLightOffsetRange.x, m_bvhLightOffsetRange.y }, { 0, g_BvhLights_bind } },
             { { m_bvhBuffer, m_bvhNodeOffsetRange.x, m_bvhNodeOffsetRange.y }, { 0, g_BvhNodes_bind } },
@@ -167,7 +168,7 @@ namespace tim
         arg.m_bufferBindings = bufBinds;
         arg.m_numBufferBindings = _countof(bufBinds);
 
-        PushConstants constants = { m_bvh->getPrimitivesCount(), m_bvh->getLightsCount(), m_bvh->getNodesCount() };
+        PushConstants constants = { m_bvh->getTrianglesCount(), m_bvh->getPrimitivesCount(), m_bvh->getLightsCount(), m_bvh->getNodesCount() };
         arg.m_constants = &constants;
         arg.m_constantSize = sizeof(constants);
         ShaderFlags flags;
@@ -226,7 +227,7 @@ namespace tim
         arg.m_bufferBindings = &bufBinds[0];
         arg.m_numBufferBindings = (u32)bufBinds.size();
 
-        PushConstants constants = { m_bvh->getPrimitivesCount(), m_bvh->getLightsCount(), m_bvh->getNodesCount() };
+        PushConstants constants = { m_bvh->getTrianglesCount(), m_bvh->getPrimitivesCount(), m_bvh->getLightsCount(), m_bvh->getNodesCount() };
         arg.m_constants = &constants;
         arg.m_constantSize = sizeof(constants);
         arg.m_key = { TIM_HASH32(rayBouncePass.comp), flags };

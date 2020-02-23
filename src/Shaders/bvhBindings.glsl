@@ -10,6 +10,11 @@ layout(std430, set = 0, binding = g_BvhPrimitives_bind) buffer BvhPrimitives
 	PackedPrimitive g_BvhPrimitiveData[];
 };
 
+layout(std430, set = 0, binding = g_BvhTriangles_bind) buffer BvhTriangles
+{
+	Triangle g_BvhTriangleData[];
+};
+
 layout(std430, set = 0, binding = g_BvhMaterials_bind) buffer BvhMaterials
 {	
 	Material g_BvhMaterialData[];

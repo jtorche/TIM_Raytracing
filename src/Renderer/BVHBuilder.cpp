@@ -338,7 +338,7 @@ namespace tim
                 if (triangleBoxCollision(m_triangles[*it].m_triangle, leftBox[bestSplit]) != CollisionType::Disjoint)
                     triangleLeft.push_back(*it);
                 if (triangleBoxCollision(m_triangles[*it].m_triangle, rightBox[bestSplit]) != CollisionType::Disjoint)
-                    triangleLeft.push_back(*it);
+                    triangleRight.push_back(*it);
             }
 
             TIM_ASSERT(m_nodes.size() < g_maxObject);
