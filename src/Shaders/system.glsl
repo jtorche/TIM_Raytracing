@@ -22,7 +22,7 @@ vec4 toLinear(vec4 sRGB)
 }
 
 
-#define USE_SHADOW					1
+#define USE_SHADOW					0
 #define COMPUTE_SHADOW_ON_THE_FLY	1
 #define NO_RAY_INVDIR				0
 

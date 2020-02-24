@@ -20,7 +20,7 @@ namespace tim
 		TIM_ASSERT(m_cpuBufferPosition.size() + 3 < m_maxVertexCount);
 
 		TriangleData triangle;
-		triangle.vertexOffset = (u32)m_cpuBufferPosition.size() / 3;
+		triangle.vertexOffset = (u32)m_cpuBufferPosition.size();
 		triangle.index[0] = 0;
 		triangle.index[1] = 1;
 		triangle.index[2] = 2;
@@ -45,7 +45,8 @@ namespace tim
 
     u32 BVHGeometry::addTriangleList(u32 _numVertex, const vec3 * _positions, const vec3 * _normals, const vec2 * _texCoords)
     {
-        u32 vertexOffset = (u32)m_cpuBufferPosition.size() / 3;
+        TIM_ASSERT(m_cpuBufferPosition.size() + _numVertex < m_maxVertexCount);
+        u32 vertexOffset = (u32)m_cpuBufferPosition.size();
 
         for (u32 i = 0; i < _numVertex; ++i)
         {
@@ -67,6 +68,7 @@ namespace tim
 
 	void BVHGeometry::flush(IRenderer* _renderer)
 	{
+        std::cout << "Total loaded vertex: " << m_cpuBufferPosition.size() << std::endl;
 		_renderer->UploadBuffer(m_gpuBuffer, 0, &m_cpuBufferPosition[0], (u32)m_cpuBufferPosition.size() * sizeof(vec3));
 		_renderer->UploadBuffer(m_gpuBuffer, m_maxVertexCount * sizeof(vec3), &m_cpuBufferNormal[0], (u32)m_cpuBufferNormal.size() * sizeof(vec3));
 		_renderer->UploadBuffer(m_gpuBuffer, m_maxVertexCount * (sizeof(vec3) + sizeof(vec3)), &m_cpuBufferUv[0], (u32)m_cpuBufferUv.size() * sizeof(vec2));

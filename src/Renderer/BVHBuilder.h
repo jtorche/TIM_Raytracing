@@ -4,6 +4,7 @@
 
 #include "Shaders/primitive_cpp.glsl"
 #include "BVHGeometry.h"
+#include <mutex>
 
 namespace tim
 {
@@ -52,9 +53,11 @@ namespace tim
 
         BVHBuilder(const BVHGeometry& _geometry) : m_geometryBuffer{ _geometry } {}
 
+        void dumpStats() const;
+
         void addSphere(const Sphere&, const Material& _mat = createLambertianMaterial({ 0.7f, 0.7f, 0.7f }));
         void addBox(const Box& _box, const Material& _mat = createLambertianMaterial({ 0.7f, 0.7f, 0.7f }));
-        void addTriangle(const BVHGeometry::TriangleData& _box, const Material& _mat = createLambertianMaterial({ 0.7f, 0.7f, 0.7f }));
+        void addTriangle(const BVHGeometry::TriangleData& _triangle, const Material& _mat = createLambertianMaterial({ 0.7f, 0.7f, 0.7f }));
         void addTriangleList(u32 _vertexOffset, u32 _numTriangle, const u32 * _indexData, const Material& _mat = createLambertianMaterial({ 0.7f, 0.7f, 0.7f }));
         void addSphereLight(const SphereLight& _light);
         void addAreaLight(const AreaLight& _light);
@@ -71,13 +74,15 @@ namespace tim
         void fillGpuBuffer(void* _data, uvec2& _triangleOffsetRange, uvec2& _primitiveOffsetRange, uvec2& _materialOffsetRange, uvec2& _lightOffsetRange, uvec2& _nodeOffsetRange, uvec2& m_leafDataOffsetRange);
 
     private:
+        void addTriangle(const BVHGeometry::TriangleData& _triangle, u32 _materialId);
+
         struct Node;
         using ObjectIt = std::vector<u32>::iterator;
         void addObjectsRec(u32 _depth, ObjectIt _objectsBegin, ObjectIt _objectsEnd, ObjectIt _trianglesBegin, ObjectIt _trianglesEnd, Node* _curNode);
 
         template<typename Fun1, typename Fun2>
         void searchBestSplit(Node* _curNode, ObjectIt _objectsBegin, ObjectIt _objectsEnd, ObjectIt _trianglesBegin, ObjectIt _trianglesEnd,
-            const Fun1& _computeStep, const Fun2& _computeFixedStep, Box& _leftBox, Box& _rightBox, size_t& _numObjInLeft, size_t& _numObjInRight) const;
+            const Fun1& _movingAxis, const Fun2& _fixedAxis, Box& _leftBox, Box& _rightBox, size_t& _numObjInLeft, size_t& _numObjInRight) const;
 
         void packNodeData(PackedBVHNode* _outNode, const BVHBuilder::Node& _node, u32 _leafDataOffset);
 
@@ -90,6 +95,17 @@ namespace tim
     private:
         const u32 m_bufferAlignment = 32;
         u32 m_maxDepth = 0, m_maxObjPerNode = 0;
+        std::mutex m_mutex;
+
+        // stats for leaf node
+        struct Stats
+        {
+            u32 numLeafs = 0;
+            u32 maxTriangle = 0;
+            float meanTriangle = 0;
+            float meanDepth = 0;
+        };
+        Stats m_stats;
 
         const BVHGeometry& m_geometryBuffer;
 
@@ -106,7 +122,8 @@ namespace tim
         };
 
         std::vector<Node> m_nodes;
-        std::vector<TrianglePrimitive> m_triangles;
+        std::vector<Triangle> m_triangles;
+        std::vector<Material> m_triangleMaterials;
         std::vector<Primitive> m_objects;
         std::vector<Light> m_lights;
     };

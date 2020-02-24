@@ -32,7 +32,7 @@ namespace tim
         bool m_leftMouseButton = false;
         float m_mouseDx = 0, m_mouseDy = 0;
 
-        vec3 pos = { 0,0,2 };
+        vec3 pos = { 0,0,1.5 };
         vec3 dir = { -1,0,0 };
         vec3 up = { 0,0,1 };
         mat4 m_viewMat = {};

@@ -2,10 +2,10 @@
 #include "SimpleCamera.h"
 #include "BVHBuilder.h"
 #include "shaderMacros.h"
-
+#include "Scene.h"
 #include "Shaders/struct_cpp.glsl"
 
-#include "OBJLoader.h"
+#include <iostream>
 
 namespace tim
 {
@@ -15,88 +15,28 @@ namespace tim
         m_geometryBuffer = std::make_unique<BVHGeometry>(_renderer, 1024 * 1024);
         m_bvh = std::make_unique<BVHBuilder>(*m_geometryBuffer);
 
-#if 1
-        const float DIMXY = 5.1f;
-        const float DIMZ = 5;
+        Scene scene(*m_geometryBuffer.get());
+        scene.build(m_bvh.get());
 
-        auto groundMirror = BVHBuilder::createMirrorMaterial({ 0,1,1 }, 0.3f);
-        auto ballMirror = BVHBuilder::createMirrorMaterial({ 0,1,1 }, 1);
-        auto glassMat = BVHBuilder::createTransparentMaterial({ 0.8f,0.8f,0.8f }, 1.1f, 0);
-        auto redGlassMat = BVHBuilder::createTransparentMaterial({ 1,0,0 }, 1.1f, 0);
-
-        m_bvh->addBox(Box{ { -DIMXY, -DIMXY, DIMZ }, {  DIMXY,          DIMXY,           DIMZ + 0.1f } });
-        m_bvh->addBox(Box{ { -DIMXY, -DIMXY, 0    }, {  DIMXY,          DIMXY,           0.1f } });
-
-        m_bvh->addBox(Box{ { -DIMXY, -DIMXY, 0    }, { -DIMXY + 0.1f,   DIMXY,           DIMZ + 0.1f } });
-        m_bvh->addBox(Box{ {  DIMXY, -DIMXY, 0    }, {  DIMXY + 0.1f,   DIMXY,           DIMZ + 0.1f } });
-
-        m_bvh->addBox(Box{ { -DIMXY, -DIMXY, 0    }, {  DIMXY,         -DIMXY + 0.1f,    DIMZ + 0.1f } });
-        // m_bvh->addBox(Box{ { -DIMXY,  DIMXY - DIMXY * 0.5f, 0    }, {  DIMXY,          DIMXY + 0.1f - DIMXY * 0.5f,    DIMZ + 0.1f } }, redGlassMat);
-
-        const float pillarSize = 0.03f;
-        const float sphereRad = 0.07f;
-        for (u32 i = 0; i < 10; ++i)
-        {
-            for (u32 j = 0; j < 10; ++j)
-            {
-                vec3 p = { -DIMXY + i * (DIMXY / 5), -DIMXY + j * (DIMXY / 5), 0 };
-                m_bvh->addSphere({ p + vec3(0,0,1), sphereRad }, ballMirror);
-                //m_bvh->addSphere({ p + vec3(0,0,1), sphereRad });
-                m_bvh->addBox(Box{ p - vec3(pillarSize, pillarSize, 0), p + vec3(pillarSize, pillarSize, 1) }, (i + j) % 2 == 0 ? glassMat : redGlassMat);
-            }
-        }
-
-        m_bvh->addSphere({ { -2, -2, 4 }, 0.19f }, BVHBuilder::createEmissiveMaterial({ 1, 0.5, 1 }));
-        m_bvh->addSphereLight({ { -2, -2, 4 }, 25, { 2, 1, 2 }, 0.2f });
-
-        m_bvh->addSphere({ { 2, 2, 4 }, 0.19f }, BVHBuilder::createEmissiveMaterial({ 1, 1, 0.5 }));
-        m_bvh->addSphereLight({ { 2, 2, 4 }, 15, { 2, 2, 1 }, 0.2f });
-
-        m_bvh->addSphere({ { 0, 0, 2 }, 0.5 }, BVHBuilder::createTransparentMaterial({ 1,0.6f,0.6f }, 1.05f, 0.05f));
-#endif
-
-        m_bvh->addSphereLight({ { 0, 0, 1.5 }, 10, { 2, 2, 1 }, 0.2f });
-        objl::Loader loader;
-        if (loader.LoadFile("../data/mesh.obj"))
-        {
-            const objl::Mesh& curMesh = loader.LoadedMeshes[0];
-            std::vector<vec3> posData(curMesh.Vertices.size());
-            std::vector<vec3> normalData(curMesh.Vertices.size());
-            for (u32 i = 0; i < curMesh.Vertices.size(); ++i)
-            {
-                posData[i] = { curMesh.Vertices[i].Position.X, curMesh.Vertices[i].Position.Y, curMesh.Vertices[i].Position.Z };
-                posData[i] += vec3(-2, -0.5 ,2);
-                normalData[i] = { curMesh.Vertices[i].Normal.X, curMesh.Vertices[i].Normal.Y, curMesh.Vertices[i].Normal.Z };
-            }
-
-            u32 vertexOffset = m_geometryBuffer->addTriangleList((u32)curMesh.Vertices.size(), &posData[0], &normalData[0]);
-
-            m_bvh->addTriangleList(vertexOffset, curMesh.Vertices.size() / 3, &curMesh.Indices[0]);
-        }
-
-        //m_bvh->addSphere({ { 2, 2, 2 }, 2 }, BVHBuilder::createEmissiveMaterial({ 1, 1, 0 }));
-
-        //m_bvh->addPointLight({ { -3, -2, 4 }, 30, { 0, 1, 1 } });
-
-        //AreaLight areaLight;
-        //areaLight.pos = { 0, 0, 3 };
-        //areaLight.width = { -0.3, 0, 0 };
-        //areaLight.height = { 0, 0.3, 0 };
-        //areaLight.color = { 1,1,1 };
-        //areaLight.attenuationRadius = 40;
-        //m_bvh->addAreaLight(areaLight);
-
-        auto triangleData = m_geometryBuffer->addTriangle({ 3,3,2 }, { 1,1,2 }, { 3,1,2.5 }); 
-        m_bvh->addTriangle(triangleData);
         m_geometryBuffer->flush(m_renderer);
 
-        m_bvh->build(12, 8, Box{ vec3{ -10,-10,-2 }, vec3{ 10,10,10 } });
+        {
+            auto start = std::chrono::system_clock::now();
+            m_bvh->build(15, 12, Box{ vec3{ -100,-100,-100 }, vec3{ 100,100,100 } });
+            m_bvh->dumpStats();
+            auto end = std::chrono::system_clock::now();
+            std::chrono::duration<double> elapsed_seconds = end - start;
+            std::cout << "Build BVH time: " << elapsed_seconds.count() << "s\n";
+        }
 
         u32 size = m_bvh->getBvhGpuSize();
+        std::cout << "Uploading " << (size >> 10) << " Ko of BVH data\n";
         m_bvhBuffer = _renderer->CreateBuffer(size, MemoryType::Default, BufferUsage::Storage | BufferUsage::Transfer);
         std::unique_ptr<ubyte[]> buffer = std::unique_ptr<ubyte[]>(new ubyte[size]);
         m_bvh->fillGpuBuffer(buffer.get(), m_bvhTriangleOffsetRange, m_bvhPrimitiveOffsetRange, m_bvhMaterialOffsetRange, m_bvhLightOffsetRange, m_bvhNodeOffsetRange, m_bvhLeafDataOffsetRange);
         _renderer->UploadBuffer(m_bvhBuffer, buffer.get(), size);
+
+        system("pause");
     }
 
     RayTracingPass::~RayTracingPass()

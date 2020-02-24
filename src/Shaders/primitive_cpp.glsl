@@ -14,9 +14,9 @@
 #define Material_Transparent	4
 
 // used to pack node data
-#define TriangleBitCount 14
-#define PrimitiveBitCount 10
-#define LightBitCount 8
+#define TriangleBitCount 18
+#define PrimitiveBitCount 9
+#define LightBitCount 5
 
 struct Ray
 {
