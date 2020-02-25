@@ -46,4 +46,9 @@ struct IndirectLightRay
 	vec4 lit;
 };
 
+#define NID_LEAF_BIT 0x80000000
+#define NID_MASK 0x3FFFFFFF
+#define NID_LEFT_LEAF_BIT 0x80000000
+#define NID_RIGHT_LEAF_BIT 0x40000000
+
 #endif

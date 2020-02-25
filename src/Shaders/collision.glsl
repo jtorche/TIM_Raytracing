@@ -87,13 +87,18 @@ struct ClosestHit
     vec3 normal;
 #endif
     float t;
-	uint nid_mid;
-	uint objectId;
+	uint nid;
+	uint mid_objId;
 };
+
+uint getObjectId(in ClosestHit _hit)
+{
+	return (_hit.mid_objId & 0x0000FFFF);
+}
 
 uint getMaterialId(in ClosestHit _hit)
 {
-	return (_hit.nid_mid & 0xFFFF0000) >> 16;
+	return (_hit.mid_objId & 0xFFFF0000) >> 16;
 }
 
 struct Hit

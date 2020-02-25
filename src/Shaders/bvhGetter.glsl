@@ -5,21 +5,23 @@
 
 bool bvh_isLeaf(uint _nid)
 {
-	return (_nid & 0x8000) > 0;
+	return (_nid & NID_LEAF_BIT) > 0;
 }
 
 void bvh_getParentSiblingId(uint _nid, out uint _parentId, out uint _siblingId)
 {
-	uint packed = g_BvhNodeData[_nid & 0x7FFF].nid.x;
-	_parentId = packed & 0x0000FFFF;
-	_siblingId = (packed & 0xFFFF0000) >> 16;
+	_parentId = g_BvhNodeData[_nid & NID_MASK].nid.x;
+	_siblingId = g_BvhNodeData[_nid & NID_MASK].nid.y;
 }
 
 void bvh_getChildId(uint _nid, out uint _left, out uint _right)
 {
-	uint packed = g_BvhNodeData[_nid].nid.y;
-	_left = packed & 0x0000FFFF;
-	_right = (packed & 0xFFFF0000) >> 16;
+	uint packed = g_BvhNodeData[_nid].nid.z;
+	_left = packed & NID_MASK;
+	_right = _left + 1;
+
+	_left = _left   | ((packed & NID_LEFT_LEAF_BIT) > 0 ? NID_LEAF_BIT : 0);
+	_right = _right | ((packed & NID_RIGHT_LEAF_BIT) > 0 ? NID_LEAF_BIT : 0);
 }
 
 void bvh_getNodeBoxes(uint _nid, out Box _box0, out Box _box1)

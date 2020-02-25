@@ -38,7 +38,7 @@ void main()
         vec3 lit = rayTrace(ray, closestHit);
 		
 		imageStore(g_outputImage, pixelCoord, vec4(lit, 1));
-        nextBounce(closestHit.objectId, getMaterialId(closestHit), vec3(1,1,1), getHitNormal(closestHit), ray, closestHit.t);
+        nextBounce(getObjectId(closestHit), getMaterialId(closestHit), vec3(1,1,1), getHitNormal(closestHit), ray, closestHit.t);
 	}
 #else
 
@@ -56,8 +56,8 @@ void main()
 
 		ClosestHit closestHit;
 		closestHit.t = TMAX;
-		closestHit.nid_mid = 0xFFFFffff;
-		uint rootId = g_Constants.numNodes == 1 ? 0x8000 : 0;
+		closestHit.mid_objId = 0xFFFFffff;
+		uint rootId = g_Constants.numNodes == 1 ? NID_LEAF_BIT : 0;
 
 		collideRayAgainstTileData(ray, closestHit);
 		
@@ -65,11 +65,11 @@ void main()
 		if(closestHit.t < TMAX)
 		{
 			for(uint i=0 ; i<g_lightCount ; ++i)
-                lit += evalLighting(rootId, g_lights[i], closestHit.nid_mid, ray, closestHit);
+                lit += evalLighting(rootId, g_lights[i], getMaterialId(closestHit), ray, closestHit);
 		}
 		
 		imageStore(g_outputImage, pixelCoord, vec4(lit, 1));
-        nextBounce(closestHit.objectId, closestHit.nid_mid, vec3(1,1,1), getHitNormal(closestHit), ray, closestHit.t);
+        nextBounce(getObjectId(closestHit), getMaterialId(closestHit), vec3(1,1,1), getHitNormal(closestHit), ray, closestHit.t);
 	}
 #endif
 }

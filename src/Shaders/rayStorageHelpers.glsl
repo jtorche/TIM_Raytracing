@@ -75,18 +75,21 @@ void nextBounce(uint _objectId, uint _matId, vec3 _lightAbsorbdeByPreBounce, vec
 		// inRefractionRay = normalize(inRefractionRay == vec3(0,0,0) ? _ray.dir : inRefractionRay);
 		if(inRefractionRay != vec3(0,0,0))
 		{
-			Ray inRay = createRay(p, inRefractionRay);
-			Hit hit;
-			if(hitPrimitiveThrough(_objectId, inRay, 100, hit))
+			if(_objectId < 0xFFFF)
 			{
-				vec3 outRefractionRay = refract(inRay.dir, -hit.normal, 1.0 / g_BvhMaterialData[_matId].params.y);
-				outRefractionRay = normalize(outRefractionRay == vec3(0,0,0) ? inRay.dir : outRefractionRay);
-				p = inRay.from + inRay.dir * hit.t;
-				IndirectLightRay outRay;
-				outRay.pos = vec4(p + hit.normal * 0.001, 1);
-				outRay.lit = vec4(_lightAbsorbdeByPreBounce * g_BvhMaterialData[_matId].color.xyz * (1-fresnelReflexion), 0);
-				outRay.dir = vec4(outRefractionRay, 0);
-				writeRefractionRay(outRay);
+				Ray inRay = createRay(p, inRefractionRay);
+				Hit hit;
+				if(hitPrimitiveThrough(_objectId, inRay, 100, hit))
+				{
+					vec3 outRefractionRay = refract(inRay.dir, -hit.normal, 1.0 / g_BvhMaterialData[_matId].params.y);
+					outRefractionRay = normalize(outRefractionRay == vec3(0,0,0) ? inRay.dir : outRefractionRay);
+					p = inRay.from + inRay.dir * hit.t;
+					IndirectLightRay outRay;
+					outRay.pos = vec4(p + hit.normal * 0.001, 1);
+					outRay.lit = vec4(_lightAbsorbdeByPreBounce * g_BvhMaterialData[_matId].color.xyz * (1-fresnelReflexion), 0);
+					outRay.dir = vec4(outRefractionRay, 0);
+					writeRefractionRay(outRay);
+				}
 			}
 		}
 	}

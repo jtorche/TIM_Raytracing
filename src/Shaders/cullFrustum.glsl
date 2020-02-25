@@ -14,7 +14,7 @@ vec4 computePlan(vec3 p1, vec3 p2, vec3 p3)
 
 bool primitiveFrustumCollision(uint objIndex, in vec4 _plans[4])
 {
-	uint type =  g_BvhPrimitiveData[objIndex].iparam & 0xFFFF;
+	uint type =  g_BvhPrimitiveData[objIndex].iparam & 0x0000FFFF;
 	switch(type)
 	{
 		case Primitive_Sphere: 
@@ -140,7 +140,8 @@ void cullWithFrustumTile(in PassData _passData, in PushConstants _constants)
 
 void collideRayAgainstTileData(in Ray _ray, inout ClosestHit _closestHit)
 {
-	uint matId = 0;
+	_closestHit.nid = 0xFFFFffff;
+
 	#if USE_SHARED_MEM
 	vec3 normal;
 	bool anyHit = false;
@@ -164,8 +165,7 @@ void collideRayAgainstTileData(in Ray _ray, inout ClosestHit _closestHit)
 		_closestHit.normal =	hasHit ? hit.normal : _closestHit.normal;
 		#endif	
 
-		matId =					hasHit ? g_BvhPrimitiveData[primIndex].iparam	: matId;
-		_closestHit.objectId =	hasHit ? primIndex : _closestHit.objectId;
+		_closestHit.mid_objId =	hasHit ? primIndex | (g_BvhPrimitiveData[primIndex].iparam & 0xFFFF0000) : _closestHit.mid_objId;
 	}
 
 	for(uint i=0 ; i<g_triangleCount ; ++i)
@@ -186,11 +186,9 @@ void collideRayAgainstTileData(in Ray _ray, inout ClosestHit _closestHit)
 		_closestHit.normal =	hasHit ? hit.normal : _closestHit.normal;
 		#endif	
 
-		matId =					hasHit ? g_BvhTriangleData[triIndex].index2_matId : matId;
-		_closestHit.objectId =	hasHit ? 0xFFFFffff : _closestHit.objectId;
+		_closestHit.mid_objId =	hasHit ? 0x0000FFFF | (g_BvhTriangleData[triIndex].index2_matId & 0xFFFF0000) : _closestHit.mid_objId;
 	}
 
-	_closestHit.nid_mid = (matId & 0xFFFF0000) >> 16;
 	#if USE_SHARED_MEM
 	if(anyHit)
 		g_normalHit[gl_LocalInvocationIndex] = normal;
@@ -201,7 +199,7 @@ vec3 evalLightWithTileData(uint rootId, in Ray _ray, in ClosestHit _closestHit)
 {
 	vec3 pixelColor = vec3(0,0,0);
 	for(uint i=0 ; i<g_lightCount ; ++i)
-		pixelColor += evalLighting(rootId, g_lights[i], _closestHit.nid_mid, _ray, _closestHit);
+		pixelColor += evalLighting(rootId, g_lights[i], getMaterialId(_closestHit), _ray, _closestHit);
 
 	return pixelColor;
 }

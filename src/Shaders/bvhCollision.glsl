@@ -156,9 +156,9 @@ uvec3 unpackObjectCount(uint _packed)
 
 void bvh_collide(uint _nid, Ray _ray, inout ClosestHit closestHit)
 {
-	_nid = _nid & 0x7FFF;
-	uint leafDataOffset = g_BvhNodeData[_nid].nid.z;
-	uvec3 unpackedLeafDat = unpackObjectCount(g_BvhNodeData[_nid].nid.w);
+	_nid = _nid & NID_MASK;
+	uint leafDataOffset = g_BvhNodeData[_nid].nid.w;
+	uvec3 unpackedLeafDat = unpackObjectCount(g_BvhLeafData[leafDataOffset]);
 	uint numTriangles = unpackedLeafDat.x;
 	uint numObjects = unpackedLeafDat.y;
 #if USE_SHARED_MEM
@@ -168,15 +168,15 @@ void bvh_collide(uint _nid, Ray _ray, inout ClosestHit closestHit)
 
 	for(uint i=0 ; i<numObjects ; ++i)
 	{
-		uint objIndex = g_BvhLeafData[numTriangles + leafDataOffset + i];
+		uint objIndex = g_BvhLeafData[1 + leafDataOffset + numTriangles + i];
 		Hit hit;
 		bool hasHit = hitPrimitive(objIndex, _ray, closestHit.t, hit);
 
 		if(hasHit)
 		{
-			closestHit.t		= hit.t * OFFSET_RAY_COLLISION;
-			closestHit.nid_mid	= _nid + (g_BvhPrimitiveData[objIndex].iparam & 0xFFFF0000);
-			closestHit.objectId = objIndex;
+			closestHit.t			= hit.t * OFFSET_RAY_COLLISION;
+			closestHit.mid_objId	= objIndex + (g_BvhPrimitiveData[objIndex].iparam & 0xFFFF0000);
+			closestHit.nid			= _nid;
 		#if USE_SHARED_MEM
 			normal = hit.normal;
 			anyHit = true;
@@ -188,16 +188,16 @@ void bvh_collide(uint _nid, Ray _ray, inout ClosestHit closestHit)
 
 	for(uint i=0 ; i<numTriangles ; ++i)
 	{
-		uint triIndex = g_BvhLeafData[leafDataOffset + i];
+		uint triIndex = g_BvhLeafData[1 + leafDataOffset + i];
 		Triangle triangle = g_BvhTriangleData[triIndex];
 		Hit hit;
 		bool hasHit = HitTriangle(_ray, triangle, 0, closestHit.t, hit);
 
 		if(hasHit)
 		{
-			closestHit.t		= hit.t * OFFSET_RAY_COLLISION;
-			closestHit.nid_mid	= _nid + (triangle.index2_matId & 0xFFFF0000);
-			closestHit.objectId = 0xFFFFffff;
+			closestHit.t			= hit.t * OFFSET_RAY_COLLISION;
+			closestHit.mid_objId	= 0x0000FFFF + (triangle.index2_matId & 0xFFFF0000);
+			closestHit.nid			= _nid;
 		#if USE_SHARED_MEM
 			normal = hit.normal;
 			anyHit = true;
@@ -215,22 +215,22 @@ void bvh_collide(uint _nid, Ray _ray, inout ClosestHit closestHit)
 
 bool bvh_collide_fast(uint _nid, Ray _ray, float tmax)
 {
-	_nid = _nid & 0x7FFF;
-	uint leafDataOffset = g_BvhNodeData[_nid].nid.z;
-	uvec3 unpackedLeafDat = unpackObjectCount(g_BvhNodeData[_nid].nid.w);
+	_nid = _nid & NID_MASK;
+	uint leafDataOffset = g_BvhNodeData[_nid].nid.w;
+	uvec3 unpackedLeafDat = unpackObjectCount(g_BvhLeafData[leafDataOffset]);
 	uint numTriangles = unpackedLeafDat.x;
 	uint numObjects = unpackedLeafDat.y;
 
 	for(uint i=0 ; i<numObjects ; ++i)
 	{
-		uint objIndex = g_BvhLeafData[leafDataOffset + numTriangles + i];
+		uint objIndex = g_BvhLeafData[1 + leafDataOffset + numTriangles + i];
 		if(hitPrimitiveFast(objIndex, _ray, tmax))
 			return true;
 	}
 
 	for(uint i=0 ; i<numTriangles ; ++i)
 	{
-		uint triIndex = g_BvhLeafData[leafDataOffset + i];
+		uint triIndex = g_BvhLeafData[1 + leafDataOffset + i];
 		vec3 p0,p1,p2; 
 		loadTriangleVertices(p0, p1, p2, g_BvhTriangleData[triIndex]);
 
@@ -244,16 +244,15 @@ bool bvh_collide_fast(uint _nid, Ray _ray, float tmax)
 #if NO_BVH
 void brutForceTraverse(Ray _ray, inout ClosestHit closestHit)
 {
-	uint objId = 0xFFFFffff;
+	closestHit.nid = 0xFFFFffff;
 	for(uint i=0 ; i<g_Constants.numPrimitives ; ++i)
 	{
 		Hit hit;
 		bool hasHit = hitPrimitive(i, _ray, closestHit.t, hit);
 
-		closestHit.t =		hasHit ? hit.t * OFFSET_RAY_COLLISION	: closestHit.t;
-		closestHit.normal = hasHit ? hit.normal						: closestHit.normal;
-		closestHit.nid_mid =hasHit ? g_BvhPrimitiveData[i].iparam	: closestHit.nid_mid;
-		objId =				hasHit ? i								: objId;
+		closestHit.t =			hasHit ? hit.t * OFFSET_RAY_COLLISION	: closestHit.t;
+		closestHit.normal =		hasHit ? hit.normal						: closestHit.normal;
+		closestHit.mid_objId =	hasHit ? i | (g_BvhPrimitiveData[i].iparam & 0xFFFF0000) : closestHit.mid_objId;
 	}
 
 	for(uint i=0 ; i<g_Constants.numTriangles ; ++i)
@@ -261,13 +260,10 @@ void brutForceTraverse(Ray _ray, inout ClosestHit closestHit)
 		Hit hit;
 		bool hasHit = HitTriangle(_ray, g_BvhTriangleData[i], 0, closestHit.t, hit);
 
-		closestHit.t =		hasHit ? hit.t * OFFSET_RAY_COLLISION		: closestHit.t;
-		closestHit.normal = hasHit ? hit.normal							: closestHit.normal;
-		closestHit.nid_mid =hasHit ? g_BvhTriangleData[i].index2_matId	: closestHit.nid_mid;
-		objId =				hasHit ? 0xFFFFffff							: objId;
+		closestHit.t =			hasHit ? hit.t * OFFSET_RAY_COLLISION		: closestHit.t;
+		closestHit.normal =		hasHit ? hit.normal							: closestHit.normal;
+		closestHit.mid_objId =	hasHit ? 0x0000FFFF | (g_BvhTriangleData[i].index2_matId & 0xFFFF0000) : closestHit.mid_objId;
 	}
-
-	closestHit.objectId = objId;
 }
 #endif
 

@@ -3,11 +3,16 @@
 
 #include "TriBoxCollision.hpp"
 #include <thread>
+#include "shaders/struct_cpp.glsl"
 
 namespace tim
 {
     namespace
     {
+        constexpr u32 g_MaxMaterialCount = 1u << 16;
+        constexpr u32 g_MaxNodeCount = NID_MASK;
+        constexpr u32 g_MaxPrimitiveCount = (1u << 16) - 1;
+
         CollisionType sphereBoxCollision(const Sphere& _sphere, const Box& _box)
         {
             vec3 closestPointInAabb = linalg::min_(linalg::max_(_sphere.center, _box.minExtent), _box.maxExtent);
@@ -204,7 +209,7 @@ namespace tim
 
     void BVHBuilder::addTriangle(const BVHGeometry::TriangleData& _triangle, u32 _materialId)
     {
-        TIM_ASSERT(matId < (1u << 16));
+        TIM_ASSERT(_materialId < g_MaxMaterialCount);
         Triangle triangle;
         triangle.vertexOffset = _triangle.vertexOffset;
         triangle.index01 = _triangle.index[0] + (_triangle.index[1] << 16);
@@ -258,14 +263,10 @@ namespace tim
 
     void BVHBuilder::build(u32 _maxDepth, u32 _maxObjPerNode, const Box& _sceneSize)
     {
-        TIM_ASSERT(_maxDepth <= 15); // because 15 bits index for node
-
         m_maxDepth = _maxDepth;
         m_maxObjPerNode = _maxObjPerNode;
 
         m_stats = {};
-
-        TIM_ASSERT(m_objects.size() < 0x7FFF);
 
         m_nodes.clear();
         m_nodes.reserve(size_t(1) << (m_maxDepth + 1));
@@ -304,13 +305,11 @@ namespace tim
         m_stats.meanDepth /= m_stats.numLeafs;
         m_stats.meanTriangle /= m_stats.numLeafs;
 
-        TIM_ASSERT(m_nodes.size() < (1u << 15));
+        TIM_ASSERT(m_nodes.size() < g_MaxNodeCount);
     }
 
     void BVHBuilder::addObjectsRec(u32 _depth, ObjectIt _objectsBegin, ObjectIt _objectsEnd, ObjectIt _trianglesBegin, ObjectIt _trianglesEnd, BVHBuilder::Node* _curNode)
     {
-        constexpr u32 g_maxObject = 0x7FFF;
-
         size_t numObjects = std::distance(_objectsBegin, _objectsEnd) + std::distance(_trianglesBegin, _trianglesEnd);
         if (numObjects <= m_maxObjPerNode || _depth >= m_maxDepth)
         {
@@ -386,11 +385,9 @@ namespace tim
             }
 
             m_mutex.lock();
-            TIM_ASSERT(m_nodes.size() < g_maxObject);
             m_nodes.push_back({});
             Node& leftNode = m_nodes.back();
 
-            TIM_ASSERT(m_nodes.size() < g_maxObject);
             m_nodes.push_back({});
             Node& rightNode = m_nodes.back();
             m_mutex.unlock();
@@ -542,7 +539,7 @@ namespace tim
         size += alignUp<u32>((u32)m_lights.size() * sizeof(PackedLight), m_bufferAlignment);
         for (const BVHBuilder::Node& n : m_nodes)
         {
-            size += (u32)(n.triangleList.size() + n.primitiveList.size() + n.lightList.size()) * sizeof(u32);
+            size += (u32)(1 + n.triangleList.size() + n.primitiveList.size() + n.lightList.size()) * sizeof(u32);
         }
         return size;
     }
@@ -608,31 +605,25 @@ namespace tim
 
     void BVHBuilder::packNodeData(PackedBVHNode* _outNode, const BVHBuilder::Node& _node, u32 _leafDataOffset)
     {
-        constexpr u16 InvalidNodeId = 0x7FFF;
-        u16 leftIndex = _node.left ? u16(_node.left - &m_nodes[0]) : InvalidNodeId;
-        u16 rightIndex = _node.right ? u16(_node.right - &m_nodes[0]) : InvalidNodeId;
-        u16 parentIndex = _node.parent ? u16(_node.parent - &m_nodes[0]) : InvalidNodeId;
-        u16 siblingIndex = _node.sibling ? u16(_node.sibling - &m_nodes[0]) : InvalidNodeId;
-        TIM_ASSERT((leftIndex == InvalidNodeId && rightIndex == InvalidNodeId) || (leftIndex != InvalidNodeId && rightIndex != InvalidNodeId));
+        TIM_ASSERT((_node.left && _node.right) || (!_node.left && !_node.right));
+        constexpr u32 InvalidNodeId = NID_MASK;
+        u32 leftIndex = _node.left ? u32(_node.left - &m_nodes[0]) : InvalidNodeId;
+        u32 rightIndex = _node.right ? u32(_node.right - &m_nodes[0]) : InvalidNodeId;
+        u32 parentIndex = _node.parent ? u32(_node.parent - &m_nodes[0]) : InvalidNodeId;
+        u32 siblingIndex = _node.sibling ? u32(_node.sibling - &m_nodes[0]) : InvalidNodeId;
+        
+        TIM_ASSERT(leftIndex + 1 == rightIndex || (leftIndex == InvalidNodeId && rightIndex == InvalidNodeId));
 
         auto isLeaf = [](const BVHBuilder::Node* node) { return node ? node->left == nullptr : false; };
         auto hasParent = [](const BVHBuilder::Node* node) { return node ? node->parent != nullptr : false; };
 
         // add bit to fast check if leaf
-        siblingIndex = isLeaf(_node.sibling) ? 0x8000 | siblingIndex : siblingIndex;
-        leftIndex = isLeaf(_node.left) ? 0x8000 | leftIndex : leftIndex;
-        rightIndex = isLeaf(_node.right) ? 0x8000 | rightIndex : rightIndex;
+        siblingIndex = isLeaf(_node.sibling) ? NID_LEAF_BIT | siblingIndex : siblingIndex;
 
-        static_assert(TriangleBitCount + PrimitiveBitCount + LightBitCount == 32);
-        TIM_ASSERT(u32(_node.triangleList.size()) < (1 << TriangleBitCount));
-        TIM_ASSERT(u32(_node.primitiveList.size()) < (1 << PrimitiveBitCount));
-        TIM_ASSERT(u32(_node.lightList.size()) < (1 << LightBitCount));
-        
-        u32 packedTriObjLightCount = u32(_node.triangleList.size()) + (u32(_node.primitiveList.size()) << TriangleBitCount) + (u32(_node.lightList.size()) << (TriangleBitCount + PrimitiveBitCount));
-        _outNode->nid = uvec4(parentIndex + (siblingIndex << 16), leftIndex + (rightIndex << 16), _leafDataOffset, packedTriObjLightCount);
+        u32 packedChildNid = leftIndex | (isLeaf(_node.left) ? NID_LEFT_LEAF_BIT : 0) | (isLeaf(_node.right) ? NID_RIGHT_LEAF_BIT : 0);
+        _outNode->nid = uvec4(parentIndex, siblingIndex, packedChildNid, _leafDataOffset);
 
-        TIM_ASSERT((leftIndex == InvalidNodeId && rightIndex == InvalidNodeId) || (leftIndex != InvalidNodeId && rightIndex != InvalidNodeId));
-        if (leftIndex != InvalidNodeId)
+        if (_node.left)
         {
             Box box0 = _node.left->extent;
             Box box1 = _node.right->extent;
@@ -699,7 +690,9 @@ namespace tim
         prevout = out;
 
         // Store material data
-        u32 materialBufferSize = u32((m_triangleMaterials.size() + m_objects.size()) * sizeof(Material));
+        u32 materialCount = u32(m_triangleMaterials.size() + m_objects.size());
+        TIM_ASSERT(materialCount < g_MaxMaterialCount);
+        u32 materialBufferSize = materialCount * sizeof(Material);
         _materialOffsetRange = { (u32)std::distance((ubyte*)_data, out), materialBufferSize };
         _materialOffsetRange.y = std::max(m_bufferAlignment, _materialOffsetRange.y);
 
@@ -751,13 +744,21 @@ namespace tim
         u32* objectListBegin = reinterpret_cast<u32*>(out + alignUp(nodeBufferSize, m_bufferAlignment));
         u32* objectListCurPtr = objectListBegin;
 
-        TIM_ASSERT(m_nodes.size() < 0x7FFF);
         for (const BVHBuilder::Node& n : m_nodes)
         {
             PackedBVHNode* node = reinterpret_cast<PackedBVHNode*>(out);
             u32 leafDataIndex = (n.triangleList.size() + n.primitiveList.size()) == 0 ? u32(-1) : u32(objectListCurPtr - objectListBegin);
             packNodeData(node, n, leafDataIndex);
 
+            static_assert(TriangleBitCount + PrimitiveBitCount + LightBitCount == 32);
+            TIM_ASSERT(u32(n.triangleList.size()) < (1 << TriangleBitCount));
+            TIM_ASSERT(u32(n.primitiveList.size()) < (1 << PrimitiveBitCount));
+            TIM_ASSERT(u32(n.lightList.size()) < (1 << LightBitCount));
+
+            u32 packedTriObjLightCount = u32(n.triangleList.size()) + (u32(n.primitiveList.size()) << TriangleBitCount) + (u32(n.lightList.size()) << (TriangleBitCount + PrimitiveBitCount));
+
+            *objectListCurPtr = packedTriObjLightCount;
+            ++objectListCurPtr;
             memcpy(objectListCurPtr, n.triangleList.data(), sizeof(u32) * n.triangleList.size());
             objectListCurPtr += n.triangleList.size();
             memcpy(objectListCurPtr, n.primitiveList.data(), sizeof(u32) * n.primitiveList.size());

@@ -16,9 +16,9 @@ vec3 rayTrace(in Ray _ray, out ClosestHit _hitResult)
 {
 	ClosestHit closestHit;
 	closestHit.t = TMAX;
-	closestHit.nid_mid = 0xFFFFffff;
-	closestHit.objectId = 0xFFFFffff;
-	uint rootId = g_Constants.numNodes == 1 ? 0x8000 : 0;
+	closestHit.mid_objId = 0xFFFFffff;
+	closestHit.nid = 0xFFFFffff;
+	uint rootId = g_Constants.numNodes == 1 ? NID_LEAF_BIT : 0;
 
 #if NO_BVH
 	brutForceTraverse(_ray, closestHit);
@@ -31,7 +31,7 @@ vec3 rayTrace(in Ray _ray, out ClosestHit _hitResult)
 	{
 	#if NO_BVH
 		for(uint i=0 ; i<g_Constants.numLights ; ++i)
-			lit += evalLighting(rootId, i, (closestHit.nid_mid & 0xFFFF0000) >> 16, _ray, closestHit);
+			lit += evalLighting(rootId, i, getMaterialId(closestHit), _ray, closestHit);
 	#else
            lit = computeDirectLighting(rootId, _ray, closestHit);
 	#endif

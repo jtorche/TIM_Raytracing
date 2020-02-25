@@ -25,11 +25,10 @@ vec3 evalLighting(uint _rootId, uint lightIndex, uint _matId, in Ray _ray, in Cl
 
 vec3 computeDirectLighting(uint rootId, in Ray _ray, in ClosestHit _hit)
 {
-	uint nid = _hit.nid_mid & 0xFFFF;
 	uint matId = getMaterialId(_hit);
 
-	uint leafDataOffset = g_BvhNodeData[nid].nid.z;
-	uvec3 unpacked = unpackObjectCount(g_BvhNodeData[nid].nid.w);
+	uint leafDataOffset = g_BvhNodeData[_hit.nid].nid.w;
+	uvec3 unpacked = unpackObjectCount(g_BvhLeafData[leafDataOffset]);
 	uint numTriangles = unpacked.x;
 	uint numObjects = unpacked.y;
 	uint numLights = unpacked.z;
@@ -37,7 +36,7 @@ vec3 computeDirectLighting(uint rootId, in Ray _ray, in ClosestHit _hit)
 	vec3 totalLight = vec3(0,0,0);
 	for(uint i=0 ; i<numLights ; ++i)
 	{
-		uint lightIndex = g_BvhLeafData[leafDataOffset + numObjects + numTriangles + i];
+		uint lightIndex = g_BvhLeafData[1 + leafDataOffset + numTriangles + numObjects + i];
 		totalLight += evalLighting(rootId, lightIndex, matId, _ray, _hit);
 	}
 

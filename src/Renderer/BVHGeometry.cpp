@@ -68,10 +68,13 @@ namespace tim
 
 	void BVHGeometry::flush(IRenderer* _renderer)
 	{
-        std::cout << "Total loaded vertex: " << m_cpuBufferPosition.size() << std::endl;
-		_renderer->UploadBuffer(m_gpuBuffer, 0, &m_cpuBufferPosition[0], (u32)m_cpuBufferPosition.size() * sizeof(vec3));
-		_renderer->UploadBuffer(m_gpuBuffer, m_maxVertexCount * sizeof(vec3), &m_cpuBufferNormal[0], (u32)m_cpuBufferNormal.size() * sizeof(vec3));
-		_renderer->UploadBuffer(m_gpuBuffer, m_maxVertexCount * (sizeof(vec3) + sizeof(vec3)), &m_cpuBufferUv[0], (u32)m_cpuBufferUv.size() * sizeof(vec2));
+        if (m_cpuBufferPosition.size() > 0)
+        {
+            std::cout << "Total loaded vertex: " << m_cpuBufferPosition.size() << std::endl;
+            _renderer->UploadBuffer(m_gpuBuffer, 0, &m_cpuBufferPosition[0], (u32)m_cpuBufferPosition.size() * sizeof(vec3));
+            _renderer->UploadBuffer(m_gpuBuffer, m_maxVertexCount * sizeof(vec3), &m_cpuBufferNormal[0], (u32)m_cpuBufferNormal.size() * sizeof(vec3));
+            _renderer->UploadBuffer(m_gpuBuffer, m_maxVertexCount * (sizeof(vec3) + sizeof(vec3)), &m_cpuBufferUv[0], (u32)m_cpuBufferUv.size() * sizeof(vec2));
+        }
 	}
 
     void BVHGeometry::generateGeometryBufferBindings(BufferBinding& _positions, BufferBinding& _normals, BufferBinding& _texcoords)
