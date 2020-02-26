@@ -9,6 +9,7 @@ namespace tim
 {
     namespace
     {
+        constexpr u32 g_maxStep = 256;
         constexpr u32 g_MaxMaterialCount = 1u << 16;
         constexpr u32 g_MaxNodeCount = NID_MASK;
         constexpr u32 g_MaxPrimitiveCount = (1u << 16) - 1;
@@ -430,7 +431,6 @@ namespace tim
         const Fun1& _movingAxis, const Fun2& _fixedAxis,
         Box& _leftBox, Box& _rightBox, size_t& _numObjInLeft, size_t& _numObjInRight) const
     {
-        const u32 g_maxStep = 128;
         size_t numObjects = std::distance(_objectsBegin, _objectsEnd) + std::distance(_trianglesBegin, _trianglesEnd);
         vec3 boxDim = _curNode->extent.maxExtent - _curNode->extent.minExtent;
 

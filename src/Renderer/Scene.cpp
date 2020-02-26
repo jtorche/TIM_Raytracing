@@ -1,8 +1,33 @@
 #include "Scene.h"
 #include "timCore/Common.h"
-#include "OBJLoader.h"
 #include "BVHBuilder.h"
 #include "BVHGeometry.h"
+
+#define TINYOBJLOADER_IMPLEMENTATION
+#include "tiny_obj_loader.h"
+
+#include "timCore/flat_hash_map.h"
+
+namespace tim
+{
+    struct ObjVertexKey 
+    { 
+        u32 posIndex, normalIndex, texcoordIndex; 
+        bool operator==(const ObjVertexKey&) const = default;
+    };
+}
+namespace std
+{
+    template<> struct hash<tim::ObjVertexKey>
+    {
+        size_t operator()(const tim::ObjVertexKey& key) const
+        {
+            size_t h = 0;
+            tim::hash_combine(h, key.posIndex, key.normalIndex, key.texcoordIndex);
+            return h;
+        }
+    };
+}
 
 namespace tim
 {
@@ -13,37 +38,66 @@ namespace tim
 
     void Scene::addOBJ(const char* _path, vec3 _pos, BVHBuilder* _bvh)
     {
-        objl::Loader loader;
-        if (loader.LoadFile(_path))
+        tinyobj::attrib_t attrib;
+        std::vector<tinyobj::shape_t> shapes;
+        std::vector<tinyobj::material_t> materials;
+        std::string warn;
+        std::string err;
+        bool ret = tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, _path);
+        if (ret)
         {
-            for (u32 objId = 0; objId < loader.LoadedMeshes.size(); ++objId)
+            std::cout << "Warning loading  " << _path << ": " << warn << std::endl;
+            for (u32 objId = 0; objId < shapes.size(); ++objId)
             {
-                const objl::Mesh& curMesh = loader.LoadedMeshes[objId];
-                if (curMesh.Vertices.size() < (1u << 16))
-                {
-                    std::vector<vec3> posData(curMesh.Vertices.size());
-                    std::vector<vec3> normalData(curMesh.Vertices.size());
-                    for (u32 i = 0; i < curMesh.Vertices.size(); ++i)
-                    {
-                        posData[i] = { curMesh.Vertices[i].Position.X, curMesh.Vertices[i].Position.Y, curMesh.Vertices[i].Position.Z };
-                        posData[i] += _pos;
-                        normalData[i] = { curMesh.Vertices[i].Normal.X, curMesh.Vertices[i].Normal.Y, curMesh.Vertices[i].Normal.Z };
-                    }
+                std::vector<vec3> vertexData;
+                std::vector<vec3> normalData;
+                std::vector<vec2> texcoordData;
+                std::vector<u32> indexData;
+                ska::flat_hash_map<ObjVertexKey, u32> vertexHasher;
 
-                    u32 vertexOffset = m_geometryBuffer.addTriangleList((u32)curMesh.Vertices.size(), &posData[0], &normalData[0]);
-                    _bvh->addTriangleList(vertexOffset, (u32)curMesh.Indices.size() / 3, &curMesh.Indices[0]);
+                const tinyobj::shape_t& curMesh = shapes[objId];
+                for (ubyte numV : curMesh.mesh.num_face_vertices)
+                    TIM_ASSERT(numV == 3);
+                
+                for (u32 i = 0; i < curMesh.mesh.indices.size(); ++i)
+                {
+                    ObjVertexKey key{ (u32)curMesh.mesh.indices[i].vertex_index, (u32)curMesh.mesh.indices[i].normal_index, 0 };
+                    auto it = vertexHasher.find(key);
+                    if (it == vertexHasher.end())
+                    {
+                        u32 index = (u32)vertexData.size();
+                        vertexData.push_back({ attrib.vertices[key.posIndex * 3], attrib.vertices[key.posIndex * 3 + 1], attrib.vertices[key.posIndex * 3 + 2] });
+                        normalData.push_back({ attrib.normals[key.normalIndex * 3], attrib.normals[key.normalIndex * 3 + 1], attrib.normals[key.normalIndex * 3 + 2] });
+                        vertexHasher[key] = index;
+                        indexData.push_back(index);
+                    }
+                    else
+                    {
+                        indexData.push_back(it->second);
+                    }
+                }
+
+                if (vertexData.size() < (1u << 16))
+                {
+                    u32 vertexOffset = m_geometryBuffer.addTriangleList((u32)vertexData.size(), &vertexData[0], &normalData[0]);
+                    TIM_ASSERT(indexData.size() % 3 == 0);
+                    _bvh->addTriangleList(vertexOffset, (u32)indexData.size() / 3, &indexData[0]);
                 }
                 else
                 {
-                    std::cout << "Mesh " << curMesh.MeshName << " has to many vertices (" << curMesh.Vertices.size() <<")\n";
+                    std::cout << "Mesh " << curMesh.name << " has to many vertices (" << vertexData.size() << ")\n";
                 }
             }
+        }
+        else
+        {
+            std::cout << "Error loading  " << _path << ": " << err << std::endl;
         }
     }
 
     void Scene::build(BVHBuilder* _bvh)
     {
-#if 1
+#if 0
         const float DIMXY = 2.1f;
         const float DIMZ = 2;
 
@@ -52,14 +106,14 @@ namespace tim
         auto glassMat = BVHBuilder::createTransparentMaterial({ 0.8f,0.8f,0.8f }, 1.1f, 0);
         auto redGlassMat = BVHBuilder::createTransparentMaterial({ 1,0,0 }, 1.1f, 0);
 
-        //_bvh->addBox(Box{ { -DIMXY, -DIMXY, DIMZ }, {  DIMXY,          DIMXY,           DIMZ + 0.1f } });
-        //_bvh->addBox(Box{ { -DIMXY, -DIMXY, 0    }, {  DIMXY,          DIMXY,           0.1f } });
-        //
-        //_bvh->addBox(Box{ { -DIMXY, -DIMXY, 0    }, { -DIMXY + 0.1f,   DIMXY,           DIMZ + 0.1f } });
-        //_bvh->addBox(Box{ {  DIMXY, -DIMXY, 0    }, {  DIMXY + 0.1f,   DIMXY,           DIMZ + 0.1f } });
-        //
-        //_bvh->addBox(Box{ { -DIMXY, -DIMXY, 0    }, {  DIMXY,         -DIMXY + 0.1f,    DIMZ + 0.1f } });
-        // m_bvh->addBox(Box{ { -DIMXY,  DIMXY - DIMXY * 0.5f, 0    }, {  DIMXY,          DIMXY + 0.1f - DIMXY * 0.5f,    DIMZ + 0.1f } }, redGlassMat);
+        _bvh->addBox(Box{ { -DIMXY, -DIMXY, DIMZ }, {  DIMXY,          DIMXY,           DIMZ + 0.1f } });
+        _bvh->addBox(Box{ { -DIMXY, -DIMXY, 0    }, {  DIMXY,          DIMXY,           0.1f } });
+        
+        _bvh->addBox(Box{ { -DIMXY, -DIMXY, 0    }, { -DIMXY + 0.1f,   DIMXY,           DIMZ + 0.1f } });
+        _bvh->addBox(Box{ {  DIMXY, -DIMXY, 0    }, {  DIMXY + 0.1f,   DIMXY,           DIMZ + 0.1f } });
+        
+        _bvh->addBox(Box{ { -DIMXY, -DIMXY, 0    }, {  DIMXY,         -DIMXY + 0.1f,    DIMZ + 0.1f } });
+         //m_bvh->addBox(Box{ { -DIMXY,  DIMXY - DIMXY * 0.5f, 0    }, {  DIMXY,          DIMXY + 0.1f - DIMXY * 0.5f,    DIMZ + 0.1f } }, redGlassMat);
 
         const float pillarSize = 0.01f;
         const float sphereRad = 0.03f;
@@ -86,8 +140,8 @@ namespace tim
         addOBJ("../data/mesh2.obj", { -2,-3,1.5 }, _bvh);
 #endif
 
-        //_bvh->addSphereLight({ { 2, 2, 1 }, 20, { 2, 1, 2 }, 0.2f });
-        //_bvh->addSphereLight({ { -2, -2, 3 }, 20, { 2, 2, 2 }, 0.2f });
+        _bvh->addSphereLight({ { 2, 2, 1 }, 20, { 2, 1, 2 }, 0.2f });
+        _bvh->addSphereLight({ { -2, -2, 3 }, 20, { 2, 2, 2 }, 0.2f });
         _bvh->addBox(Box{ { -10, -10, -1    }, {  10, 10, -0.5 } });
         addOBJ("../data/sponza100k.obj", {}, _bvh);
 

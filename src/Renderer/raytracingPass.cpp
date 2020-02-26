@@ -22,7 +22,7 @@ namespace tim
 
         {
             auto start = std::chrono::system_clock::now();
-            m_bvh->build(15, 12, Box{ vec3{ -100,-100,-100 }, vec3{ 100,100,100 } });
+            m_bvh->build(17, 12, Box{ vec3{ -100,-100,-100 }, vec3{ 100,100,100 } });
             m_bvh->dumpStats();
             auto end = std::chrono::system_clock::now();
             std::chrono::duration<double> elapsed_seconds = end - start;
