@@ -18,9 +18,6 @@ namespace tim
         {
             for (u32 objId = 0; objId < loader.LoadedMeshes.size(); ++objId)
             {
-                if (objId > 300)
-                    break;
-
                 const objl::Mesh& curMesh = loader.LoadedMeshes[objId];
                 if (curMesh.Vertices.size() < (1u << 16))
                 {
@@ -46,54 +43,53 @@ namespace tim
 
     void Scene::build(BVHBuilder* _bvh)
     {
-#if 0
-        const float DIMXY = 5.1f;
-        const float DIMZ = 5;
+#if 1
+        const float DIMXY = 2.1f;
+        const float DIMZ = 2;
 
         auto groundMirror = BVHBuilder::createMirrorMaterial({ 0,1,1 }, 0.3f);
         auto ballMirror = BVHBuilder::createMirrorMaterial({ 0,1,1 }, 1);
         auto glassMat = BVHBuilder::createTransparentMaterial({ 0.8f,0.8f,0.8f }, 1.1f, 0);
         auto redGlassMat = BVHBuilder::createTransparentMaterial({ 1,0,0 }, 1.1f, 0);
 
-        _bvh->addBox(Box{ { -DIMXY, -DIMXY, DIMZ }, {  DIMXY,          DIMXY,           DIMZ + 0.1f } });
-        _bvh->addBox(Box{ { -DIMXY, -DIMXY, 0    }, {  DIMXY,          DIMXY,           0.1f } });
-
-        _bvh->addBox(Box{ { -DIMXY, -DIMXY, 0    }, { -DIMXY + 0.1f,   DIMXY,           DIMZ + 0.1f } });
-        _bvh->addBox(Box{ {  DIMXY, -DIMXY, 0    }, {  DIMXY + 0.1f,   DIMXY,           DIMZ + 0.1f } });
-
-        _bvh->addBox(Box{ { -DIMXY, -DIMXY, 0    }, {  DIMXY,         -DIMXY + 0.1f,    DIMZ + 0.1f } });
+        //_bvh->addBox(Box{ { -DIMXY, -DIMXY, DIMZ }, {  DIMXY,          DIMXY,           DIMZ + 0.1f } });
+        //_bvh->addBox(Box{ { -DIMXY, -DIMXY, 0    }, {  DIMXY,          DIMXY,           0.1f } });
+        //
+        //_bvh->addBox(Box{ { -DIMXY, -DIMXY, 0    }, { -DIMXY + 0.1f,   DIMXY,           DIMZ + 0.1f } });
+        //_bvh->addBox(Box{ {  DIMXY, -DIMXY, 0    }, {  DIMXY + 0.1f,   DIMXY,           DIMZ + 0.1f } });
+        //
+        //_bvh->addBox(Box{ { -DIMXY, -DIMXY, 0    }, {  DIMXY,         -DIMXY + 0.1f,    DIMZ + 0.1f } });
         // m_bvh->addBox(Box{ { -DIMXY,  DIMXY - DIMXY * 0.5f, 0    }, {  DIMXY,          DIMXY + 0.1f - DIMXY * 0.5f,    DIMZ + 0.1f } }, redGlassMat);
 
-        const float pillarSize = 0.03f;
-        const float sphereRad = 0.07f;
+        const float pillarSize = 0.01f;
+        const float sphereRad = 0.03f;
         for (u32 i = 0; i < 10; ++i)
         {
             for (u32 j = 0; j < 10; ++j)
             {
                 vec3 p = { -DIMXY + i * (DIMXY / 5), -DIMXY + j * (DIMXY / 5), 0 };
-                _bvh->addSphere({ p + vec3(0,0,1), sphereRad }, ballMirror);
+                _bvh->addSphere({ p + vec3(0,0,0.4), sphereRad }, ballMirror);
                 //m_bvh->addSphere({ p + vec3(0,0,1), sphereRad });
-                _bvh->addBox(Box{ p - vec3(pillarSize, pillarSize, 0), p + vec3(pillarSize, pillarSize, 1) }, (i + j) % 2 == 0 ? glassMat : redGlassMat);
+                _bvh->addBox(Box{ p - vec3(pillarSize, pillarSize, 0), p + vec3(pillarSize, pillarSize, 0.4) }, (i + j) % 2 == 0 ? glassMat : redGlassMat);
             }
         }
 
-        _bvh->addSphere({ { -2, -2, 4 }, 0.19f }, BVHBuilder::createEmissiveMaterial({ 1, 0.5, 1 }));
-        _bvh->addSphereLight({ { -2, -2, 4 }, 25, { 2, 1, 2 }, 0.2f });
+        _bvh->addSphere({ { -0.8, -0.8, 2.5 }, 0.08f }, BVHBuilder::createEmissiveMaterial({ 1, 0.5, 1 }));
+        _bvh->addSphereLight({ { -0.8, -0.8, 2 }, 25, { 2, 1, 2 }, 0.1f });
 
-        _bvh->addSphere({ { 2, 2, 4 }, 0.19f }, BVHBuilder::createEmissiveMaterial({ 1, 1, 0.5 }));
-        _bvh->addSphereLight({ { 2, 2, 4 }, 15, { 2, 2, 1 }, 0.2f });
+        _bvh->addSphere({ { 0.6, 0.6, 1.5 }, 0.08f }, BVHBuilder::createEmissiveMaterial({ 1, 1, 0.5 }));
+        _bvh->addSphereLight({ { 0.6, 0.6, 1.5 }, 15, { 2, 2, 1 }, 0.1f });
 
-        _bvh->addSphere({ { 0, -2, 2 }, 0.5 }, BVHBuilder::createTransparentMaterial({ 1,0.6f,0.6f }, 1.05f, 0.05f));
+        _bvh->addSphere({ { 0, 0, 2 }, 0.3 }, BVHBuilder::createTransparentMaterial({ 1,0.6f,0.6f }, 1.05f, 0.05f));
 
         addOBJ("../data/mesh.obj", {2,3,1.5}, _bvh);
         addOBJ("../data/mesh2.obj", { -2,-3,1.5 }, _bvh);
 #endif
-        addOBJ("../data/mesh.obj", { 0,0,0 }, _bvh);
 
-        _bvh->addSphereLight({ { 2, 2, 1 }, 20, { 2, 1, 2 }, 0.2f });
+        //_bvh->addSphereLight({ { 2, 2, 1 }, 20, { 2, 1, 2 }, 0.2f });
         //_bvh->addSphereLight({ { -2, -2, 3 }, 20, { 2, 2, 2 }, 0.2f });
         _bvh->addBox(Box{ { -10, -10, -1    }, {  10, 10, -0.5 } });
-        //addOBJ("../data/sponza.obj", {}, _bvh);
+        addOBJ("../data/sponza100k.obj", {}, _bvh);
 
         //m_bvh->addSphere({ { 2, 2, 2 }, 2 }, BVHBuilder::createEmissiveMaterial({ 1, 1, 0 }));
 

@@ -224,7 +224,8 @@ namespace tim
         vezDestroyDevice(m_vkDevice);
         {
             auto func = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(m_vkInstance, "vkDestroyDebugUtilsMessengerEXT");
-            func(m_vkInstance, m_debugMessenger, nullptr);
+            if(func)
+                func(m_vkInstance, m_debugMessenger, nullptr);
         }
         vkDestroySurfaceKHR(m_vkInstance, m_vkSurface, nullptr);
 
