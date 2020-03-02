@@ -45,6 +45,13 @@ namespace tim
         auto maskB = FreeImage_GetBlueMask(img);
 
         ImageFormat format = ImageFormat::RGBA8;
+        if (maskR == 0x000000FF && maskG == 0x0000FF00 && maskB == 0x00FF0000)
+            format = ImageFormat::RGBA8;
+        else if (maskB == 0x000000FF && maskG == 0x0000FF00 && maskR == 0x00FF0000)
+            format = ImageFormat::BGRA8;
+        else
+            TIM_ASSERT(false);
+
         ImageCreateInfo creationInfo(format, w, h, 1, ImageType::Image2D, MemoryType::Default, ImageUsage::Sampled | ImageUsage::Transfer);
 
         u32 freeSlot = u32(-1);

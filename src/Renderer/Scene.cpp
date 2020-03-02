@@ -67,6 +67,7 @@ namespace tim
                     {
                         u32 index = (u32)vertexData.size();
                         vertexData.push_back({ attrib.vertices[key.posIndex * 3], attrib.vertices[key.posIndex * 3 + 1], attrib.vertices[key.posIndex * 3 + 2] });
+                        vertexData.back() += _pos;
                         normalData.push_back({ attrib.normals[key.normalIndex * 3], attrib.normals[key.normalIndex * 3 + 1], attrib.normals[key.normalIndex * 3 + 2] });
                         
                         if (key.texcoordIndex < attrib.texcoords.size())
@@ -103,7 +104,7 @@ namespace tim
 
     void Scene::build(BVHBuilder* _bvh)
     {
-#if 0
+#if 1
         const float DIMXY = 2.1f;
         const float DIMZ = 2;
 

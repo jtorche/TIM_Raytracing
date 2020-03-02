@@ -38,8 +38,8 @@ void main()
         vec3 lit = rayTrace(ray, closestHit);
 
         vec2 uv = vec2(float(pixelCoord.x) / g_passData.frameSize.x, float(pixelCoord.y) / g_passData.frameSize.y);
-        vec4 col = texture(textureTest, uv);
-		imageStore(g_outputImage, pixelCoord, vec4(lit * col.xyz, 1));
+        // vec4 col = texture(textureTest, uv);
+		imageStore(g_outputImage, pixelCoord, vec4(lit, 1));
         nextBounce(getObjectId(closestHit), getMaterialId(closestHit), vec3(1,1,1), getHitNormal(closestHit), ray, closestHit.t);
 	}
 #else

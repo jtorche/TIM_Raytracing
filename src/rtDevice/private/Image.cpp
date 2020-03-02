@@ -16,6 +16,8 @@ namespace tim
                 return VkFormat::VK_FORMAT_R16G16B16A16_SFLOAT;
             case ImageFormat::RGBA8:
                 return VkFormat::VK_FORMAT_R8G8B8A8_UNORM;
+            case ImageFormat::BGRA8:
+                return VkFormat::VK_FORMAT_B8G8R8A8_UNORM;
             case ImageFormat::RGBA8_SRGB:
                 return _isStorage ? VkFormat::VK_FORMAT_R8G8B8A8_UNORM : VkFormat::VK_FORMAT_R8G8B8A8_SRGB;
             default:

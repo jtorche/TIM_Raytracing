@@ -57,6 +57,7 @@ namespace tim
     {
         BGRA8_SRGB,
         RGBA8,
+        BGRA8,
         RGBA8_SRGB,
         RGBA16F,
     };
