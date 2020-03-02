@@ -3,6 +3,7 @@
 #include <VEZ.h>
 #include <vector>
 #include <atomic>
+#include <type_traits>
 
 #include "Common.h"
 
@@ -38,6 +39,8 @@ namespace tim
         void UploadBuffer(BufferHandle _handle, void* _data, u32 _dataSize) override;
         void UploadBuffer(BufferHandle _handle, u32 _destOffset, void* _data, u32 _dataSize) override;
 
+        void UploadImage(ImageHandle _handle, void* _data, u32 _pitch) override;
+
         ubyte* GetDynamicBuffer(u32 _size, BufferView& _buffer) override;
 
         ImageHandle CreateImage(const ImageCreateInfo& _info) override;
@@ -53,6 +56,8 @@ namespace tim
 
         void createSwapChain(u32 _x, u32 _y);
         void destroySwapChain();
+        void createSamplers();
+        void destroySamplers();
 
 	private:
         static VezRenderer* s_Renderer;
@@ -73,6 +78,8 @@ namespace tim
         std::atomic<u64> m_scratchBufferCursor = 0;
         u32 m_frameIndex = 0;
 
+        VkSampler m_samplers[to_integral(SamplerType::Count)];
+
         struct Queue
         {
             VkQueue m_queue = VK_NULL_HANDLE;
@@ -85,7 +92,6 @@ namespace tim
         Queue m_graphicsQueue;
 
         std::unique_ptr<PipelineStateCache> m_psoCache;
-
         std::vector<RenderContext *> m_allRenderContext;
 	};
 }

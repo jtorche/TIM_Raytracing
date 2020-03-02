@@ -6,7 +6,7 @@ add_definitions(-DNOMINMAX)
 
 link_directories("extern/glfw/lib/win64/")
 link_directories("extern/V-EZ/")
-link_directories("extern/V-EZ/")
+link_directories("extern/FreeImage/")
 
 #Core
 file(GLOB_RECURSE CORE_HDRS src/timCore/*.h)
@@ -55,5 +55,6 @@ ADD_EXECUTABLE(Program ${MAIN_SRCS} ${RENDERER_HDRS} ${RENDERER_SRCS} ${MAIN_HDR
 target_include_directories(Program PRIVATE "extern/glfw/include")
 target_include_directories(Program PRIVATE "src/")
 target_include_directories(Program PRIVATE ${Vulkan_INCLUDE_DIR})
-target_link_libraries(Program glfw VezRenderer timCore)
+target_include_directories(Program PRIVATE "extern/FreeImage")
+target_link_libraries(Program FreeImage glfw VezRenderer timCore)
 set_property(TARGET Program PROPERTY CXX_STANDARD 17)

@@ -21,4 +21,10 @@
 namespace tim
 {
     const char* toString(VkResult _res);
+
+    template<typename T>
+    constexpr std::underlying_type_t<T> to_integral(T _x)
+    {
+        return static_cast<std::underlying_type_t<T>>(_x);
+    }
 }

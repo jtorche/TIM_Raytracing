@@ -187,6 +187,8 @@ namespace tim
             for (u32 i = 0; i < TIM_FRAME_LATENCY; ++i)
                 m_backBuffer[i] = new Image(imgCreateInfo);
         }
+
+        createSamplers();
     }
 
     void VezRenderer::destroySwapChain()
@@ -203,6 +205,7 @@ namespace tim
 
 	void VezRenderer::Deinit()
 	{
+        destroySamplers();
         vezDeviceWaitIdle(m_vkDevice);
 
         m_psoCache.reset();
@@ -351,6 +354,17 @@ namespace tim
 		vezBufferSubData(m_vkDevice, buf->getVkBuffer(), _destOffset, _dataSize, _data);
     }
 
+    void VezRenderer::UploadImage(ImageHandle _handle, void* _data, u32 _pitch)
+    {
+        Image* img = reinterpret_cast<Image*>(_handle.ptr);
+        VezImageSubDataInfo info = {};
+        info.dataRowLength = _pitch;
+        info.imageExtent = { img->getDesc().width, img->getDesc().height, 1 };
+        info.imageOffset = { 0,0,0 };
+        info.imageSubresource = { 0,0,1 };
+        vezImageSubData(m_vkDevice, img->getVkHandle(), &info, _data);
+    }
+
     ubyte * VezRenderer::GetDynamicBuffer(u32 _size, BufferView& _buffer)
     {
         u64 offset = m_scratchBufferCursor.fetch_add(_size);
@@ -380,5 +394,55 @@ namespace tim
         Image* image = reinterpret_cast<Image *>(_image.ptr);
         delete image;
         _image.ptr = nullptr;
+    }
+
+    void VezRenderer::createSamplers()
+    {
+        VezSamplerCreateInfo info = {};
+
+        // Clamp_Nearest_MipNearest
+        info.magFilter = VkFilter::VK_FILTER_NEAREST;
+        info.minFilter = VkFilter::VK_FILTER_NEAREST;
+        info.mipmapMode = VkSamplerMipmapMode::VK_SAMPLER_MIPMAP_MODE_NEAREST;
+        info.addressModeU = VkSamplerAddressMode::VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+        info.addressModeV = VkSamplerAddressMode::VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+        info.addressModeW = VkSamplerAddressMode::VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+        vezCreateSampler(m_vkDevice, &info, &m_samplers[to_integral(SamplerType::Clamp_Nearest_MipNearest)]);
+
+        // Repeat_Nearest_MipNearest
+        info.magFilter = VkFilter::VK_FILTER_NEAREST;
+        info.minFilter = VkFilter::VK_FILTER_NEAREST;
+        info.mipmapMode = VkSamplerMipmapMode::VK_SAMPLER_MIPMAP_MODE_NEAREST;
+        info.addressModeU = VkSamplerAddressMode::VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        info.addressModeV = VkSamplerAddressMode::VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        info.addressModeW = VkSamplerAddressMode::VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        vezCreateSampler(m_vkDevice, &info, &m_samplers[to_integral(SamplerType::Repeat_Nearest_MipNearest)]);
+
+        // Clamp_Linear_MipNearest
+        info.magFilter = VkFilter::VK_FILTER_LINEAR;
+        info.minFilter = VkFilter::VK_FILTER_LINEAR;
+        info.mipmapMode = VkSamplerMipmapMode::VK_SAMPLER_MIPMAP_MODE_NEAREST;
+        info.addressModeU = VkSamplerAddressMode::VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+        info.addressModeV = VkSamplerAddressMode::VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+        info.addressModeW = VkSamplerAddressMode::VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+        vezCreateSampler(m_vkDevice, &info, &m_samplers[to_integral(SamplerType::Clamp_Linear_MipNearest)]);
+
+        // Repeat_Linear_MipNearest
+        info.magFilter = VkFilter::VK_FILTER_LINEAR;
+        info.minFilter = VkFilter::VK_FILTER_LINEAR;
+        info.mipmapMode = VkSamplerMipmapMode::VK_SAMPLER_MIPMAP_MODE_NEAREST;
+        info.addressModeU = VkSamplerAddressMode::VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        info.addressModeV = VkSamplerAddressMode::VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        info.addressModeW = VkSamplerAddressMode::VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        vezCreateSampler(m_vkDevice, &info, &m_samplers[to_integral(SamplerType::Repeat_Linear_MipNearest)]);
+    }
+
+    void VezRenderer::destroySamplers()
+    {
+        for (u32 i = 0; i < to_integral(SamplerType::Count); ++i)
+        {
+            vezDestroySampler(m_vkDevice, m_samplers[i]);
+            m_samplers[i] = {};
+        }
     }
 }

@@ -585,6 +585,7 @@ VKAPI_ATTR void VKAPI_CALL vezCmdBindBuffer(VkBuffer buffer, VkDeviceSize offset
 VKAPI_ATTR void VKAPI_CALL vezCmdBindBufferView(VkBufferView bufferView, uint32_t set, uint32_t binding, uint32_t arrayElement);
 VKAPI_ATTR void VKAPI_CALL vezCmdBindImageView(VkImageView imageView, VkSampler sampler, uint32_t set, uint32_t binding, uint32_t arrayElement);
 VKAPI_ATTR void VKAPI_CALL vezCmdBindSampler(VkSampler sampler, uint32_t set, uint32_t binding, uint32_t arrayElement);
+VKAPI_ATTR void VKAPI_CALL vezCmdBindCombinedImageSampler(VkImageView imageView, VkSampler sampler, uint32_t set, uint32_t binding, uint32_t arrayElement);
 VKAPI_ATTR void VKAPI_CALL vezCmdBindVertexBuffers(uint32_t firstBinding, uint32_t bindingCount, const VkBuffer* pBuffers, const VkDeviceSize* pOffsets);
 VKAPI_ATTR void VKAPI_CALL vezCmdBindIndexBuffer(VkBuffer buffer, VkDeviceSize offset, VkIndexType indexType);
 VKAPI_ATTR void VKAPI_CALL vezCmdSetVertexInputFormat(VezVertexInputFormat format);

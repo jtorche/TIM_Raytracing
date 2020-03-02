@@ -84,4 +84,14 @@ namespace tim
     {
         void* ptr = nullptr;
     };
+
+    enum class SamplerType : u32
+    {
+        Clamp_Nearest_MipNearest,
+        Repeat_Nearest_MipNearest,
+        Clamp_Linear_MipNearest,
+        Repeat_Linear_MipNearest,
+
+        Count
+    };
 }

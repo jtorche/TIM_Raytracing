@@ -32,6 +32,8 @@ namespace tim
         virtual void UploadBuffer(BufferHandle _handle, void * _data, u32 _dataSize) = 0;
         virtual void UploadBuffer(BufferHandle _handle, u32 _destOffset, void* _data, u32 _dataSize) = 0;
 
+        virtual void UploadImage(ImageHandle _handle, void * _data, u32 _pitch) = 0;
+
         virtual ubyte * GetDynamicBuffer(u32 _size, BufferView& _buffer) = 0;
 
         virtual ImageHandle CreateImage(const ImageCreateInfo& _info) = 0;

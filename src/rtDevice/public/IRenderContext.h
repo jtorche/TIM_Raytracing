@@ -30,6 +30,7 @@ namespace tim
         ImageHandle m_image;
         ImageViewType m_viewType;
         BindingPoint m_binding;
+        SamplerType m_sampler = SamplerType::Count;
     };
 
     struct BufferView

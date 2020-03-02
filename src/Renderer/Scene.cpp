@@ -61,13 +61,19 @@ namespace tim
                 
                 for (u32 i = 0; i < curMesh.mesh.indices.size(); ++i)
                 {
-                    ObjVertexKey key{ (u32)curMesh.mesh.indices[i].vertex_index, (u32)curMesh.mesh.indices[i].normal_index, 0 };
+                    ObjVertexKey key{ (u32)curMesh.mesh.indices[i].vertex_index, (u32)curMesh.mesh.indices[i].normal_index, (u32)curMesh.mesh.indices[i].texcoord_index };
                     auto it = vertexHasher.find(key);
                     if (it == vertexHasher.end())
                     {
                         u32 index = (u32)vertexData.size();
                         vertexData.push_back({ attrib.vertices[key.posIndex * 3], attrib.vertices[key.posIndex * 3 + 1], attrib.vertices[key.posIndex * 3 + 2] });
                         normalData.push_back({ attrib.normals[key.normalIndex * 3], attrib.normals[key.normalIndex * 3 + 1], attrib.normals[key.normalIndex * 3 + 2] });
+                        
+                        if (key.texcoordIndex < attrib.texcoords.size())
+                            texcoordData.push_back({ attrib.texcoords[key.texcoordIndex * 2], attrib.texcoords[key.texcoordIndex * 2 + 1] });
+                        else
+                            texcoordData.push_back({ 0,0 });
+
                         vertexHasher[key] = index;
                         indexData.push_back(index);
                     }
@@ -142,8 +148,8 @@ namespace tim
 
         _bvh->addSphereLight({ { 2, 2, 1 }, 20, { 2, 1, 2 }, 0.2f });
         _bvh->addSphereLight({ { -2, -2, 3 }, 20, { 2, 2, 2 }, 0.2f });
-        _bvh->addBox(Box{ { -10, -10, -1    }, {  10, 10, -0.5 } });
-        addOBJ("../data/sponza100k.obj", {}, _bvh);
+        _bvh->addBox(Box{ { -10, -10, -1 }, {  10, 10, -0.5 } });
+        // addOBJ("../data/sponza.obj", {}, _bvh);
 
         //m_bvh->addSphere({ { 2, 2, 2 }, 2 }, BVHBuilder::createEmissiveMaterial({ 1, 1, 0 }));
 

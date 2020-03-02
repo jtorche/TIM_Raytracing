@@ -4,12 +4,14 @@
 #include "shaderMacros.h"
 #include "Scene.h"
 #include "Shaders/struct_cpp.glsl"
+#include "TextureManager.h"
 
 #include <iostream>
 
 namespace tim
 {
-    RayTracingPass::RayTracingPass(IRenderer* _renderer, IRenderContext* _context, ResourceAllocator& _allocator) : m_frameSize{ 800,600 }, m_renderer{ _renderer }, m_context{ _context }, m_resourceAllocator{ _allocator }
+    RayTracingPass::RayTracingPass(IRenderer* _renderer, IRenderContext* _context, ResourceAllocator& _allocator, TextureManager& _texManager) 
+        : m_frameSize{ 800,600 }, m_renderer{ _renderer }, m_context{ _context }, m_resourceAllocator{ _allocator }, m_textureManager{ _texManager }
     {
         m_rayBounceRecursionDepth = 2;
         m_geometryBuffer = std::make_unique<BVHGeometry>(_renderer, 1024 * 1024);
@@ -104,9 +106,10 @@ namespace tim
         m_context->ClearBuffer(refractionRayBuffer, 0);
 
         DrawArguments arg = {};
-        ImageBinding imgBinds[] = {
+        std::vector<ImageBinding> imgBinds = {
             { _outputBuffer, ImageViewType::Storage, 0, g_outputImage_bind }
         };
+        m_textureManager.fillImageBindings(imgBinds);
 
         BufferBinding geometryPos, geometryNormals, geometryTexcoords;
         m_geometryBuffer->generateGeometryBufferBindings(geometryPos, geometryNormals, geometryTexcoords);
@@ -124,8 +127,8 @@ namespace tim
             geometryPos, geometryNormals, geometryTexcoords
         };
 
-        arg.m_imageBindings = imgBinds;
-        arg.m_numImageBindings = _countof(imgBinds);
+        arg.m_imageBindings = &imgBinds[0];
+        arg.m_numImageBindings = (u32)imgBinds.size();
         arg.m_bufferBindings = bufBinds;
         arg.m_numBufferBindings = _countof(bufBinds);
 
@@ -154,10 +157,11 @@ namespace tim
         ImageHandle mainColorBuffer = _curImage;
 
         DrawArguments arg = {};
-        ImageBinding imgBinds[] = {
+        std::vector<ImageBinding> imgBinds = {
             { mainColorBuffer, ImageViewType::Storage, 0, g_outputImage_bind },
             { mainColorBuffer, ImageViewType::Storage, 0, g_inputImage_bind }
         };
+        m_textureManager.fillImageBindings(imgBinds);
 
         BufferBinding geometryPos, geometryNormals, geometryTexcoords;
         m_geometryBuffer->generateGeometryBufferBindings(geometryPos, geometryNormals, geometryTexcoords);
@@ -183,8 +187,8 @@ namespace tim
             bufBinds.push_back({ { outRayBuffer, 0, getRayStorageBufferSize() }, { 0, g_OutRayBuffer_bind } });
         }
 
-        arg.m_imageBindings = imgBinds;
-        arg.m_numImageBindings = _countof(imgBinds);
+        arg.m_imageBindings = &imgBinds[0];
+        arg.m_numImageBindings = (u32)imgBinds.size();
         arg.m_bufferBindings = &bufBinds[0];
         arg.m_numBufferBindings = (u32)bufBinds.size();
 

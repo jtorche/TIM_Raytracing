@@ -8,11 +8,12 @@ namespace tim
     class SimpleCamera;
     class BVHBuilder;
     class BVHGeometry;
+    class TextureManager;
 
     class RayTracingPass
     {
     public:
-        RayTracingPass(IRenderer* _renderer, IRenderContext* _context, ResourceAllocator& _allocator);
+        RayTracingPass(IRenderer* _renderer, IRenderContext* _context, ResourceAllocator& _allocator, TextureManager& _texManager);
         ~RayTracingPass();
 
         void rebuildBvh(u32 _maxDepth, u32 _maxObjPerNode);
@@ -29,6 +30,7 @@ namespace tim
         IRenderer* m_renderer = nullptr;
         IRenderContext* m_context = nullptr;
         ResourceAllocator& m_resourceAllocator;
+        TextureManager& m_textureManager;
 
         std::unique_ptr<BVHBuilder> m_bvh;
         std::unique_ptr<BVHGeometry> m_geometryBuffer;

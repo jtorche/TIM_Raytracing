@@ -14,9 +14,11 @@
 #define g_OutRayBuffer_bind 8
 #define g_OutRefractionRayBuffer_bind 9
 #define g_inputImage_bind 10
+#define g_dataTextures_bind 12
 
 #define LOCAL_SIZE 16
 #define TMAX 100
+#define TEXTURE_ARRAY_SIZE 16
 
 struct PassData
 {

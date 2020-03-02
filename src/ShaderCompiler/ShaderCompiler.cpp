@@ -54,7 +54,7 @@ namespace tim
             bool retry = false;
             do
             {
-                system(("glslc.exe " + cmdArg).c_str());
+                system(("C:\\VulkanSDK\\1.2.131.2\\Bin\\glslc.exe " + cmdArg).c_str());
                 if (!fs::exists(outputFile))
                 {
                     std::cout << "\nCompilation failed, would you retry ?\n";

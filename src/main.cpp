@@ -5,6 +5,7 @@
 #include "Renderer/postprocessPass.h"
 #include "Renderer/SimpleCamera.h"
 #include "Renderer/shaderMacros.h"
+#include "Renderer/TextureManager.h"
 
 #include <iostream>
 
@@ -109,7 +110,9 @@ int main()
     IRenderContext* context = g_renderer->CreateRenderContext(RenderContextType::Graphics);
     
     {
-        RayTracingPass rtPass(g_renderer, context, resourceAllocator);
+        TextureManager textureManager(g_renderer);
+        textureManager.loadTexture("../data/image/test.png");
+        RayTracingPass rtPass(g_renderer, context, resourceAllocator, textureManager);
         PostprocessPass postprocessPass(g_renderer, context);
 
         double prevTime = glfwGetTime();

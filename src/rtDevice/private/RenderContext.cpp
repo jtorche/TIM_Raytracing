@@ -88,8 +88,16 @@ namespace tim
             const auto& binding = _drawArgs.m_imageBindings[i];
             const Image* img = reinterpret_cast<const Image*>(binding.m_image.ptr);
 
-            vezCmdBindImageView(binding.m_viewType == ImageViewType::Sampled ? img->getVkSampledView() : img->getVkStorageView(), 
-                                VK_NULL_HANDLE, binding.m_binding.m_set, binding.m_binding.m_slot, binding.m_binding.m_arrayElement);
+            if (binding.m_sampler != SamplerType::Count)
+            {
+                TIM_ASSERT(binding.m_viewType == ImageViewType::Sampled);
+                vezCmdBindCombinedImageSampler(img->getVkSampledView(), VezRenderer::get().m_samplers[to_integral(binding.m_sampler)], binding.m_binding.m_set, binding.m_binding.m_slot, binding.m_binding.m_arrayElement);
+            }
+            else
+            {
+                vezCmdBindImageView(binding.m_viewType == ImageViewType::Sampled ? img->getVkSampledView() : img->getVkStorageView(),
+                                    VK_NULL_HANDLE, binding.m_binding.m_set, binding.m_binding.m_slot, binding.m_binding.m_arrayElement);
+            }
         }
 
         vezCmdDispatch(_sizeX, _sizeY, _sizeZ);
