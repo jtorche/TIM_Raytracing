@@ -36,11 +36,11 @@ void main()
 		ClosestHit closestHit;
         Ray ray = createRay(g_passData.cameraPos.xyz, normalize(rayTarget - g_passData.cameraPos.xyz));
         vec3 lit = rayTrace(ray, closestHit);
-
-        vec2 uv = vec2(float(pixelCoord.x) / g_passData.frameSize.x, float(pixelCoord.y) / g_passData.frameSize.y);
-        // vec4 col = texture(textureTest, uv);
-		imageStore(g_outputImage, pixelCoord, vec4(lit, 1));
-        nextBounce(getObjectId(closestHit), getMaterialId(closestHit), vec3(1,1,1), getHitNormal(closestHit), ray, closestHit.t);
+        
+        // vec2 uv = vec2(float(pixelCoord.x) / g_passData.frameSize.x, float(pixelCoord.y) / g_passData.frameSize.y);
+        // lit = toLinear(texture(g_dataTextures[g_TextureBrdf], uv)).xyz;
+        imageStore(g_outputImage, pixelCoord, vec4(lit, 1));
+        nextBounce(vec3(1,1,1), closestHit, ray, g_passData.cameraPos.xyz);
 	}
 #else
 
@@ -71,7 +71,7 @@ void main()
 		}
 		
 		imageStore(g_outputImage, pixelCoord, vec4(lit, 1));
-        nextBounce(getObjectId(closestHit), getMaterialId(closestHit), vec3(1,1,1), getHitNormal(closestHit), ray, closestHit.t);
+        nextBounce(vec3(1,1,1), closestHit, ray, g_passData.cameraPos.xyz);
 	}
 #endif
 }

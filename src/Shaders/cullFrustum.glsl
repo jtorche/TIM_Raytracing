@@ -142,11 +142,6 @@ void collideRayAgainstTileData(in Ray _ray, inout ClosestHit _closestHit)
 {
 	_closestHit.nid = 0xFFFFffff;
 
-	#if USE_SHARED_MEM
-	vec3 normal;
-	bool anyHit = false;
-	#endif
-
 	for(uint i=0 ; i<g_primitiveCount ; ++i)
 	{
 		uint primIndex = g_primitives[i];
@@ -155,15 +150,7 @@ void collideRayAgainstTileData(in Ray _ray, inout ClosestHit _closestHit)
 
 		_closestHit.t =			hasHit ? hit.t * OFFSET_RAY_COLLISION	: _closestHit.t;
 
-		#if USE_SHARED_MEM
-		if(hasHit)
-		{
-			normal = hit.normal;
-			anyHit = true;
-		}
-		#else
-		_closestHit.normal =	hasHit ? hit.normal : _closestHit.normal;
-		#endif	
+		if(hasHit) storeHitNormal(_closestHit, hit.normal);
 
 		_closestHit.mid_objId =	hasHit ? primIndex | (g_BvhPrimitiveData[primIndex].iparam & 0xFFFF0000) : _closestHit.mid_objId;
 	}
@@ -176,23 +163,11 @@ void collideRayAgainstTileData(in Ray _ray, inout ClosestHit _closestHit)
 
 		_closestHit.t =			hasHit ? hit.t * OFFSET_RAY_COLLISION : _closestHit.t;
 
-		#if USE_SHARED_MEM
-		if(hasHit)
-		{
-			normal = hit.normal;
-			anyHit = true;
-		}
-		#else
-		_closestHit.normal =	hasHit ? hit.normal : _closestHit.normal;
-		#endif	
+		if(hasHit) storeHitNormal(_closestHit, hit.normal);
+		if(hasHit) storeHitUv(_closestHit, hit.uv);
 
 		_closestHit.mid_objId =	hasHit ? 0x0000FFFF | (g_BvhTriangleData[triIndex].index2_matId & 0xFFFF0000) : _closestHit.mid_objId;
 	}
-
-	#if USE_SHARED_MEM
-	if(anyHit)
-		g_normalHit[gl_LocalInvocationIndex] = normal;
-	#endif
 }
 
 vec3 evalLightWithTileData(uint rootId, in Ray _ray, in ClosestHit _closestHit)

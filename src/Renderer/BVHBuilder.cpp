@@ -161,16 +161,25 @@ namespace tim
     Material BVHBuilder::createLambertianMaterial(vec3 _color)
     {
         Material mat;
-        mat.type_ids = { Material_Lambert,0,0,0 };
+        mat.type_ids = { Material_Lambert, u32(-1),u32(-1),u32(-1) };
         mat.color = { _color.x, _color.y, _color.z, 0 };
 
+        return mat;
+    }
+
+    Material BVHBuilder::createPbrMaterial(vec3 _color, float _metalness)
+    {
+        Material mat;
+        mat.type_ids = { Material_PBR, u32(-1),u32(-1),u32(-1) };
+        mat.color = { _color.x, _color.y, _color.z, 0 };
+        mat.params.x = _metalness;
         return mat;
     }
 
     Material BVHBuilder::createEmissiveMaterial(vec3 _color)
     {
         Material mat;
-        mat.type_ids = { Material_Emissive,0,0,0 };
+        mat.type_ids = { Material_Emissive, u32(-1),u32(-1),u32(-1) };
         mat.color = { _color.x, _color.y, _color.z, 0 };
 
         return mat;
@@ -179,7 +188,7 @@ namespace tim
     Material BVHBuilder::createMirrorMaterial(vec3 _color, float _mirrorness)
     {
         Material mat;
-        mat.type_ids = { Material_Mirror,0,0,0 };
+        mat.type_ids = { Material_Mirror, u32(-1),u32(-1),u32(-1) };
         mat.color = { _color.x, _color.y, _color.z, 0 };
         mat.params.x = _mirrorness;
 
@@ -189,12 +198,17 @@ namespace tim
     Material BVHBuilder::createTransparentMaterial(vec3 _color, float _refractionIndice, float _reflectivity)
     {
         Material mat;
-        mat.type_ids = { Material_Transparent,0,0,0 };
+        mat.type_ids = { Material_Transparent, u32(-1),u32(-1),u32(-1) };
         mat.color = { _color.x, _color.y, _color.z, 0 };
         mat.params.x = _reflectivity;
         mat.params.y = _refractionIndice;
 
         return mat;
+    }
+
+    void BVHBuilder::setTextureMaterial(Material& _mat, u32 _texture0, u32 _texture1)
+    {
+        _mat.type_ids.y = _texture0 + (_texture1 << 16);
     }
 
     void BVHBuilder::addSphere(const Sphere& _sphere, const Material& _mat)

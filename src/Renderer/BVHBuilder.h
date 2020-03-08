@@ -47,9 +47,11 @@ namespace tim
     {
     public:
         static Material createLambertianMaterial(vec3 _color);
+        static Material createPbrMaterial(vec3 _color, float _metalness = 0);
         static Material createEmissiveMaterial(vec3 _color);
         static Material createMirrorMaterial(vec3 _color, float _mirrorness);
         static Material createTransparentMaterial(vec3 _color, float _refractionIndice, float _reflectivity);
+        static void setTextureMaterial(Material& _mat, u32 _texture0, u32 _texture1);
 
         BVHBuilder(const BVHGeometry& _geometry) : m_geometryBuffer{ _geometry } {}
 

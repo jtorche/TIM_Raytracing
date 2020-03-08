@@ -12,6 +12,7 @@
 #define Material_Lambert		2
 #define Material_Mirror			3
 #define Material_Transparent	4
+#define Material_PBR			5
 
 // used to pack node data
 #define TriangleBitCount 18

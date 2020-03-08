@@ -17,7 +17,7 @@ namespace tim
         m_geometryBuffer = std::make_unique<BVHGeometry>(_renderer, 1024 * 1024);
         m_bvh = std::make_unique<BVHBuilder>(*m_geometryBuffer);
 
-        Scene scene(*m_geometryBuffer.get());
+        Scene scene(*m_geometryBuffer.get(), m_textureManager);
         scene.build(m_bvh.get());
 
         m_geometryBuffer->flush(m_renderer);

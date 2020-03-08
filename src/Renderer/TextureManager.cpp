@@ -6,11 +6,16 @@ namespace tim
 {
     TextureManager::TextureManager(IRenderer* _renderer) : m_renderer{ _renderer }
     {
+        ImageCreateInfo creationInfo(ImageFormat::RGBA8, 8, 8, 1, ImageType::Image2D, MemoryType::Default, ImageUsage::Sampled | ImageUsage::Transfer);
+        m_defaultTexture = m_renderer->CreateImage(creationInfo);
 
+        for (u32 i = 0; i < TEXTURE_ARRAY_SIZE; ++i)
+            m_samplingMode[i] = SamplerType::Clamp_Nearest_MipNearest;
     }
 
     TextureManager::~TextureManager()
     {
+        m_renderer->DestroyImage(m_defaultTexture);
         for (u32 i = 0; i < TEXTURE_ARRAY_SIZE; ++i)
         {
             m_renderer->DestroyImage(m_images[i]);
@@ -74,6 +79,11 @@ namespace tim
         return freeSlot;
     }
 
+    void TextureManager::setSamplingMode(u32 _index, SamplerType _mode)
+    {
+        m_samplingMode[_index] = _mode;
+    }
+
     void TextureManager::fillImageBindings(std::vector<ImageBinding>& _bindings) const
     {
         for (u32 i = 0; i < TEXTURE_ARRAY_SIZE; ++i)
@@ -84,7 +94,16 @@ namespace tim
                 binding.m_binding = { 0, g_dataTextures_bind, i };
                 binding.m_viewType = ImageViewType::Sampled;
                 binding.m_image = m_images[i];
-                binding.m_sampler = SamplerType::Repeat_Linear_MipNearest;
+                binding.m_sampler = m_samplingMode[i];
+                _bindings.push_back(binding);
+            }
+            else
+            {
+                ImageBinding binding;
+                binding.m_binding = { 0, g_dataTextures_bind, i };
+                binding.m_viewType = ImageViewType::Sampled;
+                binding.m_image = m_defaultTexture;
+                binding.m_sampler = m_samplingMode[i];
                 _bindings.push_back(binding);
             }
         }

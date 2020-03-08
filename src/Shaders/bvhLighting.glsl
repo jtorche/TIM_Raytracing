@@ -6,18 +6,14 @@
 
 vec3 evalLighting(uint _rootId, uint lightIndex, uint _matId, in Ray _ray, in ClosestHit _hit)
 {
-#if USE_SHARED_MEM
-	vec3 normal = g_normalHit[gl_LocalInvocationIndex];
-#else
-	vec3 normal = _hit.normal;	
-#endif
+	vec3 normal = getHitNormal(_hit);
 
 	switch(g_BvhLightData[lightIndex].iparam)
 	{
 		case Light_Sphere:
-		return evalSphereLight(_rootId, loadSphereLight(lightIndex), g_BvhMaterialData[_matId], _ray.from + _ray.dir * _hit.t, normal, vec3(0,0,0));
+		return evalSphereLight(_rootId, loadSphereLight(lightIndex), g_BvhMaterialData[_matId], _ray.from + _ray.dir * _hit.t, normal, _ray.from);
 		case Light_Area:
-		return evalAreaLight(_rootId, loadAreaLight(lightIndex), g_BvhMaterialData[_matId], _ray.from + _ray.dir * _hit.t, normal, vec3(0,0,0));
+		return evalAreaLight(_rootId, loadAreaLight(lightIndex), g_BvhMaterialData[_matId], _ray.from + _ray.dir * _hit.t, normal, _ray.from);
 	}
 
 	return vec3(0,0,0);

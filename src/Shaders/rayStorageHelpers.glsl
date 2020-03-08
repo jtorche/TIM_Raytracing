@@ -47,46 +47,73 @@ void writeRefractionRay(in IndirectLightRay _ray)
 
 void computeReflexionRay(uint _objectId, vec3 _lit, vec3 _normal, in Ray _ray, float _t);
 
-void nextBounce(uint _objectId, uint _matId, vec3 _lightAbsorbdeByPreBounce, vec3 _normal, in Ray _ray, float _t)
+void nextBounce(vec3 _lightAbsorbdeByPreBounce, in ClosestHit _closestHit, in Ray _ray, vec3 _eyePos)
 {
+	uint objId = getObjectId(_closestHit);
+	uint matId = getMaterialId(_closestHit);
+	float t = _closestHit.t;
+	vec3 normal = getHitNormal(_closestHit);
+	vec2 uv = getHitUv(_closestHit);
+	vec3 P = _ray.from  + _ray.dir * t;
+	vec3 albedo = g_BvhMaterialData[matId].color.xyz;
+	
 #if defined(FIRST_RECURSION_STEP) || defined(CONTINUE_RECURSION)
-    if (g_BvhMaterialData[_matId].type_ids.x == Material_Mirror)
+    if (g_BvhMaterialData[matId].type_ids.x == Material_Mirror)
     {
-		vec3 lit = _lightAbsorbdeByPreBounce * g_BvhMaterialData[_matId].color.xyz * g_BvhMaterialData[_matId].params.x;
-		computeReflexionRay(_objectId, lit, _normal, _ray, _t);
+		vec3 lit = _lightAbsorbdeByPreBounce * albedo * g_BvhMaterialData[matId].params.x;
+		computeReflexionRay(objId, lit, normal, _ray, t);
     }
-#endif
-
-#if defined(FIRST_RECURSION_STEP) || defined(CONTINUE_RECURSION)
-	if(g_BvhMaterialData[_matId].type_ids.x == Material_Transparent)
+	else if (g_BvhMaterialData[matId].type_ids.x == Material_PBR)
 	{
-		const float refractionIndice = g_BvhMaterialData[_matId].params.y;
-		float fresnelReflexion = computeFresnelReflexion(_ray.dir, _normal, refractionIndice);
+		// Sample pre-filtered specular reflection environment at correct mipmap level.
+		//vec3 specularIrradiance = _lit;
+		//
+		//// Split-sum approximation factors for Cook-Torrance specular BRDF.
+		float metalness = g_BvhMaterialData[matId].params.x;
+		vec3 Lo = normalize(_eyePos - P);
+		float cosLo = max(0.0, dot(normal, Lo));
+		vec2 specularBRDF = texture(g_dataTextures[g_TextureBrdf], vec2(cosLo, RoughnessPBR)).xy;
+		vec3 F0 = mix(Fdielectric, albedo, metalness);
+		vec3 specularIBL = (F0 * specularBRDF.x + specularBRDF.y) * _lightAbsorbdeByPreBounce;
 
-		float objectReflectivity = g_BvhMaterialData[_matId].params.x;
+		//vec2 specularBRDF = specularBRDF_LUT.Sample(spBRDF_Sampler, float2(cosLo, roughness)).rg;
+		//
+		//// Total specular IBL contribution.
+		//float3 specularIBL = (F0 * specularBRDF.x + specularBRDF.y) * specularIrradiance;
+		//
+		//// Total ambient lighting contribution.
+		//ambientLighting = diffuseIBL + specularIBL;
+	}
+
+	else if(g_BvhMaterialData[matId].type_ids.x == Material_Transparent)
+	{
+		const float refractionIndice = g_BvhMaterialData[matId].params.y;
+		float fresnelReflexion = computeFresnelReflexion(_ray.dir, normal, refractionIndice);
+
+		float objectReflectivity = g_BvhMaterialData[matId].params.x;
 		fresnelReflexion = (objectReflectivity + (1.0-objectReflectivity) * fresnelReflexion);
 
 		#if defined(FIRST_RECURSION_STEP)
-		computeReflexionRay(_objectId, _lightAbsorbdeByPreBounce * g_BvhMaterialData[_matId].color.xyz * fresnelReflexion, _normal, _ray, _t);
+		computeReflexionRay(objId, _lightAbsorbdeByPreBounce * albedo * fresnelReflexion, normal, _ray, t);
 		#endif
 
-		vec3 p = _ray.from + _ray.dir * _t;
-		vec3 inRefractionRay = refract(_ray.dir, normalize(_normal), refractionIndice);
+		vec3 p = _ray.from + _ray.dir * t;
+		vec3 inRefractionRay = refract(_ray.dir, normalize(normal), refractionIndice);
 		// inRefractionRay = normalize(inRefractionRay == vec3(0,0,0) ? _ray.dir : inRefractionRay);
 		if(inRefractionRay != vec3(0,0,0))
 		{
-			if(_objectId < 0xFFFF)
+			if(objId < 0xFFFF)
 			{
 				Ray inRay = createRay(p, inRefractionRay);
 				Hit hit;
-				if(hitPrimitiveThrough(_objectId, inRay, 100, hit))
+				if(hitPrimitiveThrough(objId, inRay, 100, hit))
 				{
-					vec3 outRefractionRay = refract(inRay.dir, -hit.normal, 1.0 / g_BvhMaterialData[_matId].params.y);
+					vec3 outRefractionRay = refract(inRay.dir, -hit.normal, 1.0 / g_BvhMaterialData[matId].params.y);
 					outRefractionRay = normalize(outRefractionRay == vec3(0,0,0) ? inRay.dir : outRefractionRay);
 					p = inRay.from + inRay.dir * hit.t;
 					IndirectLightRay outRay;
 					outRay.pos = vec4(p + hit.normal * 0.001, 1);
-					outRay.lit = vec4(_lightAbsorbdeByPreBounce * g_BvhMaterialData[_matId].color.xyz * (1-fresnelReflexion), 0);
+					outRay.lit = vec4(_lightAbsorbdeByPreBounce * albedo * (1-fresnelReflexion), 0);
 					outRay.dir = vec4(outRefractionRay, 0);
 					writeRefractionRay(outRay);
 				}
@@ -94,6 +121,7 @@ void nextBounce(uint _objectId, uint _matId, vec3 _lightAbsorbdeByPreBounce, vec
 		}
 	}
 #endif
+
 }
 
 void computeReflexionRay(uint _objectId, vec3 _lit, vec3 _normal, in Ray _ray, float _t)

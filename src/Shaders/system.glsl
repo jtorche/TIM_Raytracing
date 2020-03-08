@@ -35,4 +35,7 @@ vec4 toLinear(vec4 sRGB)
 
 #define OFFSET_RAY_COLLISION 0.9999
 
+#define Fdielectric vec3(0.04,0.04,0.04)
+#define RoughnessPBR 0.1
+
 #endif

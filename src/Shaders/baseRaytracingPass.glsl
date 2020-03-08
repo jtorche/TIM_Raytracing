@@ -18,6 +18,8 @@ vec3 rayTrace(in Ray _ray, out ClosestHit _hitResult)
 	closestHit.t = TMAX;
 	closestHit.mid_objId = 0xFFFFffff;
 	closestHit.nid = 0xFFFFffff;
+	storeHitUv(closestHit, vec2(0,0));
+
 	uint rootId = g_Constants.numNodes == 1 ? NID_LEAF_BIT : 0;
 
 #if NO_BVH
@@ -38,6 +40,12 @@ vec3 rayTrace(in Ray _ray, out ClosestHit _hitResult)
 	}
 
 	_hitResult = closestHit;
+
+	uint matId = getMaterialId(closestHit);
+	uint diffuseMap = g_BvhMaterialData[matId].type_ids.y & 0xFFFF;
+	if(diffuseMap < 0xFFFF) 
+		lit *= toLinear(texture(g_dataTextures[diffuseMap], getHitUv(closestHit))).xyz;
+
 	return lit;
 }
 

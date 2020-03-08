@@ -85,6 +85,7 @@ struct ClosestHit
 {
 #if !USE_SHARED_MEM
     vec3 normal;
+	vec2 uv;
 #endif
     float t;
 	uint nid;
@@ -106,6 +107,7 @@ struct Hit
     vec3 normal;
     float t;
 	uint nid_mid;
+	vec2 uv;
 };
 
 bool HitSphere(Ray r, Sphere s, float tMin, float tmax, out Hit outHit)

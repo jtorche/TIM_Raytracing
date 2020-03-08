@@ -20,6 +20,8 @@
 #define TMAX 100
 #define TEXTURE_ARRAY_SIZE 16
 
+#define g_TextureBrdf 0
+
 struct PassData
 {
 	uvec2 frameSize;

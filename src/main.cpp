@@ -111,6 +111,7 @@ int main()
     
     {
         TextureManager textureManager(g_renderer);
+        textureManager.loadTexture("../data/image/ibl_brdf_lut.png");
         RayTracingPass rtPass(g_renderer, context, resourceAllocator, textureManager);
         PostprocessPass postprocessPass(g_renderer, context);
 
