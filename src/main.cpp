@@ -13,7 +13,7 @@ using namespace tim;
 
 IRenderer * g_renderer = nullptr;
 SimpleCamera camera;
-uvec2 frameResolution = { 640, 420 };
+uvec2 frameResolution = { 800, 600 };
 bool g_rebuildBvh = false;
 
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
@@ -40,6 +40,9 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 
     if (key == GLFW_KEY_R && action == GLFW_PRESS)
         g_rebuildBvh = true;
+
+    if (key == GLFW_KEY_P)
+        system("pause");
 }
 
 void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
@@ -79,8 +82,9 @@ void window_size_callback(GLFWwindow* window, int width, int height)
     }
 }
 
-int main()
+int main(int argc, char* argv[])
 {
+    printf("%s\n",argv[0]);
 	GLFWwindow* window;
 
 	/* Initialize the library */
@@ -104,14 +108,14 @@ int main()
     g_renderer = createRenderer();
     ResourceAllocator resourceAllocator(g_renderer);
 
-    ShaderCompiler shaderCompiler("../src/Shaders/", getShaderMacros());
+    ShaderCompiler shaderCompiler("./src/Shaders/", getShaderMacros());
     g_renderer->Init(shaderCompiler , &winHandle, frameResolution.x, frameResolution.y, false);
 
     IRenderContext* context = g_renderer->CreateRenderContext(RenderContextType::Graphics);
     
     {
         TextureManager textureManager(g_renderer);
-        textureManager.loadTexture("../data/image/ibl_brdf_lut.png");
+        textureManager.loadTexture("./data/image/ibl_brdf_lut.png");
         RayTracingPass rtPass(g_renderer, context, resourceAllocator, textureManager);
         PostprocessPass postprocessPass(g_renderer, context);
 

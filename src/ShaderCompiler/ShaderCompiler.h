@@ -4,6 +4,7 @@
 #include "timCore/flat_hash_map.h"
 #include "ShaderFlags.h"
 #include <array>
+#include <filesystem>
 
 namespace tim
 {
@@ -29,7 +30,7 @@ namespace tim
         
         struct FXFile
         {
-            std::string m_fxName;
+            std::filesystem::path m_fxName;
             ska::flat_hash_map<u64, Blob> m_bytecode;
         };
         ska::flat_hash_map<FxNameHash, FXFile> m_shaders;

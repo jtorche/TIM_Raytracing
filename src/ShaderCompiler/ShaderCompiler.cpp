@@ -1,7 +1,6 @@
 #include "ShaderCompiler.h"
 #include "timCore/hash.h"
 #include "timCore/Common.h"
-#include <filesystem>
 #include <iostream>
 #include <windows.h>
 
@@ -20,7 +19,7 @@ namespace tim
                 if (entry.path().extension() == ".comp")
                 {
                     std::cout << "FX: "<< entry.path().filename() << "\n";
-                    m_shaders[TIM_HASH32_STR(entry.path().filename().c_str())] = { entry.path().u8string() };
+                    m_shaders[TIM_HASH32_STR(entry.path().filename().c_str())] = { entry.path() };
                 }
             }
         }
@@ -45,7 +44,7 @@ namespace tim
         else
         {
             std::string outputFile = m_folder + "cache/" + buildShaderKeyString(_fx, _flags);
-            std::string cmdArg = itFx->second.m_fxName + " " + buildDefineCommand(_flags) + " -O -o " + outputFile;
+            std::string cmdArg = std::string((const char *)itFx->second.m_fxName.u8string().c_str()) + " " + buildDefineCommand(_flags) + " -O -o " + outputFile;
 
             fs::remove(outputFile);
 
@@ -54,7 +53,11 @@ namespace tim
             bool retry = false;
             do
             {
-                system(("C:\\VulkanSDK\\1.2.131.2\\Bin\\glslc.exe " + cmdArg).c_str());
+                std::string compilerPath = "C:\\VulkanSDK\\1.3.216.0\\Bin\\glslc.exe";
+                if (!fs::exists(compilerPath))
+                    std::cout << compilerPath << " does not exist." << std::endl;
+
+                system((compilerPath + " " + cmdArg).c_str());
                 if (!fs::exists(outputFile))
                 {
                     std::cout << "\nCompilation failed, would you retry ?\n";

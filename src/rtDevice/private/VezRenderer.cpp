@@ -36,7 +36,8 @@ namespace tim
         {
             OutputDebugString(pCallbackData->pMessage);
             OutputDebugString("\n");
-            __debugbreak();
+            if((messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) > 0)
+                __debugbreak();
         }
 
         return VK_FALSE;
@@ -68,7 +69,7 @@ namespace tim
             std::vector<const char*> enabledLayers = 
             { 
             #ifdef _DEBUG
-                "VK_LAYER_LUNARG_standard_validation" 
+                "VK_LAYER_KHRONOS_validation" 
             #endif
             };
 

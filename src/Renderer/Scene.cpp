@@ -137,21 +137,21 @@ namespace tim
             }
         }
 
-        _bvh->addSphere({ { -1.5, -1.5, 1.5 }, 0.08f }, BVHBuilder::createEmissiveMaterial({ 1, 0.5, 1 }));
-        _bvh->addSphereLight({ { -1.5, -1.5, 1.5 }, 15, { 2, 1, 2 }, 0.1f });
+        _bvh->addSphere({ { -1.5f, -1.5f, 1.5f }, 0.08f }, BVHBuilder::createEmissiveMaterial({ 1, 0.5, 1 }));
+        _bvh->addSphereLight({ { -1.5f, -1.5f, 1.5f }, 15, { 2, 1, 2 }, 0.1f });
 
-        _bvh->addSphere({ { 1, 1, 1.5 }, 0.08f }, BVHBuilder::createEmissiveMaterial({ 1, 1, 0.5 }));
+        _bvh->addSphere({ { 1, 1, 1.5f }, 0.08f }, BVHBuilder::createEmissiveMaterial({ 1, 1, 0.5 }));
         _bvh->addSphereLight({ { 1, 1, 1.5 }, 8, { 2, 2, 1 }, 0.1f });
 
-        _bvh->addSphere({ { 0, 0, 1.3 }, 0.2 }, BVHBuilder::createTransparentMaterial({ 1,0.6f,0.6f }, 1.05f, 0.05f));
-        _bvh->addSphere({ { -1.5, 0, 1.3 }, 0.2 }, BVHBuilder::createPbrMaterial({ 1,0.6f,0.6f }));
+        _bvh->addSphere({ { 0, 0, 1.3f }, 0.2f }, BVHBuilder::createTransparentMaterial({ 1,0.6f,0.6f }, 1.05f, 0.05f));
+        _bvh->addSphere({ { -1.5f, 0, 1.3f }, 0.2f }, BVHBuilder::createPbrMaterial({ 1,0.6f,0.6f }));
 
         Material suzanneMat = BVHBuilder::createLambertianMaterial({ 0.9f, 0.9f, 0.9f, });
-        u32 texId = m_texManager.loadTexture("../data/image/tex.png");
+        u32 texId = m_texManager.loadTexture("./data/image/tex.png");
         BVHBuilder::setTextureMaterial(suzanneMat, texId, 0);
 
-        addOBJ("../data/suzanne.obj", { 1,1.7,1 }, vec3(1), _bvh, suzanneMat);
-        addOBJ("../data/mesh2.obj", { -1,-1.7,1.3 }, vec3(0.6), _bvh, BVHBuilder::createPbrMaterial({ 0.9f, 0.9f, 0.9f, }));
+        addOBJ("./data/suzanne.obj", { 1,1.7f,1 }, vec3(1), _bvh, suzanneMat);
+        addOBJ("./data/mesh2.obj", { -1,-1.7f,1.3f }, vec3(0.6), _bvh, BVHBuilder::createPbrMaterial({ 0.9f, 0.9f, 0.9f, }));
 #endif
 
         // _bvh->addSphereLight({ { 2, 2, 1 }, 20, { 2, 1, 2 }, 0.2f });

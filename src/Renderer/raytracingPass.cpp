@@ -85,16 +85,13 @@ namespace tim
         mat4 viewProj = linalg::mul(projMat, _camera.getViewMat());
         passData.invProjView = linalg::inverse(viewProj);
 
-        passData.frustumCorner00 = linalg::mul(passData.invProjView, vec4(-1, -1, 1, 1));
-        passData.frustumCorner10 = linalg::mul(passData.invProjView, vec4(1, -1, 1, 1));
-        passData.frustumCorner01 = linalg::mul(passData.invProjView, vec4(-1, 1, 1, 1));
+        passData.frustumCorner00 = linalg::mul(passData.invProjView, vec4(-1, -1, 0.5f, 1));
+        passData.frustumCorner10 = linalg::mul(passData.invProjView, vec4( 1, -1, 0.5f, 1));
+        passData.frustumCorner01 = linalg::mul(passData.invProjView, vec4(-1,  1, 0.5f, 1));
 
         passData.frustumCorner00 /= passData.frustumCorner00.w;
         passData.frustumCorner10 /= passData.frustumCorner10.w;
         passData.frustumCorner01 /= passData.frustumCorner01.w;
-
-        auto w = passData.frustumCorner10 - passData.frustumCorner00;
-        auto h = passData.frustumCorner01 - passData.frustumCorner00;
 
         BufferView passDataBuffer;
         void* passDataPtr = m_renderer->GetDynamicBuffer(sizeof(PassData), passDataBuffer);

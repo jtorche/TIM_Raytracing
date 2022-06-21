@@ -22,7 +22,7 @@ namespace tim
 
     private:
         void drawBounce(u32 _depth, BufferView _passData, BufferHandle _inputRayBuffer, ImageHandle _outputImage);
-        u32 RayTracingPass::getRayStorageBufferSize() const;
+        u32 getRayStorageBufferSize() const;
 
     private:
         u32 m_rayBounceRecursionDepth;
