@@ -63,6 +63,7 @@ void nextBounce(vec3 _lightAbsorbdeByPreBounce, in ClosestHit _closestHit, in Ra
 		vec3 lit = _lightAbsorbdeByPreBounce * albedo * g_BvhMaterialData[matId].params.x;
 		computeReflexionRay(objId, lit, normal, _ray, t);
     }
+	#if 0
 	else if (g_BvhMaterialData[matId].type_ids.x == Material_PBR)
 	{
 		// Sample pre-filtered specular reflection environment at correct mipmap level.
@@ -84,7 +85,7 @@ void nextBounce(vec3 _lightAbsorbdeByPreBounce, in ClosestHit _closestHit, in Ra
 		//// Total ambient lighting contribution.
 		//ambientLighting = diffuseIBL + specularIBL;
 	}
-
+	#endif
 	else if(g_BvhMaterialData[matId].type_ids.x == Material_Transparent)
 	{
 		const float refractionIndice = g_BvhMaterialData[matId].params.y;

@@ -62,13 +62,22 @@ shared uint g_lightCount;
 
 void cullWithFrustumTile(in PassData _passData, in PushConstants _constants)
 {
+	uvec2 workGroup = gl_WorkGroupID.xy;
+	//workGroup = uvec2(1,1);
 	vec3 step_x = (_passData.frustumCorner10.xyz - _passData.frustumCorner00.xyz) / gl_NumWorkGroups.x;
 	vec3 step_y = (_passData.frustumCorner01.xyz - _passData.frustumCorner00.xyz) / gl_NumWorkGroups.y;
 	
-	vec3 tile_bl = _passData.frustumCorner00.xyz + step_x * gl_WorkGroupID.x +		step_y * gl_WorkGroupID.y;
-	vec3 tile_br = _passData.frustumCorner00.xyz + step_x * (gl_WorkGroupID.x+1) +	step_y * gl_WorkGroupID.y;
-	vec3 tile_tl = _passData.frustumCorner00.xyz + step_x * gl_WorkGroupID.x +		step_y * (gl_WorkGroupID.y+1);
-	vec3 tile_tr = _passData.frustumCorner00.xyz + step_x * (gl_WorkGroupID.x+1) +	step_y * (gl_WorkGroupID.y+1);
+	vec3 tile_bl = _passData.frustumCorner00.xyz + step_x * workGroup.x +		step_y * workGroup.y;
+	vec3 tile_br = _passData.frustumCorner00.xyz + step_x * (workGroup.x+1) +	step_y * workGroup.y;
+	vec3 tile_tl = _passData.frustumCorner00.xyz + step_x * workGroup.x +		step_y * (workGroup.y+1);
+	vec3 tile_tr = _passData.frustumCorner00.xyz + step_x * (workGroup.x+1) +	step_y * (workGroup.y+1);
+
+	vec3 deltaX = step_x * 0.25;
+	vec3 deltaY = step_y * 0.25;
+	tile_bl = tile_bl - deltaX - deltaY;
+	tile_br = tile_br + deltaX - deltaY;
+	tile_tl = tile_tl - deltaX + deltaY;
+	tile_tr = tile_tr + deltaX + deltaY;
 	
 	vec4 plans[4]; // left right top down near far
 	plans[0] = computePlan(vec3(_passData.cameraPos), tile_tl, tile_bl);
@@ -101,7 +110,9 @@ void cullWithFrustumTile(in PassData _passData, in PushConstants _constants)
 		if(primitiveFrustumCollision(i, plans))
 		{
 		    safe_i = atomicAdd(g_primitiveCount, 1);
-			g_primitives[safe_i] = i;
+
+			if(safe_i < MAX_PRIMITIVES_PER_TILE)
+				g_primitives[safe_i] = i;
 		}
 	}
 
@@ -116,7 +127,9 @@ void cullWithFrustumTile(in PassData _passData, in PushConstants _constants)
 		if(triangleFrustumCollision(i, plans))
 		{
 		    safe_i = atomicAdd(g_triangleCount, 1);
-			g_triangles[safe_i] = i;
+
+			if(safe_i < MAX_TRIANGLES_PER_TILE)
+				g_triangles[safe_i] = i;
 		}
 	}
 
@@ -131,7 +144,9 @@ void cullWithFrustumTile(in PassData _passData, in PushConstants _constants)
 		if(lightFrustumCollision(i, plans))
 		{
 		    safe_i = atomicAdd(g_lightCount, 1);
-			g_lights[safe_i] = i;
+
+			if(safe_i < MAX_LIGHTS_PER_TILE)
+				g_lights[safe_i] = i;
 		}
 	}
 
