@@ -151,6 +151,7 @@ namespace tim
         BVHBuilder::setTextureMaterial(suzanneMat, texId, 0);
 
         addOBJ("./data/suzanne.obj", { 1,1.7f,1 }, vec3(1), _bvh, suzanneMat);
+        addOBJ("./data/longboard/longboard.obj", { 1,1.7f,4 }, vec3(1), _bvh, suzanneMat);
         addOBJ("./data/mesh2.obj", { -1,-1.7f,1.3f }, vec3(0.6), _bvh, BVHBuilder::createPbrMaterial({ 0.9f, 0.9f, 0.9f, }));
 #endif
 
