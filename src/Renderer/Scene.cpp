@@ -113,7 +113,7 @@ namespace tim
         auto ballMirror = BVHBuilder::createMirrorMaterial({ 0,1,1 }, 1);
         auto glassMat = BVHBuilder::createTransparentMaterial({ 0.8f,0.8f,0.8f }, 1.1f, 0);
         auto redGlassMat = BVHBuilder::createTransparentMaterial({ 1,0,0 }, 1.1f, 0);
-
+#if 0
         _bvh->addBox(Box{ { -DIMXY, -DIMXY, DIMZ }, {  DIMXY,          DIMXY,           DIMZ + 0.1f } });
         _bvh->addBox(Box{ { -DIMXY, -DIMXY, 0    }, {  DIMXY,          DIMXY,           0.1f } });
         
@@ -136,29 +136,30 @@ namespace tim
                 _bvh->addBox(Box{ p - vec3(pillarSize, pillarSize, 0), p + vec3(pillarSize, pillarSize, pillarHeight) }, (i + j) % 2 == 0 ? glassMat : redGlassMat);
             }
         }
+#endif
+        _bvh->addSphere({ { 0, 0, 2.1f }, 0.08f }, BVHBuilder::createEmissiveMaterial({ 1, 0.5, 1 }));
+        _bvh->addSphereLight({ { 0, 0, 2.1f }, 15, { 2, 1, 2 }, 0.1f });
 
-        _bvh->addSphere({ { -1.5f, -1.5f, 1.5f }, 0.08f }, BVHBuilder::createEmissiveMaterial({ 1, 0.5, 1 }));
-        _bvh->addSphereLight({ { -1.5f, -1.5f, 1.5f }, 15, { 2, 1, 2 }, 0.1f });
+        //_bvh->addSphere({ { 1, 1, 1.5f }, 0.08f }, BVHBuilder::createEmissiveMaterial({ 1, 1, 0.5 }));
+        //_bvh->addSphereLight({ { 1, 1, 1.5 }, 8, { 2, 2, 1 }, 0.1f });
 
-        _bvh->addSphere({ { 1, 1, 1.5f }, 0.08f }, BVHBuilder::createEmissiveMaterial({ 1, 1, 0.5 }));
-        _bvh->addSphereLight({ { 1, 1, 1.5 }, 8, { 2, 2, 1 }, 0.1f });
-
-        _bvh->addSphere({ { 0, 0, 1.3f }, 0.2f }, BVHBuilder::createTransparentMaterial({ 1,0.6f,0.6f }, 1.05f, 0.05f));
+        _bvh->addSphere({ {  2.0f, 0, 1.3f }, 0.2f }, ballMirror);
+        _bvh->addSphere({ {  0.5f, 0, 1.3f }, 0.2f }, BVHBuilder::createTransparentMaterial({ 1,0.6f,0.6f }, 1.05f, 0.05f));
         _bvh->addSphere({ { -1.5f, 0, 1.3f }, 0.2f }, BVHBuilder::createPbrMaterial({ 1,0.6f,0.6f }));
 
         Material suzanneMat = BVHBuilder::createLambertianMaterial({ 0.9f, 0.9f, 0.9f, });
-        u32 texId = m_texManager.loadTexture("./data/image/tex.png");
-        BVHBuilder::setTextureMaterial(suzanneMat, texId, 0);
+        // u32 texId = m_texManager.loadTexture("./data/image/tex.png");
+        // BVHBuilder::setTextureMaterial(suzanneMat, texId, 0);
 
         addOBJ("./data/suzanne.obj", { 1,1.7f,1 }, vec3(1), _bvh, suzanneMat);
-        addOBJ("./data/longboard/longboard.obj", { 1,1.7f,4 }, vec3(1), _bvh, suzanneMat);
-        addOBJ("./data/mesh2.obj", { -1,-1.7f,1.3f }, vec3(0.6), _bvh, BVHBuilder::createPbrMaterial({ 0.9f, 0.9f, 0.9f, }));
+        //addOBJ("./data/longboard/longboard2.obj", { 1,1.7f,4 }, vec3(1), _bvh, suzanneMat);
+        addOBJ("./data/mesh2.obj", { -1,-1.7f,1.3f }, vec3(0.6f), _bvh, BVHBuilder::createPbrMaterial({ 0.9f, 0.9f, 0.9f, }));
 #endif
 
         // _bvh->addSphereLight({ { 2, 2, 1 }, 20, { 2, 1, 2 }, 0.2f });
         // _bvh->addSphereLight({ { -2, -2, 3 }, 20, { 2, 2, 2 }, 0.2f });
         // _bvh->addBox(Box{ { -10, -10, -1 }, {  10, 10, -0.5 } });
-        // addOBJ("../data/sponza.obj", {}, _bvh);
+        addOBJ("./data/sponza100K.obj", {}, vec3(1), _bvh, suzanneMat);
 
         //m_bvh->addSphere({ { 2, 2, 2 }, 2 }, BVHBuilder::createEmissiveMaterial({ 1, 1, 0 }));
 

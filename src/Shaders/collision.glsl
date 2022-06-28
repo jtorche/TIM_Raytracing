@@ -90,7 +90,16 @@ struct ClosestHit
     float t;
 	uint nid;
 	uint mid_objId;
+#if DEBUG_GEOMETRY
+    uint dbgColorId;
+#endif
 };
+
+#if DEBUG_GEOMETRY
+void ClosestHit_setDebugColorId(inout ClosestHit hit, uint id) { hit.dbgColorId = id; }
+#else
+void ClosestHit_setDebugColorId(inout ClosestHit hit, uint id) { }
+#endif
 
 uint getObjectId(in ClosestHit _hit)
 {

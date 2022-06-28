@@ -132,12 +132,15 @@ int main(int argc, char* argv[])
             if (g_rebuildBvh)
             {
                 g_rebuildBvh = false;
-                u32 maxDepth = 5; u32 maxObjPerNode = 8;
+                u32 maxDepth = 5; u32 maxObjPerNode = 8, recursionDepth = 2;
                 std::cout << "Rebuild bvh, max depth : ";
                 std::cin >> maxDepth;
                 std::cout << "Rebuild bvh, max obj per node : ";
                 std::cin >> maxObjPerNode;
+                std::cout << "Rendering recursion depth : ";
+                std::cin >> recursionDepth;
 
+                rtPass.setBounceRecursionDepth(recursionDepth);
                 rtPass.rebuildBvh(maxDepth, maxObjPerNode);
             }
 

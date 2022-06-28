@@ -70,6 +70,7 @@ namespace tim
             { 
             #ifdef _DEBUG
                 "VK_LAYER_KHRONOS_validation" 
+                //"VK_LAYER_LUNARG_standard_validation" 
             #endif
             };
 

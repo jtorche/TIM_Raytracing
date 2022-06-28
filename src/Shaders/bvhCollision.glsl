@@ -196,6 +196,7 @@ void bvh_collide(uint _nid, Ray _ray, inout ClosestHit closestHit)
 			closestHit.t			= hit.t * OFFSET_RAY_COLLISION;
 			closestHit.mid_objId	= objIndex + (g_BvhPrimitiveData[objIndex].iparam & 0xFFFF0000);
 			closestHit.nid			= _nid;
+			ClosestHit_setDebugColorId(closestHit, objIndex);
 
 			storeHitNormal(closestHit, hit.normal);
 		}
@@ -213,6 +214,7 @@ void bvh_collide(uint _nid, Ray _ray, inout ClosestHit closestHit)
 			closestHit.t			= hit.t * OFFSET_RAY_COLLISION;
 			closestHit.mid_objId	= 0x0000FFFF + (triangle.index2_matId & 0xFFFF0000);
 			closestHit.nid			= _nid;
+			ClosestHit_setDebugColorId(closestHit, triIndex);
 
 			storeHitNormal(closestHit, hit.normal);
 			storeHitUv(closestHit, hit.uv);
@@ -260,6 +262,7 @@ void brutForceTraverse(Ray _ray, inout ClosestHit closestHit)
 		closestHit.t =			hasHit ? hit.t * OFFSET_RAY_COLLISION	: closestHit.t;
 		closestHit.normal =		hasHit ? hit.normal						: closestHit.normal;
 		closestHit.mid_objId =	hasHit ? i | (g_BvhPrimitiveData[i].iparam & 0xFFFF0000) : closestHit.mid_objId;
+		ClosestHit_setDebugColorId(closestHit, i);
 	}
 
 	for(uint i=0 ; i<g_Constants.numTriangles ; ++i)
@@ -271,6 +274,7 @@ void brutForceTraverse(Ray _ray, inout ClosestHit closestHit)
 		closestHit.normal =		hasHit ? hit.normal							: closestHit.normal;
 		closestHit.uv =			hasHit ? hit.uv								: closestHit.uv;
 		closestHit.mid_objId =	hasHit ? 0x0000FFFF | (g_BvhTriangleData[i].index2_matId & 0xFFFF0000) : closestHit.mid_objId;
+		ClosestHit_setDebugColorId(closestHit, i);
 	}
 }
 #endif

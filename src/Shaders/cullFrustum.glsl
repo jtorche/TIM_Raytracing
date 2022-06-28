@@ -168,6 +168,7 @@ void collideRayAgainstTileData(in Ray _ray, inout ClosestHit _closestHit)
 		if(hasHit) storeHitNormal(_closestHit, hit.normal);
 
 		_closestHit.mid_objId =	hasHit ? primIndex | (g_BvhPrimitiveData[primIndex].iparam & 0xFFFF0000) : _closestHit.mid_objId;
+		ClosestHit_setDebugColorId(_closestHit, primIndex);
 	}
 
 	for(uint i=0 ; i<g_triangleCount ; ++i)
@@ -182,6 +183,7 @@ void collideRayAgainstTileData(in Ray _ray, inout ClosestHit _closestHit)
 		if(hasHit) storeHitUv(_closestHit, hit.uv);
 
 		_closestHit.mid_objId =	hasHit ? 0x0000FFFF | (g_BvhTriangleData[triIndex].index2_matId & 0xFFFF0000) : _closestHit.mid_objId;
+		ClosestHit_setDebugColorId(_closestHit, triIndex);
 	}
 }
 

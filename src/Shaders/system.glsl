@@ -22,13 +22,15 @@ vec4 toLinear(vec4 sRGB)
 }
 
 
-#define USE_SHADOW					0
+#define USE_SHADOW					1
 #define COMPUTE_SHADOW_ON_THE_FLY	1
 #define NO_RAY_INVDIR				0
 
 #define NO_BVH				0
-#define TILE_FRUSTUM_CULL	1
+#define TILE_FRUSTUM_CULL	0
 #define USE_SHARED_MEM		0
+
+#define DEBUG_GEOMETRY		0
 
 #define g_AreaLightShadowUniformSampling	0
 #define g_AreaLightShadowSampleCount	    1

@@ -18,6 +18,7 @@ vec3 rayTrace(in Ray _ray, out ClosestHit _hitResult)
 	closestHit.t = TMAX;
 	closestHit.mid_objId = 0xFFFFffff;
 	closestHit.nid = 0xFFFFffff;
+	ClosestHit_setDebugColorId(closestHit, 0);
 	storeHitUv(closestHit, vec2(0,0));
 
 	uint rootId = g_Constants.numNodes == 1 ? NID_LEAF_BIT : 0;
@@ -37,6 +38,22 @@ vec3 rayTrace(in Ray _ray, out ClosestHit _hitResult)
 	#else
            lit = computeDirectLighting(rootId, _ray, closestHit);
 	#endif
+
+#if DEBUG_GEOMETRY
+		   vec3 dbgColor[8] = 
+		   {
+			   vec3(1,0,0),
+			   vec3(0,1,0),
+			   vec3(0,0,1),
+			   vec3(1,1,0),
+			   vec3(1,0,1),
+			   vec3(0,1,1),
+			   vec3(0.3,0.3,0.3),
+			   vec3(0.7,0.7,0.7)
+		   };
+
+		   lit = dbgColor[closestHit.dbgColorId % 8];
+#endif
 	}
 
 	_hitResult = closestHit;

@@ -17,6 +17,7 @@ namespace tim
         ~RayTracingPass();
 
         void rebuildBvh(u32 _maxDepth, u32 _maxObjPerNode);
+        void setBounceRecursionDepth(u32 _depth);
         void setFrameBufferSize(uvec2 _res);
         void draw(ImageHandle _outputBuffer, const SimpleCamera& _camera);
 

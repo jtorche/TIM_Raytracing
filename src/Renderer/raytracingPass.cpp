@@ -14,29 +14,7 @@ namespace tim
         : m_frameSize{ 800,600 }, m_renderer{ _renderer }, m_context{ _context }, m_resourceAllocator{ _allocator }, m_textureManager{ _texManager }
     {
         m_rayBounceRecursionDepth = 2;
-        m_geometryBuffer = std::make_unique<BVHGeometry>(_renderer, 1024 * 1024);
-        m_bvh = std::make_unique<BVHBuilder>(*m_geometryBuffer);
-
-        Scene scene(*m_geometryBuffer.get(), m_textureManager);
-        scene.build(m_bvh.get());
-
-        m_geometryBuffer->flush(m_renderer);
-
-        {
-            auto start = std::chrono::system_clock::now();
-            m_bvh->build(17, 12, Box{ vec3{ -100,-100,-100 }, vec3{ 100,100,100 } });
-            m_bvh->dumpStats();
-            auto end = std::chrono::system_clock::now();
-            std::chrono::duration<double> elapsed_seconds = end - start;
-            std::cout << "Build BVH time: " << elapsed_seconds.count() << "s\n";
-        }
-
-        u32 size = m_bvh->getBvhGpuSize();
-        std::cout << "Uploading " << (size >> 10) << " Ko of BVH data\n";
-        m_bvhBuffer = _renderer->CreateBuffer(size, MemoryType::Default, BufferUsage::Storage | BufferUsage::Transfer);
-        std::unique_ptr<ubyte[]> buffer = std::unique_ptr<ubyte[]>(new ubyte[size]);
-        m_bvh->fillGpuBuffer(buffer.get(), m_bvhTriangleOffsetRange, m_bvhPrimitiveOffsetRange, m_bvhMaterialOffsetRange, m_bvhLightOffsetRange, m_bvhNodeOffsetRange, m_bvhLeafDataOffsetRange);
-        _renderer->UploadBuffer(m_bvhBuffer, buffer.get(), size);
+        rebuildBvh(20, 12);
 
         system("pause");
     }
@@ -54,7 +32,25 @@ namespace tim
             m_renderer->DestroyBuffer(m_bvhBuffer);
         }
 
+        m_geometryBuffer = std::make_unique<BVHGeometry>(m_renderer, 1024 * 1024);
+        m_bvh = std::make_unique<BVHBuilder>(*m_geometryBuffer);
+
+        Scene scene(*m_geometryBuffer.get(), m_textureManager);
+        scene.build(m_bvh.get());
+
+        m_geometryBuffer->flush(m_renderer);
+
+        {
+            auto start = std::chrono::system_clock::now();
+            m_bvh->build(_maxDepth, _maxObjPerNode, Box{ vec3{ -100,-100,-100 }, vec3{ 100,100,100 } });
+            m_bvh->dumpStats();
+            auto end = std::chrono::system_clock::now();
+            std::chrono::duration<double> elapsed_seconds = end - start;
+            std::cout << "Build BVH time: " << elapsed_seconds.count() << "s\n";
+        }
+
         u32 size = m_bvh->getBvhGpuSize();
+        std::cout << "Uploading " << (size >> 10) << " Ko of BVH data\n";
         m_bvhBuffer = m_renderer->CreateBuffer(size, MemoryType::Default, BufferUsage::Storage | BufferUsage::Transfer);
         std::unique_ptr<ubyte[]> buffer = std::unique_ptr<ubyte[]>(new ubyte[size]);
         m_bvh->fillGpuBuffer(buffer.get(), m_bvhTriangleOffsetRange, m_bvhPrimitiveOffsetRange, m_bvhMaterialOffsetRange, m_bvhLightOffsetRange, m_bvhNodeOffsetRange, m_bvhLeafDataOffsetRange);
@@ -64,6 +60,11 @@ namespace tim
     void RayTracingPass::setFrameBufferSize(uvec2 _res)
     {
         m_frameSize = _res;
+    }
+
+    void RayTracingPass::setBounceRecursionDepth(u32 _depth)
+    {
+        m_rayBounceRecursionDepth = _depth;
     }
 
     u32 RayTracingPass::getRayStorageBufferSize() const
