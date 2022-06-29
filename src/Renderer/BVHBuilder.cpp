@@ -9,7 +9,6 @@ namespace tim
 {
     namespace
     {
-        constexpr u32 g_maxStep = 1024;
         constexpr u32 g_MaxMaterialCount = 1u << 16;
         constexpr u32 g_MaxNodeCount = NID_MASK;
         constexpr u32 g_MaxPrimitiveCount = (1u << 16) - 1;
