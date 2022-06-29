@@ -63,12 +63,8 @@ void nextBounce(vec3 _lightAbsorbdeByPreBounce, in ClosestHit _closestHit, in Ra
 		vec3 lit = _lightAbsorbdeByPreBounce * albedo * g_BvhMaterialData[matId].params.x;
 		computeReflexionRay(objId, lit, normal, _ray, t);
     }
-	#if 0
 	else if (g_BvhMaterialData[matId].type_ids.x == Material_PBR)
 	{
-		// Sample pre-filtered specular reflection environment at correct mipmap level.
-		//vec3 specularIrradiance = _lit;
-		//
 		//// Split-sum approximation factors for Cook-Torrance specular BRDF.
 		float metalness = g_BvhMaterialData[matId].params.x;
 		vec3 Lo = normalize(_eyePos - P);
@@ -77,15 +73,8 @@ void nextBounce(vec3 _lightAbsorbdeByPreBounce, in ClosestHit _closestHit, in Ra
 		vec3 F0 = mix(Fdielectric, albedo, metalness);
 		vec3 specularIBL = (F0 * specularBRDF.x + specularBRDF.y) * _lightAbsorbdeByPreBounce;
 
-		//vec2 specularBRDF = specularBRDF_LUT.Sample(spBRDF_Sampler, float2(cosLo, roughness)).rg;
-		//
-		//// Total specular IBL contribution.
-		//float3 specularIBL = (F0 * specularBRDF.x + specularBRDF.y) * specularIrradiance;
-		//
-		//// Total ambient lighting contribution.
-		//ambientLighting = diffuseIBL + specularIBL;
+		computeReflexionRay(objId, specularIBL, normal, _ray, t);
 	}
-	#endif
 	else if(g_BvhMaterialData[matId].type_ids.x == Material_Transparent)
 	{
 		const float refractionIndice = g_BvhMaterialData[matId].params.y;

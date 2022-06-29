@@ -40,6 +40,8 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 
     if (key == GLFW_KEY_R && action == GLFW_PRESS)
         g_rebuildBvh = true;
+    if (key == GLFW_KEY_C && action == GLFW_PRESS)
+        std::cout << "Camera pos: " << camera.getPos().x << " , " << camera.getPos().y << " , " << camera.getPos().z << std::endl;
 
     if (key == GLFW_KEY_P)
         system("pause");

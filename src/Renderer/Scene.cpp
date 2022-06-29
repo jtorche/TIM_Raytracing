@@ -137,11 +137,11 @@ namespace tim
             }
         }
 #endif
-        _bvh->addSphere({ { 0, 0, 2.1f }, 0.08f }, BVHBuilder::createEmissiveMaterial({ 1, 0.5, 1 }));
-        _bvh->addSphereLight({ { 0, 0, 2.1f }, 15, { 2, 1, 2 }, 0.1f });
+        _bvh->addSphere({ { 0, 0, 2.1f }, 0.08f }, BVHBuilder::createEmissiveMaterial({ 1, 1, 1 }));
+        _bvh->addSphereLight({ { 0, 0, 2.1f }, 15, { 2, 2, 2 }, 0.1f });
 
-        //_bvh->addSphere({ { 1, 1, 1.5f }, 0.08f }, BVHBuilder::createEmissiveMaterial({ 1, 1, 0.5 }));
-        //_bvh->addSphereLight({ { 1, 1, 1.5 }, 8, { 2, 2, 1 }, 0.1f });
+        _bvh->addSphere({ { -3.93968 , 1.37829 , 2.65274 }, 0.08f }, BVHBuilder::createEmissiveMaterial({ 2,0.5,0.5 }));
+        _bvh->addSphereLight({ { -3.93968 , 1.37829 , 2.65274 }, 2, { 2,0.5,0.5 }, 0.1f });
 
         _bvh->addSphere({ {  2.0f, 0, 1.3f }, 0.2f }, ballMirror);
         _bvh->addSphere({ {  0.5f, 0, 1.3f }, 0.2f }, BVHBuilder::createTransparentMaterial({ 1,0.6f,0.6f }, 1.05f, 0.05f));

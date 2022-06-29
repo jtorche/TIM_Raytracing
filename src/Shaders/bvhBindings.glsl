@@ -50,7 +50,6 @@ layout(std430, set = 1, binding = 2) buffer GeometryData_TexCoord
 };
 
 layout(set = 0, binding = g_dataTextures_bind) uniform sampler2D g_dataTextures[TEXTURE_ARRAY_SIZE];
-// layout(set = 0, binding = g_dataTextures_bind) uniform sampler2D g_dataTexture;
 
 #if USE_SHARED_MEM
 shared vec3 g_normalHit[LOCAL_SIZE * LOCAL_SIZE];
