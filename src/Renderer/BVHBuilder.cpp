@@ -9,7 +9,7 @@ namespace tim
 {
     namespace
     {
-        constexpr u32 g_maxStep = 256;
+        constexpr u32 g_maxStep = 1024;
         constexpr u32 g_MaxMaterialCount = 1u << 16;
         constexpr u32 g_MaxNodeCount = NID_MASK;
         constexpr u32 g_MaxPrimitiveCount = (1u << 16) - 1;
@@ -446,15 +446,11 @@ namespace tim
         Box& _leftBox, Box& _rightBox, size_t& _numObjInLeft, size_t& _numObjInRight) const
     {
         size_t numObjects = std::distance(_objectsBegin, _objectsEnd) + std::distance(_trianglesBegin, _trianglesEnd);
-        vec3 boxDim = _curNode->extent.maxExtent - _curNode->extent.minExtent;
 
-        size_t curBest_numObjInLeft = std::numeric_limits<size_t>::max();
-        size_t curBest_numObjInRight = std::numeric_limits<size_t>::max();
-
-        auto processSplit = [&](const Box& leftBox, const Box& rightBox)
+        auto processSplit = [&](const Box& leftBox, const Box& rightBox) -> std::pair<size_t, size_t>
         {
             if (!checkBox(leftBox) || !checkBox(rightBox))
-                return;
+                return std::make_pair(0u, 0u);
 
             size_t numObjInLeft = std::count_if(_objectsBegin, _objectsEnd, [&](u32 _id)
             {
@@ -478,69 +474,32 @@ namespace tim
                 return collide;
             });
 
-
-            if (std::max(numObjInLeft, numObjInRight) < std::max(curBest_numObjInLeft, curBest_numObjInRight))
-            {
-                _leftBox = leftBox;
-                _rightBox = rightBox;
-                _numObjInLeft = numObjInLeft;
-                _numObjInRight = numObjInRight;
-                curBest_numObjInLeft = numObjInLeft;
-                curBest_numObjInRight = numObjInRight;
-            }
+            return std::make_pair(numObjInLeft, numObjInRight);
         };
 
-        if (numObjects < g_maxStep)
+        vec3 boxDim = _curNode->extent.maxExtent - _curNode->extent.minExtent;
+
+        size_t prevScore = size_t(-1);
+        vec2 searchBestCut = { 0, 1 };
+        for (u32 i = 0; i < 32; ++i)
         {
-            vec3 fixedAxis = _fixedAxis(boxDim);
-            for (auto it = _trianglesBegin; it < _trianglesEnd; ++it)
-            {
-                Box aabb = getAABB(m_triangles[*it]);
-                aabb.minExtent -= vec3(0.001f, 0.001f, 0.001f);
-                aabb.maxExtent += vec3(0.001f, 0.001f, 0.001f);
-                {
-                    Box leftBox = { _curNode->extent.minExtent, _fixedAxis(_curNode->extent.maxExtent) + _movingAxis(aabb.minExtent) };
-                    Box rightBox = { _fixedAxis(_curNode->extent.minExtent) + _movingAxis(aabb.minExtent), _curNode->extent.maxExtent };
-
-                    processSplit(leftBox, rightBox);
-                }
-                {
-                    Box leftBox = { _curNode->extent.minExtent, _fixedAxis(_curNode->extent.maxExtent) + _movingAxis(aabb.maxExtent) };
-                    Box rightBox = { _fixedAxis(_curNode->extent.minExtent) + _movingAxis(aabb.maxExtent), _curNode->extent.maxExtent };
-                    
-                    processSplit(leftBox, rightBox);
-                }
-            }
-
-            for (auto it = _objectsBegin; it < _objectsEnd; ++it)
-            {
-                Box aabb = getAABB(m_objects[*it]);
-                {
-                    Box leftBox = { _curNode->extent.minExtent, _fixedAxis(_curNode->extent.maxExtent) + _movingAxis(aabb.minExtent) };
-                    Box rightBox = { _fixedAxis(_curNode->extent.minExtent) + _movingAxis(aabb.minExtent), _curNode->extent.maxExtent };
-
-                    processSplit(leftBox, rightBox);
-                }
-                {
-                    Box leftBox = { _curNode->extent.minExtent, _fixedAxis(_curNode->extent.maxExtent) + _movingAxis(aabb.maxExtent) };
-                    Box rightBox = { _fixedAxis(_curNode->extent.minExtent) + _movingAxis(aabb.maxExtent), _curNode->extent.maxExtent };
-
-                    processSplit(leftBox, rightBox);
-                }
-            }
-        }
-        else
-        {
-            vec3 boxStep = boxDim / g_maxStep;
-            vec3 step = _movingAxis(boxStep);
+            float newCut = (searchBestCut.x + searchBestCut.y) * 0.5f;
+            vec3 step = _movingAxis(boxDim * newCut);
             vec3 fixedStep = _fixedAxis(boxDim);
 
-            for (u32 i = 0; i < g_maxStep; ++i)
-            {
-                Box leftBox = { _curNode->extent.minExtent, _curNode->extent.minExtent + fixedStep + step * i };
-                Box rightBox = { _curNode->extent.minExtent + step * i, _curNode->extent.maxExtent };
-                processSplit(leftBox, rightBox);
-            }
+            _leftBox = { _curNode->extent.minExtent, _curNode->extent.minExtent + fixedStep + step };
+            _rightBox = { _curNode->extent.minExtent + step, _curNode->extent.maxExtent };
+            
+            std::tie(_numObjInLeft, _numObjInRight) = processSplit(_leftBox, _rightBox);
+
+            size_t absDiff = _numObjInLeft < _numObjInRight ? _numObjInRight - _numObjInLeft : _numObjInLeft - _numObjInRight;
+            if (absDiff <= std::max<size_t>(numObjects / (16*1024), 1)) // best cut have been found
+                break;
+
+            if (_numObjInLeft > _numObjInRight) // take left
+                searchBestCut.y = newCut;
+            else                                // take right
+                searchBestCut.x = newCut;
         }
     }
 
