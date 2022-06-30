@@ -109,51 +109,36 @@ namespace tim
         const float DIMXY = 3.1f;
         const float DIMZ = 2;
 
-        auto groundMirror = BVHBuilder::createMirrorMaterial({ 0,1,1 }, 0.3f);
-        auto ballMirror = BVHBuilder::createMirrorMaterial({ 0,1,1 }, 1);
         auto glassMat = BVHBuilder::createTransparentMaterial({ 0.8f,0.8f,0.8f }, 1.1f, 0);
-        auto redGlassMat = BVHBuilder::createTransparentMaterial({ 1,0,0 }, 1.1f, 0);
-#if 0
-        _bvh->addBox(Box{ { -DIMXY, -DIMXY, DIMZ }, {  DIMXY,          DIMXY,           DIMZ + 0.1f } });
-        _bvh->addBox(Box{ { -DIMXY, -DIMXY, 0    }, {  DIMXY,          DIMXY,           0.1f } });
-        
-        _bvh->addBox(Box{ { -DIMXY, -DIMXY, 0    }, { -DIMXY + 0.1f,   DIMXY,           DIMZ + 0.1f } });
-        _bvh->addBox(Box{ {  DIMXY, -DIMXY, 0    }, {  DIMXY + 0.1f,   DIMXY,           DIMZ + 0.1f } });
-        
-        _bvh->addBox(Box{ { -DIMXY, -DIMXY, 0    }, {  DIMXY,         -DIMXY + 0.1f,    DIMZ + 0.1f } });
-         //m_bvh->addBox(Box{ { -DIMXY,  DIMXY - DIMXY * 0.5f, 0    }, {  DIMXY,          DIMXY + 0.1f - DIMXY * 0.5f,    DIMZ + 0.1f } }, redGlassMat);
+        auto redGlassMat = BVHBuilder::createTransparentMaterial({ 1,0.5,0.5 }, 1.05f, 0.1f);
 
-        const float pillarSize = 0.03f;
-        const float pillarHeight = 0.8f;
-        const float sphereRad = 0.1f;
-        for (u32 i = 0; i < 10; ++i)
-        {
-            for (u32 j = 0; j < 8; ++j)
-            {
-                vec3 p = { -DIMXY + i * (DIMXY / 4), -DIMXY + j * (DIMXY / 4), 0 };
-                _bvh->addSphere({ p + vec3(0,0,pillarHeight), sphereRad }, ballMirror);
-                //m_bvh->addSphere({ p + vec3(0,0,1), sphereRad });
-                _bvh->addBox(Box{ p - vec3(pillarSize, pillarSize, 0), p + vec3(pillarSize, pillarSize, pillarHeight) }, (i + j) % 2 == 0 ? glassMat : redGlassMat);
-            }
-        }
-#endif
+        Material suzanneMat = BVHBuilder::createLambertianMaterial({ 0.9f, 0.9f, 0.9f });
+        Material redMat = BVHBuilder::createLambertianMaterial({ 0.9f, 0.2f, 0.2f });
+        Material blueMat = BVHBuilder::createLambertianMaterial({ 0.2f, 0.2f, 0.9f });
+        Material pbrMat = BVHBuilder::createPbrMaterial({ 0.9f, 0.9f, 0.9f }, 0);
+        Material pbrMatMetal = BVHBuilder::createPbrMaterial({ 0.9f, 0.9f, 0.9f }, 1);
+
         _bvh->addSphere({ { 0, 0, 2.1f }, 0.08f }, BVHBuilder::createEmissiveMaterial({ 1, 1, 1 }));
         _bvh->addSphereLight({ { 0, 0, 2.1f }, 15, { 2, 2, 2 }, 0.1f });
 
         _bvh->addSphere({ { -3.93968 , 1.37829 , 2.65274 }, 0.08f }, BVHBuilder::createEmissiveMaterial({ 2,0.5,0.5 }));
         _bvh->addSphereLight({ { -3.93968 , 1.37829 , 2.65274 }, 2, { 2,0.5,0.5 }, 0.1f });
 
-        _bvh->addSphere({ {  2.0f, 0, 1.3f }, 0.2f }, ballMirror);
+        _bvh->addSphere({ {  2.0f, 0, 1.3f }, 0.2f }, pbrMatMetal);
         _bvh->addSphere({ {  0.5f, 0, 1.3f }, 0.2f }, BVHBuilder::createTransparentMaterial({ 1,0.6f,0.6f }, 1.05f, 0.05f));
-        _bvh->addSphere({ { -1.5f, 0, 1.3f }, 0.2f }, BVHBuilder::createPbrMaterial({ 1,0.6f,0.6f }));
+        _bvh->addSphere({ { -1.5f, 0, 1.3f }, 0.2f }, BVHBuilder::createPbrMaterial({ 1,0.6f,0.6f }, 0));
 
-        Material suzanneMat = BVHBuilder::createLambertianMaterial({ 0.9f, 0.9f, 0.9f, });
+        const float dim = 0.3;
+        _bvh->addBox(Box{ { -dim, -dim*0.1, 0 }, { dim, dim * 0.1, dim*2 } }, redGlassMat);
+        _bvh->addBox(Box{ { -dim*20, -dim * 0.1 + dim, 0 }, { dim * 20, dim * 0.1 + dim, dim * 2 } }, redMat);
+        _bvh->addBox(Box{ { -dim*20, -dim * 0.1 - dim, 0 }, { dim * 20, dim * 0.1 - dim, dim * 2 } }, blueMat);
+
         // u32 texId = m_texManager.loadTexture("./data/image/tex.png");
         // BVHBuilder::setTextureMaterial(suzanneMat, texId, 0);
 
-        addOBJ("./data/suzanne.obj", { 1,1.7f,1 }, vec3(1), _bvh, suzanneMat);
+        addOBJ("./data/suzanne.obj", { 1,1.7f,1 }, vec3(1), _bvh, pbrMat);
         //addOBJ("./data/longboard/longboard2.obj", { 1,1.7f,4 }, vec3(1), _bvh, suzanneMat);
-        addOBJ("./data/mesh2.obj", { -1,-1.7f,1.3f }, vec3(0.6f), _bvh, BVHBuilder::createPbrMaterial({ 0.9f, 0.9f, 0.9f, }));
+        // addOBJ("./data/mesh2.obj", { -1,-1.7f,1.3f }, vec3(0.6f), _bvh, pbrMat);
 #endif
 
         // _bvh->addSphereLight({ { 2, 2, 1 }, 20, { 2, 1, 2 }, 0.2f });

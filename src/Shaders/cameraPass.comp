@@ -40,7 +40,7 @@ void main()
         // vec2 uv = vec2(float(pixelCoord.x) / g_passData.frameSize.x, float(pixelCoord.y) / g_passData.frameSize.y);
         // lit = toLinear(texture(g_dataTextures[g_TextureBrdf], uv)).xyz;
         imageStore(g_outputImage, pixelCoord, vec4(lit, 1));
-        nextBounce(vec3(1,1,1), closestHit, ray, g_passData.cameraPos.xyz);
+        nextBounce(vec3(1,1,1), closestHit, ray);
 	}
 #else
 
@@ -71,7 +71,7 @@ void main()
 		}
 		
 		imageStore(g_outputImage, pixelCoord, vec4(lit, 1));
-        nextBounce(vec3(1,1,1), closestHit, ray, g_passData.cameraPos.xyz);
+        nextBounce(vec3(1,1,1), closestHit, ray);
 	}
 #endif
 }

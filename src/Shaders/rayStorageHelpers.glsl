@@ -46,8 +46,9 @@ void writeRefractionRay(in IndirectLightRay _ray)
 }
 
 void computeReflexionRay(uint _objectId, vec3 _lit, vec3 _normal, in Ray _ray, float _t);
+vec3 computeSpecularBrdf(vec3 albedo, float metalness, vec3 v, vec3 n);
 
-void nextBounce(vec3 _lightAbsorbdeByPreBounce, in ClosestHit _closestHit, in Ray _ray, vec3 _eyePos)
+void nextBounce(vec3 _lightAbsorbdeByPreBounce, in ClosestHit _closestHit, in Ray _ray)
 {
 	uint objId = getObjectId(_closestHit);
 	uint matId = getMaterialId(_closestHit);
@@ -58,22 +59,11 @@ void nextBounce(vec3 _lightAbsorbdeByPreBounce, in ClosestHit _closestHit, in Ra
 	vec3 albedo = g_BvhMaterialData[matId].color.xyz;
 	
 #if defined(FIRST_RECURSION_STEP) || defined(CONTINUE_RECURSION)
-    if (g_BvhMaterialData[matId].type_ids.x == Material_Mirror)
-    {
-		vec3 lit = _lightAbsorbdeByPreBounce * albedo * g_BvhMaterialData[matId].params.x;
-		computeReflexionRay(objId, lit, normal, _ray, t);
-    }
-	else if (g_BvhMaterialData[matId].type_ids.x == Material_PBR)
+    if (g_BvhMaterialData[matId].type_ids.x == Material_PBR)
 	{
-		//// Split-sum approximation factors for Cook-Torrance specular BRDF.
-		float metalness = g_BvhMaterialData[matId].params.x;
-		vec3 Lo = normalize(_eyePos - P);
-		float cosLo = max(0.0, dot(normal, Lo));
-		vec2 specularBRDF = texture(g_dataTextures[g_TextureBrdf], vec2(cosLo, RoughnessPBR)).xy;
-		vec3 F0 = mix(Fdielectric, albedo, metalness);
-		vec3 specularIBL = (F0 * specularBRDF.x + specularBRDF.y) * _lightAbsorbdeByPreBounce;
-
-		computeReflexionRay(objId, specularIBL, normal, _ray, t);
+		const float metalness = g_BvhMaterialData[matId].params.x;
+		vec3 Lr = computeSpecularBrdf(albedo, metalness, -_ray.dir, normal);
+		computeReflexionRay(objId, Lr * _lightAbsorbdeByPreBounce, normal, _ray, t);
 	}
 	else if(g_BvhMaterialData[matId].type_ids.x == Material_Transparent)
 	{
@@ -81,7 +71,7 @@ void nextBounce(vec3 _lightAbsorbdeByPreBounce, in ClosestHit _closestHit, in Ra
 		float fresnelReflexion = computeFresnelReflexion(_ray.dir, normal, refractionIndice);
 
 		float objectReflectivity = g_BvhMaterialData[matId].params.x;
-		fresnelReflexion = (objectReflectivity + (1.0-objectReflectivity) * fresnelReflexion);
+		fresnelReflexion = (objectReflectivity + (1.0 - objectReflectivity) * fresnelReflexion);
 
 		#if defined(FIRST_RECURSION_STEP)
 		computeReflexionRay(objId, _lightAbsorbdeByPreBounce * albedo * fresnelReflexion, normal, _ray, t);
@@ -124,6 +114,13 @@ void computeReflexionRay(uint _objectId, vec3 _lit, vec3 _normal, in Ray _ray, f
     outRay.lit = vec4(_lit, 0);
     outRay.dir = vec4(normalize(n), 0);
 	writeReflexionRay(outRay);
+}
+
+vec3 computeSpecularBrdf(vec3 albedo, float metalness, vec3 v, vec3 n)
+{
+	vec3 F0 = mix(Fdielectric, albedo, metalness);
+	vec2 Ldfg = textureLod(g_dataTextures[g_TextureBrdf], vec2(max(0, dot(n, v)), RoughnessPBR), 0.0).xy;
+	return F0 * Ldfg.x + Ldfg.y;
 }
 
 #endif

@@ -184,16 +184,6 @@ namespace tim
         return mat;
     }
 
-    Material BVHBuilder::createMirrorMaterial(vec3 _color, float _mirrorness)
-    {
-        Material mat;
-        mat.type_ids = { Material_Mirror, u32(-1),u32(-1),u32(-1) };
-        mat.color = { _color.x, _color.y, _color.z, 0 };
-        mat.params.x = _mirrorness;
-
-        return mat;
-    }
-
     Material BVHBuilder::createTransparentMaterial(vec3 _color, float _refractionIndice, float _reflectivity)
     {
         Material mat;
