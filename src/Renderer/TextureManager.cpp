@@ -16,16 +16,24 @@ namespace tim
     TextureManager::~TextureManager()
     {
         m_renderer->DestroyImage(m_defaultTexture);
-        unloadAllImages();
+        for (u32 i = 0; i < TEXTURE_ARRAY_SIZE; ++i)
+        {
+            if (m_images[i].ptr != 0)
+                m_renderer->DestroyImage(m_images[i]);
+        }
     }
 
-    u16 TextureManager::loadTexture(const char* _path)
+    u16 TextureManager::loadTexture(const std::string& _path)
     {
-        auto imgExt = FreeImage_GetFileType(_path);
+        auto it = m_texPathToId.find(_path);
+        if (it != m_texPathToId.end())
+            return it->second;
+
+        auto imgExt = FreeImage_GetFileType(_path.c_str());
         if (imgExt == FREE_IMAGE_FORMAT::FIF_UNKNOWN)
             return u16(-1);
 
-        FIBITMAP* img = FreeImage_Load(imgExt, _path);
+        FIBITMAP* img = FreeImage_Load(imgExt, _path.c_str());
         if (!img)
             return u16(-1);
 
@@ -46,11 +54,11 @@ namespace tim
         auto maskG = FreeImage_GetGreenMask(img);
         auto maskB = FreeImage_GetBlueMask(img);
 
-        ImageFormat format = ImageFormat::RGBA8;
+        ImageFormat format = ImageFormat::RGBA8_SRGB;
         if (maskR == 0x000000FF && maskG == 0x0000FF00 && maskB == 0x00FF0000)
-            format = ImageFormat::RGBA8;
+            format = ImageFormat::RGBA8_SRGB;
         else if (maskB == 0x000000FF && maskG == 0x0000FF00 && maskR == 0x00FF0000)
-            format = ImageFormat::BGRA8;
+            format = ImageFormat::BGRA8_SRGB;
         else
             TIM_ASSERT(false);
 
@@ -73,16 +81,9 @@ namespace tim
         m_renderer->UploadImage(m_images[freeSlot], data, pitch, 0);
 
         FreeImage_Unload(img);
-        return freeSlot;
-    }
 
-    void TextureManager::unloadAllImages()
-    {
-        for (u32 i = 0; i < TEXTURE_ARRAY_SIZE; ++i)
-        {
-            if (m_images[i].ptr != 0)
-                m_renderer->DestroyImage(m_images[i]);
-        }
+        m_texPathToId[_path] = freeSlot;
+        return freeSlot;
     }
 
     void TextureManager::setSamplingMode(u32 _index, SamplerType _mode)

@@ -85,7 +85,7 @@ vec3 rayTrace(in Ray _ray, out ClosestHit _hitResult)
 	uint matId = getMaterialId(closestHit);
 	uint diffuseMap = g_BvhMaterialData[matId].type_ids.y & 0xFFFF;
 	if(diffuseMap < 0xFFFF) 
-		lit *= toLinear(texture(g_dataTextures[nonuniformEXT(diffuseMap)], getHitUv(closestHit))).xyz;
+		lit *= texture(g_dataTextures[nonuniformEXT(diffuseMap)], getHitUv(closestHit)).xyz;
 
 	return lit;
 }
