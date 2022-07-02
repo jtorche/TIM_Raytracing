@@ -10,18 +10,20 @@ void  bvh_getNodeBoxes(uint _nid, out Box _box0, out Box _box1);
 void  bvh_collide(uint _nid, Ray r, inout ClosestHit closestHit);
 bool  bvh_collide_fast(uint _nid, Ray r, float tmax);
 
-void traverseBvh(Ray r, uint rootId, inout ClosestHit closestHit)
+uint traverseBvh(Ray r, uint rootId, inout ClosestHit closestHit)
 {
 	// MBVH2 traversal loop
 	uint nodeId = rootId;
 	uint bitstack = 0;
 	uint parentId, siblingId;
+	uint numTraversal = 0;
 
 	while(true) 
 	{
 		// Inner node loop
 		while(!bvh_isLeaf(nodeId))
 		{
+			numTraversal++;
 			uint child0Id, child1Id;
 			bvh_getChildId(nodeId, child0Id, child1Id);
 
@@ -59,7 +61,7 @@ void traverseBvh(Ray r, uint rootId, inout ClosestHit closestHit)
 		while((bitstack & 1) == 0) 
 		{
 			if(bitstack == 0)
-				return;
+				return numTraversal;
 
 			nodeId = parentId;
 			bvh_getParentSiblingId(nodeId, parentId, siblingId);
@@ -69,6 +71,8 @@ void traverseBvh(Ray r, uint rootId, inout ClosestHit closestHit)
 		nodeId = siblingId;
 		bitstack = bitstack ^ 1;
 	}
+
+	return numTraversal;
 }
 
 bool traverseBvhFast(Ray r, uint rootId, float tmax)

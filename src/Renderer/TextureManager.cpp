@@ -16,10 +16,7 @@ namespace tim
     TextureManager::~TextureManager()
     {
         m_renderer->DestroyImage(m_defaultTexture);
-        for (u32 i = 0; i < TEXTURE_ARRAY_SIZE; ++i)
-        {
-            m_renderer->DestroyImage(m_images[i]);
-        }
+        unloadAllImages();
     }
 
     u16 TextureManager::loadTexture(const char* _path)
@@ -77,6 +74,15 @@ namespace tim
 
         FreeImage_Unload(img);
         return freeSlot;
+    }
+
+    void TextureManager::unloadAllImages()
+    {
+        for (u32 i = 0; i < TEXTURE_ARRAY_SIZE; ++i)
+        {
+            if (m_images[i].ptr != 0)
+                m_renderer->DestroyImage(m_images[i]);
+        }
     }
 
     void TextureManager::setSamplingMode(u32 _index, SamplerType _mode)

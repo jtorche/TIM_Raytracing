@@ -8,9 +8,10 @@ namespace tim
     public:
         SimpleCamera() = default;
 
-        void setDirection(bool _left, bool _right, bool _forward, bool _backward)
+        void setDirection(bool _left, bool _right, bool _forward, bool _backward, bool _boost)
         {
             m_left = _left; m_right = _right; m_forward = _forward; m_backward = _backward;
+            m_boost = _boost;
         }
         void setMouseDelta(float _dx, float _dy)
         {
@@ -29,7 +30,7 @@ namespace tim
 
     private:
         bool m_left = false, m_right = false, m_forward = false, m_backward = false;
-        bool m_leftMouseButton = false;
+        bool m_leftMouseButton = false, m_boost = false;
         float m_mouseDx = 0, m_mouseDy = 0;
 
         vec3 pos = { 0,0,1.5 };

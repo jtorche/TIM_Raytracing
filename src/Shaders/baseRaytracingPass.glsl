@@ -26,7 +26,31 @@ vec3 rayTrace(in Ray _ray, out ClosestHit _hitResult)
 #if NO_BVH
 	brutForceTraverse(_ray, closestHit);
 #else
-	traverseBvh(_ray, rootId, closestHit);
+	uint numTraversal = traverseBvh(_ray, rootId, closestHit);
+	#if DEBUG_BVH_TRAVERSAL
+
+	const uint numColors = 5;
+	const uint step = 150;
+	const uint maxTraversal = step * numColors;
+	vec3 dbgColor[6] =
+	{
+		vec3(0,1,0),
+		vec3(0,1,1),
+		vec3(0,0,1),
+		vec3(1,0,1),
+		vec3(1,0,0),
+		vec3(1,0,0)
+	};
+
+	numTraversal = min(numTraversal, maxTraversal);
+
+	for (uint i = 0; i < numColors; ++i)
+	{
+		if (numTraversal <= step + step * i)
+			return mix(dbgColor[i], dbgColor[i+1], float(numTraversal - step * i) / step);
+	}
+	return dbgColor[numColors - 1];
+	#endif
 #endif
 	
 	vec3 lit = vec3(0,0,0);
@@ -61,7 +85,7 @@ vec3 rayTrace(in Ray _ray, out ClosestHit _hitResult)
 	uint matId = getMaterialId(closestHit);
 	uint diffuseMap = g_BvhMaterialData[matId].type_ids.y & 0xFFFF;
 	if(diffuseMap < 0xFFFF) 
-		lit *= toLinear(texture(g_dataTextures[diffuseMap], getHitUv(closestHit))).xyz;
+		lit *= toLinear(texture(g_dataTextures[nonuniformEXT(diffuseMap)], getHitUv(closestHit))).xyz;
 
 	return lit;
 }

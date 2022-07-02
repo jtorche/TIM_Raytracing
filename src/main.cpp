@@ -15,6 +15,7 @@ IRenderer * g_renderer = nullptr;
 SimpleCamera camera;
 uvec2 frameResolution = { 800, 600 };
 bool g_rebuildBvh = false;
+bool g_windowMinimized = false;
 
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
@@ -22,6 +23,7 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
     static bool backward = false;
     static bool left = false;
     static bool right = false;
+    static bool boost = false;
 
     if (key == GLFW_KEY_F10 && action == GLFW_PRESS)
         g_renderer->InvalidateShaders();
@@ -36,7 +38,10 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
     if (key == GLFW_KEY_D)
         right = action == GLFW_PRESS || action == GLFW_REPEAT;
 
-    camera.setDirection(left, right, forward, backward);
+    if (key == GLFW_KEY_LEFT_SHIFT)
+        boost = action == GLFW_PRESS || action == GLFW_REPEAT;
+
+    camera.setDirection(left, right, forward, backward, boost);
 
     if (key == GLFW_KEY_R && action == GLFW_PRESS)
         g_rebuildBvh = true;
@@ -75,12 +80,24 @@ void window_size_callback(GLFWwindow* window, int width, int height)
     static int s_width = 0;
     static int s_height = 0;
 
-    if (g_renderer && (s_width != width || s_height != height))
+    if (!g_windowMinimized && g_renderer && (s_width != width || s_height != height))
     {
         s_width = width;
         s_height = height;
         frameResolution = uvec2{ u32(width), u32(height) };
         g_renderer->Resize(s_width, s_height);
+    }
+}
+
+void window_iconify_callback(GLFWwindow* window, int iconified)
+{
+    if (iconified)
+    {
+        g_windowMinimized = true;
+    }
+    else
+    {
+        g_windowMinimized = false;
     }
 }
 
@@ -102,10 +119,12 @@ int main(int argc, char* argv[])
 	}
 
     HWND winHandle = glfwGetWin32Window(window);
+
     glfwSetKeyCallback(window, key_callback);
     glfwSetCursorPosCallback(window, cursor_position_callback);
     glfwSetMouseButtonCallback(window, mouse_button_callback);
     glfwSetWindowSizeCallback(window, window_size_callback);
+    glfwSetWindowIconifyCallback(window, window_iconify_callback);
 
     g_renderer = createRenderer();
     ResourceAllocator resourceAllocator(g_renderer);
@@ -129,56 +148,62 @@ int main(int argc, char* argv[])
         {
             /* Poll for and process events */
             glfwPollEvents();
-            camera.update(float(frameTime));
 
-            if (g_rebuildBvh)
+            if (!g_windowMinimized)
             {
-                g_rebuildBvh = false;
-                u32 maxDepth = 5; u32 maxObjPerNode = 8, recursionDepth = 2;
-                std::cout << "Rebuild bvh, max depth : ";
-                std::cin >> maxDepth;
-                std::cout << "Rebuild bvh, max obj per node : ";
-                std::cin >> maxObjPerNode;
-                std::cout << "Rendering recursion depth : ";
-                std::cin >> recursionDepth;
+                camera.update(float(frameTime));
 
-                rtPass.setBounceRecursionDepth(recursionDepth);
-                rtPass.rebuildBvh(maxDepth, maxObjPerNode);
+                if (g_rebuildBvh)
+                {
+                    g_rebuildBvh = false;
+                    u32 maxDepth = 5; u32 maxObjPerNode = 8, recursionDepth = 2;
+                    std::cout << "Rebuild bvh, max depth : ";
+                    std::cin >> maxDepth;
+                    std::cout << "Rebuild bvh, max obj per node : ";
+                    std::cin >> maxObjPerNode;
+                    std::cout << "Rendering recursion depth : ";
+                    std::cin >> recursionDepth;
+
+                    rtPass.setBounceRecursionDepth(recursionDepth);
+                    rtPass.rebuildBvh(maxDepth, maxObjPerNode);
+                }
+
+                g_renderer->BeginFrame();
+                ImageHandle backbuffer = g_renderer->GetBackBuffer();
+
+                context->BeginRender();
+                context->ClearImage(backbuffer, Color{ 0, 0, 0, 0 });
+
+                postprocessPass.setFrameBufferSize(frameResolution);
+                rtPass.setFrameBufferSize(frameResolution);
+
+                ImageCreateInfo imgInfo(ImageFormat::RGBA16F, frameResolution.x, frameResolution.y, 1, 1, ImageType::Image2D, MemoryType::Default);
+                ImageHandle outputColorBuffer = resourceAllocator.allocTexture(imgInfo);
+                rtPass.draw(outputColorBuffer, camera);
+
+                postprocessPass.linearToSrgb(outputColorBuffer, backbuffer);
+                resourceAllocator.releaseTexture(outputColorBuffer);
+
+                context->EndRender();
+
+                g_renderer->Execute(context);
+
+                g_renderer->EndFrame();
+                g_renderer->Present();
+
+                if (frameIndex % 100 == 0)
+                    std::cout << "FPS : " << u32(0.5f + 1.f / float(frameTime)) << std::endl;
+
+                double curTime = glfwGetTime();
+                frameTime = curTime - prevTime;
+                prevTime = curTime;
+                frameIndex++;
             }
-
-            g_renderer->BeginFrame();
-            ImageHandle backbuffer = g_renderer->GetBackBuffer();
-
-            context->BeginRender();
-            context->ClearImage(backbuffer, Color{ 0, 0, 0, 0 });
-
-            postprocessPass.setFrameBufferSize(frameResolution);
-            rtPass.setFrameBufferSize(frameResolution);
-
-            ImageCreateInfo imgInfo(ImageFormat::RGBA16F, frameResolution.x, frameResolution.y, 1, 1, ImageType::Image2D, MemoryType::Default);
-            ImageHandle outputColorBuffer = resourceAllocator.allocTexture(imgInfo);
-            rtPass.draw(outputColorBuffer, camera);
-
-            postprocessPass.linearToSrgb(outputColorBuffer, backbuffer);
-            resourceAllocator.releaseTexture(outputColorBuffer);
-
-            context->EndRender();
-
-            g_renderer->Execute(context);
-
-            g_renderer->EndFrame();
-            g_renderer->Present();
-
-            if (frameIndex % 100 == 0)
-                std::cout << "FPS : " << u32(0.5f + 1.f / float(frameTime)) << std::endl;
-
-            double curTime = glfwGetTime();
-            frameTime = curTime - prevTime;
-            prevTime = curTime;
-            frameIndex++;
-
-            //double sleepTime = std::max<double>(0, (1.0 / 60) - frameTime);
-            //Sleep(u32(1000.0 * sleepTime));
+            else
+            {
+                Sleep(100);
+                prevTime = glfwGetTime();
+            }
         }
 
         g_renderer->WaitForIdle();

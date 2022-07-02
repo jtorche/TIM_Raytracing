@@ -117,23 +117,49 @@ namespace tim
                 VkPhysicalDeviceProperties properties;
                 vezGetPhysicalDeviceProperties(physicalDevice, &properties);
 
-                // VkPhysicalDeviceFeatures features;
-                // vezGetPhysicalDeviceFeatures(physicalDevice, &features);
-
                 if (properties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU)
                 {
+                    m_vkPhysicalDevice = physicalDevice;
+                    vezGetPhysicalDeviceProperties(m_vkPhysicalDevice, &m_physicalDeviceProperties);
+
                     VezDeviceCreateInfo deviceCreateInfo = {};
                     const char* enabledExtensions[] =
                     {
-                        // VK_KHR_SURFACE_EXTENSION_NAME, 
-                        VK_KHR_SWAPCHAIN_EXTENSION_NAME
+                        VK_KHR_SWAPCHAIN_EXTENSION_NAME,
                         VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME,
                     };
+                    
                     deviceCreateInfo.enabledExtensionCount = _countof(enabledExtensions);
                     deviceCreateInfo.ppEnabledExtensionNames = enabledExtensions;
 
-                    m_vkPhysicalDevice = physicalDevice;
-                    vezGetPhysicalDeviceProperties(m_vkPhysicalDevice, &m_physicalDeviceProperties);
+                    VkPhysicalDeviceDescriptorIndexingFeatures indexingFeatures = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES };
+                    indexingFeatures.shaderInputAttachmentArrayDynamicIndexing = VK_TRUE;
+                    indexingFeatures.shaderUniformTexelBufferArrayDynamicIndexing = VK_TRUE;
+                    indexingFeatures.shaderStorageTexelBufferArrayDynamicIndexing = VK_TRUE;
+                    indexingFeatures.shaderUniformBufferArrayNonUniformIndexing = VK_TRUE;
+                    indexingFeatures.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;
+                    indexingFeatures.shaderStorageBufferArrayNonUniformIndexing = VK_TRUE;
+                    indexingFeatures.shaderStorageImageArrayNonUniformIndexing = VK_TRUE;
+                    indexingFeatures.shaderInputAttachmentArrayNonUniformIndexing = VK_TRUE;
+                    indexingFeatures.shaderUniformTexelBufferArrayNonUniformIndexing = VK_TRUE;
+                    indexingFeatures.shaderStorageTexelBufferArrayNonUniformIndexing = VK_TRUE;
+                    deviceCreateInfo.pNext = &indexingFeatures;
+
+                    // Need Vulkan 1_2
+                    // VkPhysicalDeviceVulkan12Features features12 = {};
+                    // features12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
+                    // features12.descriptorIndexing = VK_TRUE;
+                    // features12.shaderInputAttachmentArrayDynamicIndexing = VK_TRUE;
+                    // features12.shaderUniformTexelBufferArrayDynamicIndexing = VK_TRUE;
+                    // features12.shaderStorageTexelBufferArrayDynamicIndexing = VK_TRUE;
+                    // features12.shaderUniformBufferArrayNonUniformIndexing = VK_TRUE;
+                    // features12.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;
+                    // features12.shaderStorageBufferArrayNonUniformIndexing = VK_TRUE;
+                    // features12.shaderStorageImageArrayNonUniformIndexing = VK_TRUE;
+                    // features12.shaderInputAttachmentArrayNonUniformIndexing = VK_TRUE;
+                    // features12.shaderUniformTexelBufferArrayNonUniformIndexing = VK_TRUE;
+                    // features12.shaderStorageTexelBufferArrayNonUniformIndexing = VK_TRUE;
+                    // deviceCreateInfo.pNext = &features12;
 
                     TIM_VK_VERIFY(vezCreateDevice(physicalDevice, &deviceCreateInfo, &m_vkDevice));
 
@@ -145,13 +171,7 @@ namespace tim
             }
         }
 
-        {
-            //u32 queueCount;
-            //VkQueueFamilyProperties queueProperties[3];
-            //vezGetPhysicalDeviceQueueFamilyProperties(m_vkPhysicalDevice, &queueCount, queueProperties);
-
-            vezGetDeviceGraphicsQueue(m_vkDevice, 0, &m_graphicsQueue.m_queue);
-        }
+        vezGetDeviceGraphicsQueue(m_vkDevice, 0, &m_graphicsQueue.m_queue);
 
         createSwapChain(m_resolutionX, m_resolutionY);
 
@@ -180,6 +200,7 @@ namespace tim
             VezSwapchainCreateInfo swapchainCreateInfo = {};
             swapchainCreateInfo.surface = m_vkSurface;
             swapchainCreateInfo.format = { VK_FORMAT_B8G8R8A8_UNORM, VK_COLOR_SPACE_SRGB_NONLINEAR_KHR };
+
             TIM_VK_VERIFY(vezCreateSwapchain(m_vkDevice, &swapchainCreateInfo, &m_vezSwapChain));
         }
 

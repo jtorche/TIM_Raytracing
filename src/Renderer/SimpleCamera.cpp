@@ -6,7 +6,7 @@ namespace tim
     void SimpleCamera::update(float _time)
     {
         const float g_RotationMouseSpeed = 0.01f;
-        const float g_CameraSpeed = 1;
+        const float g_CameraSpeed = m_boost ? 5 : 1;
 
         vec3 horizontalAxis = linalg::cross(dir, up);
 
