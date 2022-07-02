@@ -1,10 +1,12 @@
 #pragma once
 #include "rtDevice/public/IRenderer.h"
+#include <filesystem>
 
 struct Material;
 
 namespace tim
 {
+    namespace fs = std::filesystem;
     class BVHBuilder;
     class BVHGeometry;
     class TextureManager;
@@ -21,7 +23,10 @@ namespace tim
         BVHGeometry& m_geometryBuffer;
         TextureManager& m_texManager;
 
-        void addOBJ(const char* _path, vec3 _pos, vec3 _scale, BVHBuilder* _builder, const Material& _mat);
+        void addOBJ(const fs::path& _path, vec3 _pos, vec3 _scale, BVHBuilder* _builder, const Material& _mat, bool _swapYZ = false);
+        void addOBJWithMtl(const fs::path& _path, vec3 _pos, vec3 _scale, BVHBuilder* _builder, bool _swapYZ = false);
+
+        void addOBJInner(const fs::path& _path, vec3 _pos, vec3 _scale, BVHBuilder* _builder, const Material* _mat, bool _swapYZ = false);
 
     };
 }

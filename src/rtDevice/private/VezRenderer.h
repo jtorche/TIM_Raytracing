@@ -39,7 +39,7 @@ namespace tim
         void UploadBuffer(BufferHandle _handle, void* _data, u32 _dataSize) override;
         void UploadBuffer(BufferHandle _handle, u32 _destOffset, void* _data, u32 _dataSize) override;
 
-        void UploadImage(ImageHandle _handle, void* _data, u32 _pitch) override;
+        void UploadImage(ImageHandle _handle, void* _data, u32 _pitch, u32 _mipIndex) override;
 
         ubyte* GetDynamicBuffer(u32 _size, BufferView& _buffer) override;
 

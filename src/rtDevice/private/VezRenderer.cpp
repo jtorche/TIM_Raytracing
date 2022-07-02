@@ -127,6 +127,7 @@ namespace tim
                     {
                         // VK_KHR_SURFACE_EXTENSION_NAME, 
                         VK_KHR_SWAPCHAIN_EXTENSION_NAME
+                        VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME,
                     };
                     deviceCreateInfo.enabledExtensionCount = _countof(enabledExtensions);
                     deviceCreateInfo.ppEnabledExtensionNames = enabledExtensions;
@@ -356,14 +357,14 @@ namespace tim
 		vezBufferSubData(m_vkDevice, buf->getVkBuffer(), _destOffset, _dataSize, _data);
     }
 
-    void VezRenderer::UploadImage(ImageHandle _handle, void* _data, u32 _pitch)
+    void VezRenderer::UploadImage(ImageHandle _handle, void* _data, u32 _pitch, u32 _mipIndex)
     {
         Image* img = reinterpret_cast<Image*>(_handle.ptr);
         VezImageSubDataInfo info = {};
         info.dataRowLength = _pitch;
         info.imageExtent = { img->getDesc().width, img->getDesc().height, 1 };
         info.imageOffset = { 0,0,0 };
-        info.imageSubresource = { 0,0,1 };
+        info.imageSubresource = { _mipIndex,0,1 };
         vezImageSubData(m_vkDevice, img->getVkHandle(), &info, _data);
     }
 
@@ -437,6 +438,24 @@ namespace tim
         info.addressModeV = VkSamplerAddressMode::VK_SAMPLER_ADDRESS_MODE_REPEAT;
         info.addressModeW = VkSamplerAddressMode::VK_SAMPLER_ADDRESS_MODE_REPEAT;
         vezCreateSampler(m_vkDevice, &info, &m_samplers[to_integral(SamplerType::Repeat_Linear_MipNearest)]);
+
+        // Clamp_Linear_MipLinear
+        info.magFilter = VkFilter::VK_FILTER_LINEAR;
+        info.minFilter = VkFilter::VK_FILTER_LINEAR;
+        info.mipmapMode = VkSamplerMipmapMode::VK_SAMPLER_MIPMAP_MODE_LINEAR;
+        info.addressModeU = VkSamplerAddressMode::VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+        info.addressModeV = VkSamplerAddressMode::VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+        info.addressModeW = VkSamplerAddressMode::VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+        vezCreateSampler(m_vkDevice, &info, &m_samplers[to_integral(SamplerType::Clamp_Linear_MipLinear)]);
+
+        // Repeat_Linear_MipLinear
+        info.magFilter = VkFilter::VK_FILTER_LINEAR;
+        info.minFilter = VkFilter::VK_FILTER_LINEAR;
+        info.mipmapMode = VkSamplerMipmapMode::VK_SAMPLER_MIPMAP_MODE_LINEAR;
+        info.addressModeU = VkSamplerAddressMode::VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        info.addressModeV = VkSamplerAddressMode::VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        info.addressModeW = VkSamplerAddressMode::VK_SAMPLER_ADDRESS_MODE_REPEAT;
+        vezCreateSampler(m_vkDevice, &info, &m_samplers[to_integral(SamplerType::Repeat_Linear_MipLinear)]);
     }
 
     void VezRenderer::destroySamplers()

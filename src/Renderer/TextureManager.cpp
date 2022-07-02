@@ -6,11 +6,11 @@ namespace tim
 {
     TextureManager::TextureManager(IRenderer* _renderer) : m_renderer{ _renderer }
     {
-        ImageCreateInfo creationInfo(ImageFormat::RGBA8, 8, 8, 1, ImageType::Image2D, MemoryType::Default, ImageUsage::Sampled | ImageUsage::Transfer);
+        ImageCreateInfo creationInfo(ImageFormat::RGBA8, 8, 8, 1, 1, ImageType::Image2D, MemoryType::Default, ImageUsage::Sampled | ImageUsage::Transfer);
         m_defaultTexture = m_renderer->CreateImage(creationInfo);
 
         for (u32 i = 0; i < TEXTURE_ARRAY_SIZE; ++i)
-            m_samplingMode[i] = SamplerType::Clamp_Nearest_MipNearest;
+            m_samplingMode[i] = SamplerType::Repeat_Linear_MipNearest;
     }
 
     TextureManager::~TextureManager()
@@ -57,7 +57,7 @@ namespace tim
         else
             TIM_ASSERT(false);
 
-        ImageCreateInfo creationInfo(format, w, h, 1, ImageType::Image2D, MemoryType::Default, ImageUsage::Sampled | ImageUsage::Transfer);
+        ImageCreateInfo creationInfo(format, w, h, 1, 1, ImageType::Image2D, MemoryType::Default, ImageUsage::Sampled | ImageUsage::Transfer);
 
         u32 freeSlot = u32(-1);
         for (u32 i = 0; i < TEXTURE_ARRAY_SIZE; ++i)
@@ -73,7 +73,7 @@ namespace tim
         m_images[freeSlot] = m_renderer->CreateImage(creationInfo);
 
         u32 pitch = FreeImage_GetPitch(img) / 4;
-        m_renderer->UploadImage(m_images[freeSlot], data, pitch);
+        m_renderer->UploadImage(m_images[freeSlot], data, pitch, 0);
 
         FreeImage_Unload(img);
         return freeSlot;

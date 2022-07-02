@@ -41,7 +41,7 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
     if (key == GLFW_KEY_R && action == GLFW_PRESS)
         g_rebuildBvh = true;
     if (key == GLFW_KEY_C && action == GLFW_PRESS)
-        std::cout << "Camera pos: " << camera.getPos().x << " , " << camera.getPos().y << " , " << camera.getPos().z << std::endl;
+        std::cout << "Camera pos: " << camera.getPos().x << "f , " << camera.getPos().y << "f , " << camera.getPos().z << "f" << std::endl;
 
     if (key == GLFW_KEY_P)
         system("pause");
@@ -155,7 +155,7 @@ int main(int argc, char* argv[])
             postprocessPass.setFrameBufferSize(frameResolution);
             rtPass.setFrameBufferSize(frameResolution);
 
-            ImageCreateInfo imgInfo(ImageFormat::RGBA16F, frameResolution.x, frameResolution.y, 1, ImageType::Image2D, MemoryType::Default);
+            ImageCreateInfo imgInfo(ImageFormat::RGBA16F, frameResolution.x, frameResolution.y, 1, 1, ImageType::Image2D, MemoryType::Default);
             ImageHandle outputColorBuffer = resourceAllocator.allocTexture(imgInfo);
             rtPass.draw(outputColorBuffer, camera);
 

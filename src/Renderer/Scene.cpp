@@ -37,17 +37,80 @@ namespace tim
 
     }
 
-    void Scene::addOBJ(const char* _path, vec3 _pos, vec3 _scale, BVHBuilder* _bvh, const Material& _mat)
+    namespace
+    {
+        void transformVertex(vec3& _v, const vec3& _pos, vec3& _scale, bool _swapYZ)
+        {
+            if (_swapYZ)
+                std::swap(_v.y, _v.z);
+            _v = _v * _scale + _pos;
+        }
+
+        void transformNormal(vec3& _v, const vec3& _pos, vec3& _scale, bool _swapYZ)
+        {
+            if (_swapYZ)
+                std::swap(_v.y, _v.z);
+        }
+    }
+
+    void Scene::addOBJWithMtl(const fs::path& _path, vec3 _pos, vec3 _scale, BVHBuilder* _builder, bool _swapYZ)
+    {
+        addOBJInner(_path, _pos, _scale, _builder, nullptr, _swapYZ);
+    }
+
+    void Scene::addOBJ(const fs::path& _path, vec3 _pos, vec3 _scale, BVHBuilder* _builder, const Material& _mat, bool _swapYZ)
+    {
+        addOBJInner(_path, _pos, _scale, _builder, &_mat, _swapYZ);
+    }
+
+    void Scene::addOBJInner(const fs::path& _path, vec3 _pos, vec3 _scale, BVHBuilder* _builder, const Material* _mat, bool _swapYZ)
     {
         tinyobj::attrib_t attrib;
         std::vector<tinyobj::shape_t> shapes;
-        std::vector<tinyobj::material_t> materials;
+        std::vector<tinyobj::material_t> mtlMaterials;
         std::string warn;
         std::string err;
-        bool ret = tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, _path);
+
+        std::filesystem::path mtlFolder = _path;
+        mtlFolder.remove_filename();
+        std::u8string mtlFolderStr{ mtlFolder.u8string() };
+        mtlFolderStr.erase(mtlFolderStr.end() - 1);
+
+        bool ret = tinyobj::LoadObj(&attrib, &shapes, &mtlMaterials, &warn, &err, (const  char*)_path.u8string().c_str(), _mat ? nullptr : (const  char*)mtlFolderStr.c_str());
         if (ret)
         {
             std::cout << "Warning loading  " << _path << ": " << warn << std::endl;
+
+            std::vector<Material> materials;
+            if (!_mat)
+            {
+                materials.resize(mtlMaterials.size());
+
+                ska::flat_hash_map<std::string, u32> texToId;
+                for (u32 i = 0; i < mtlMaterials.size(); ++i)
+                {
+                    Material mat = BVHBuilder::createLambertianMaterial({ mtlMaterials[i].diffuse[0], mtlMaterials[i].diffuse[1], mtlMaterials[i].diffuse[2] });
+                    if (!mtlMaterials[i].diffuse_texname.empty())
+                    {
+                        auto it = texToId.find(mtlMaterials[i].diffuse_texname);
+                        if (it != texToId.end())
+                            BVHBuilder::setTextureMaterial(mat, it->second, 0);
+                        else
+                        {
+                            std::filesystem::path texPath = _path;
+                            texPath.replace_filename(mtlMaterials[i].diffuse_texname);
+                            u32 texId = m_texManager.loadTexture((const char*)texPath.u8string().c_str());
+                            TIM_ASSERT(texId != u32(-1));
+                            BVHBuilder::setTextureMaterial(mat, texId, 0);
+                            texToId[mtlMaterials[i].diffuse_texname] = texId;
+                        }
+
+                    }
+
+                    materials[size_t(i)] = mat;
+                }
+            }
+
             for (u32 objId = 0; objId < shapes.size(); ++objId)
             {
                 std::vector<vec3> vertexData;
@@ -59,18 +122,28 @@ namespace tim
                 const tinyobj::shape_t& curMesh = shapes[objId];
                 for (ubyte numV : curMesh.mesh.num_face_vertices)
                     TIM_ASSERT(numV == 3);
-                
+
+                int materialId = -1;
+
                 for (u32 i = 0; i < curMesh.mesh.indices.size(); ++i)
                 {
+                    if (!_mat)
+                    {
+                        TIM_ASSERT(materialId == curMesh.mesh.material_ids[i / 3] || materialId == -1);
+                        materialId = curMesh.mesh.material_ids[i / 3];
+                    }
+
                     ObjVertexKey key{ (u32)curMesh.mesh.indices[i].vertex_index, (u32)curMesh.mesh.indices[i].normal_index, (u32)curMesh.mesh.indices[i].texcoord_index };
                     auto it = vertexHasher.find(key);
                     if (it == vertexHasher.end())
                     {
                         u32 index = (u32)vertexData.size();
                         vertexData.push_back({ attrib.vertices[key.posIndex * 3], attrib.vertices[key.posIndex * 3 + 1], attrib.vertices[key.posIndex * 3 + 2] });
-                        vertexData.back() += _pos;
+                        transformVertex(vertexData.back(), _pos, _scale, _swapYZ);
+
                         normalData.push_back({ attrib.normals[key.normalIndex * 3], attrib.normals[key.normalIndex * 3 + 1], attrib.normals[key.normalIndex * 3 + 2] });
-                        
+                        transformNormal(normalData.back(), _pos, _scale, _swapYZ);
+
                         if (key.texcoordIndex < attrib.texcoords.size())
                             texcoordData.push_back({ attrib.texcoords[key.texcoordIndex * 2], attrib.texcoords[key.texcoordIndex * 2 + 1] });
                         else
@@ -89,7 +162,7 @@ namespace tim
                 {
                     u32 vertexOffset = m_geometryBuffer.addTriangleList((u32)vertexData.size(), &vertexData[0], &normalData[0], &texcoordData[0]);
                     TIM_ASSERT(indexData.size() % 3 == 0);
-                    _bvh->addTriangleList(vertexOffset, (u32)indexData.size() / 3, &indexData[0], _mat);
+                    _builder->addTriangleList(vertexOffset, (u32)indexData.size() / 3, &indexData[0], _mat ? *_mat : materials[materialId]);
                 }
                 else
                 {
@@ -113,30 +186,35 @@ namespace tim
         auto redGlassMat = BVHBuilder::createTransparentMaterial({ 1,0.5,0.5 }, 1.05f, 0.1f);
 
         Material suzanneMat = BVHBuilder::createLambertianMaterial({ 0.9f, 0.9f, 0.9f });
+        Material roomMat = BVHBuilder::createLambertianMaterial({ 0.9f, 0.9f, 0.9f });
         Material redMat = BVHBuilder::createLambertianMaterial({ 0.9f, 0.2f, 0.2f });
         Material blueMat = BVHBuilder::createLambertianMaterial({ 0.2f, 0.2f, 0.9f });
         Material pbrMat = BVHBuilder::createPbrMaterial({ 0.9f, 0.9f, 0.9f }, 0);
         Material pbrMatMetal = BVHBuilder::createPbrMaterial({ 0.9f, 0.9f, 0.9f }, 1);
 
-        _bvh->addSphere({ { 0, 0, 2.1f }, 0.08f }, BVHBuilder::createEmissiveMaterial({ 1, 1, 1 }));
-        _bvh->addSphereLight({ { 0, 0, 2.1f }, 15, { 2, 2, 2 }, 0.1f });
+        _bvh->addSphere({ { 0, 0, 4.1f }, 0.08f }, BVHBuilder::createEmissiveMaterial({ 1, 1, 1 }));
+        _bvh->addSphereLight({ { 0, 0, 4.1f }, 15, { 2, 2, 2 }, 0.1f });
 
-        _bvh->addSphere({ { -3.93968 , 1.37829 , 2.65274 }, 0.08f }, BVHBuilder::createEmissiveMaterial({ 2,0.5,0.5 }));
-        _bvh->addSphereLight({ { -3.93968 , 1.37829 , 2.65274 }, 2, { 2,0.5,0.5 }, 0.1f });
+        _bvh->addSphere({ { -9.18164f , 3.32356f , 6.98306f }, 0.05f }, BVHBuilder::createEmissiveMaterial({ 1,0.2,0.2 }));
+        _bvh->addSphereLight({ { -9.18164f , 3.32356f , 6.98306f }, 8, { 3,0.5,0.5 }, 0.1f });
 
         _bvh->addSphere({ {  2.0f, 0, 1.3f }, 0.2f }, pbrMatMetal);
         _bvh->addSphere({ {  0.5f, 0, 1.3f }, 0.2f }, BVHBuilder::createTransparentMaterial({ 1,0.6f,0.6f }, 1.05f, 0.05f));
         _bvh->addSphere({ { -1.5f, 0, 1.3f }, 0.2f }, BVHBuilder::createPbrMaterial({ 1,0.6f,0.6f }, 0));
 
-        const float dim = 0.3;
+        const float dim = 0.3f;
         _bvh->addBox(Box{ { -dim, -dim*0.1, 0 }, { dim, dim * 0.1, dim*2 } }, redGlassMat);
         _bvh->addBox(Box{ { -dim*20, -dim * 0.1 + dim, 0 }, { dim * 20, dim * 0.1 + dim, dim * 2 } }, redMat);
         _bvh->addBox(Box{ { -dim*20, -dim * 0.1 - dim, 0 }, { dim * 20, dim * 0.1 - dim, dim * 2 } }, blueMat);
 
-        // u32 texId = m_texManager.loadTexture("./data/image/tex.png");
-        // BVHBuilder::setTextureMaterial(suzanneMat, texId, 0);
+        u32 texFlame = m_texManager.loadTexture("./data/image/flame.png");
+        u32 texDot = m_texManager.loadTexture("./data/image/tex.png");
 
-        addOBJ("./data/suzanne.obj", { 1,1.7f,1 }, vec3(1), _bvh, pbrMat);
+        BVHBuilder::setTextureMaterial(suzanneMat, texFlame, 0);
+        addOBJ("./data/suzanne.obj", { -2.5f, 0, 1.3f }, vec3(1), _bvh, suzanneMat);
+
+        BVHBuilder::setTextureMaterial(suzanneMat, texDot, 0);
+        addOBJ("./data/suzanne.obj", { 3.f, 0, 1.3f }, vec3(1), _bvh, suzanneMat);
         //addOBJ("./data/longboard/longboard2.obj", { 1,1.7f,4 }, vec3(1), _bvh, suzanneMat);
         // addOBJ("./data/mesh2.obj", { -1,-1.7f,1.3f }, vec3(0.6f), _bvh, pbrMat);
 #endif
@@ -144,7 +222,9 @@ namespace tim
         // _bvh->addSphereLight({ { 2, 2, 1 }, 20, { 2, 1, 2 }, 0.2f });
         // _bvh->addSphereLight({ { -2, -2, 3 }, 20, { 2, 2, 2 }, 0.2f });
         // _bvh->addBox(Box{ { -10, -10, -1 }, {  10, 10, -0.5 } });
-        addOBJ("./data/sponza100K.obj", {}, vec3(1), _bvh, suzanneMat);
+    #ifndef _DEBUG
+        addOBJWithMtl("./data/sponza.obj", {}, vec3(0.01), _bvh, true);
+    #endif
 
         //m_bvh->addSphere({ { 2, 2, 2 }, 2 }, BVHBuilder::createEmissiveMaterial({ 1, 1, 0 }));
 

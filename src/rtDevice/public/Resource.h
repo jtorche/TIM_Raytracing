@@ -1,5 +1,6 @@
 #pragma once
 #include "timCore/type.h"
+#include "timCore/Common.h"
 
 namespace tim
 {
@@ -64,14 +65,21 @@ namespace tim
 
     struct ImageCreateInfo
     {
-        ImageCreateInfo(ImageFormat _format, u32 _width, u32 _height, u32 _depth = 1, ImageType _type = ImageType::Image2D, MemoryType _mem = MemoryType::Default, ImageUsage _usage = ImageUsage::Storage) :
-            type{ _type }, format{ _format }, width{ _width }, height{ _height }, depth{ _depth }, memory{ _mem }, usage{ _usage } {}
+        ImageCreateInfo(ImageFormat _format, u32 _width, u32 _height, u32 _depth = 1, u32 _numMips = 1, ImageType _type = ImageType::Image2D, MemoryType _mem = MemoryType::Default, ImageUsage _usage = ImageUsage::Storage) :
+            type{ _type }, format{ _format }, width{ _width }, height{ _height }, depth{ _depth }, numMips{ _numMips }, memory{ _mem }, usage{ _usage } 
+        {
+            if (numMips == u32(-1)) // compute mip count automatically
+            {
+                TIM_ASSERT(isPowerOf2(_width) && isPowerOf2(_height));
+                numMips = std::max(log2(_width), log2(_height));
+            }
+        }
 
         bool operator==(const ImageCreateInfo& _info) const = default;
 
         ImageType type;
         ImageFormat format;
-        u32 width, height, depth;
+        u32 width, height, depth, numMips;
         MemoryType memory;
         ImageUsage usage;
     };
@@ -92,6 +100,8 @@ namespace tim
         Repeat_Nearest_MipNearest,
         Clamp_Linear_MipNearest,
         Repeat_Linear_MipNearest,
+        Clamp_Linear_MipLinear,
+        Repeat_Linear_MipLinear,
 
         Count
     };

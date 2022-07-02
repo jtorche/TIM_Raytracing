@@ -79,7 +79,7 @@ namespace tim
 
         info.extent = { _desc.width, _desc.height, m_desc.type == ImageType::Image3D ? _desc.depth : 1 };
         info.arrayLayers = m_desc.type == ImageType::Image2D_Array ? _desc.depth : 1;
-        info.mipLevels = 1;
+        info.mipLevels = _desc.numMips;
         info.tiling = VK_IMAGE_TILING_OPTIMAL;
         info.samples = VK_SAMPLE_COUNT_1_BIT;
         info.queueFamilyIndexCount = 0;

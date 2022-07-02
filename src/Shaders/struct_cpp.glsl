@@ -18,7 +18,7 @@
 
 #define LOCAL_SIZE 16
 #define TMAX 100
-#define TEXTURE_ARRAY_SIZE 16
+#define TEXTURE_ARRAY_SIZE 64
 
 #define g_TextureBrdf 0
 
