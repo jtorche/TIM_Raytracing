@@ -45,7 +45,7 @@ vec3 computeSunLighting(uint _rootId, vec3 _sunDir, vec3 _sunColor, uint _matId,
 	vec3 normal = getHitNormal(_hit);
 	vec3 texColor = getHitColor(_hit);
 
-	return evalSunLight(_rootId, -_sunDir, _sunColor, g_BvhMaterialData[_matId], texColor,
+	return evalSunLight(_rootId, _sunDir, _sunColor, g_BvhMaterialData[_matId], texColor,
 		                _ray.from + _ray.dir * _hit.t, normal, _ray.from);
 }
 
