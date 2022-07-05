@@ -81,6 +81,8 @@ namespace tim
         passData.invFrameSize = { 1.f / m_frameSize.x, 1.f / m_frameSize.y };
         passData.cameraPos = { _camera.getPos(), 0 };
         passData.cameraDir = { _camera.getDir(), 0 };
+        passData.sunDir = { normalize(m_sunData.sunDir), 0 };
+        passData.sunColor = { m_sunData.sunColor, 0 };
 
         mat4 projMat = linalg::perspective_matrix<float>(fov, float(m_frameSize.x) / m_frameSize.y, 0.1f, TMAX, linalg::neg_z, linalg::zero_to_one);
         mat4 viewProj = linalg::mul(projMat, _camera.getViewMat());

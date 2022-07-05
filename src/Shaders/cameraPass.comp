@@ -36,7 +36,7 @@ void main()
 
 		ClosestHit closestHit;
         Ray ray = createRay(g_passData.cameraPos.xyz, normalize(rayTarget - g_passData.cameraPos.xyz));
-        vec3 lit = rayTrace(ray, closestHit);
+        vec3 lit = rayTrace(g_passData, ray, closestHit);
         
         imageStore(g_outputImage, pixelCoord, vec4(lit, 1));
         nextBounce(vec3(1,1,1), closestHit, ray);

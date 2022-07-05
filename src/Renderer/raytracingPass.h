@@ -10,6 +10,12 @@ namespace tim
     class BVHGeometry;
     class TextureManager;
 
+    struct SunData
+    {
+        vec3 sunDir = vec3(0.3, 0.3, -1);
+        vec3 sunColor = vec3(1,1,1);
+    };
+
     class RayTracingPass
     {
     public:
@@ -33,6 +39,7 @@ namespace tim
         ResourceAllocator& m_resourceAllocator;
         TextureManager& m_textureManager;
 
+        SunData m_sunData;
         std::unique_ptr<BVHBuilder> m_bvh;
         std::unique_ptr<BVHGeometry> m_geometryBuffer;
         BufferHandle m_bvhBuffer;

@@ -1,6 +1,7 @@
 #ifndef H_BASERAYTRACINGPASS_FXH_
 #define H_BASERAYTRACINGPASS_FXH_
 
+#include "struct_cpp.glsl"
 #include "collision.glsl"
 #include "lighting.glsl"
 
@@ -12,7 +13,7 @@
 
 #include "bvhLighting.glsl"
 
-vec3 rayTrace(in Ray _ray, out ClosestHit _hitResult)
+vec3 rayTrace(in PassData _passData, in Ray _ray, out ClosestHit _hitResult)
 {
 	ClosestHit closestHit;
 	closestHit.t = TMAX;
@@ -60,8 +61,10 @@ vec3 rayTrace(in Ray _ray, out ClosestHit _hitResult)
 		for(uint i=0 ; i<g_Constants.numLights ; ++i)
 			lit += evalLighting(rootId, i, getMaterialId(closestHit), _ray, closestHit);
 	#else
-           lit = computeDirectLighting(rootId, _ray, closestHit);
+           lit += computeDirectLighting(rootId, _ray, closestHit);
 	#endif
+
+		   lit += computeSunLighting(rootId, _passData.sunDir.xyz, _passData.sunColor.xyz, getMaterialId(closestHit), _ray, closestHit);
 
 #if DEBUG_GEOMETRY
 		   vec3 dbgColor[8] = 
@@ -81,11 +84,6 @@ vec3 rayTrace(in Ray _ray, out ClosestHit _hitResult)
 	}
 
 	_hitResult = closestHit;
-
-	uint matId = getMaterialId(closestHit);
-	uint diffuseMap = g_BvhMaterialData[matId].type_ids.y & 0xFFFF;
-	if(diffuseMap < 0xFFFF) 
-		lit *= texture(g_dataTextures[nonuniformEXT(diffuseMap)], getHitUv(closestHit)).xyz;
 
 	return lit;
 }

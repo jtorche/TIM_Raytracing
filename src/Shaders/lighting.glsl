@@ -14,11 +14,11 @@ vec3 computePbrLighting(vec3 albedo, float metalness, vec3 lightColor, vec3 v, v
 
 float computeAttenuation(float _dist, float _lightRadius)
 {
-	float att = (_lightRadius * _lightRadius + 1) / ( g_LightCapThreshold * _dist * _dist);
+	float att = (_lightRadius * _lightRadius + 1) / (g_LightCapThreshold * _dist * _dist);
 	return clamp(att - (1.0 / g_LightCapThreshold), 0, 1);
 }
 
-vec3 computeLighting(uint rootId, in Material _mat, vec3 lightColor, vec3 P, vec3 L, vec3 N, vec3 E, float att, float shadowRayLength)
+vec3 computeLighting(uint rootId, in Material _mat, vec3 _texColor, vec3 _lightColor, vec3 P, vec3 L, vec3 N, vec3 E, float att, float shadowRayLength)
 {
 	if(_mat.type_ids.x == Material_Emissive)
 		return _mat.color.xyz;
@@ -30,9 +30,9 @@ vec3 computeLighting(uint rootId, in Material _mat, vec3 lightColor, vec3 P, vec
 	float dotL = clamp(dot(N, L), 0, 1);
 
 	if(_mat.type_ids.x == Material_PBR)
-		lit = computePbrLighting(_mat.color.xyz, _mat.params.x, lightColor, normalize(E-P), L, N);
+		lit = computePbrLighting(_mat.color.xyz * _texColor, _mat.params.x, _lightColor, normalize(E-P), L, N);
 	else if(_mat.type_ids.x == Material_Lambert)
-		lit = dotL * lightColor * _mat.color.xyz;
+		lit = dotL * _lightColor * _mat.color.xyz * _texColor;
 
 	lit *= att;
 
@@ -52,16 +52,21 @@ vec3 computeLighting(uint rootId, in Material _mat, vec3 lightColor, vec3 P, vec
 	return lit;
 }
 
-vec3 evalSphereLight(uint _rootId, in SphereLight _sl, in Material _mat, vec3 _pos, vec3 _normal, vec3 _eye)
+vec3 evalSphereLight(uint _rootId, in SphereLight _sl, in Material _mat, in vec3 _texColor, vec3 _pos, vec3 _normal, vec3 _eye)
 {
 	float d = length(_sl.pos - _pos);
 	vec3 L = (_sl.pos - _pos) / d;
 	d = max(0.01, d - _sl.sphereRadius);
 
-	return computeLighting(_rootId, _mat, _sl.color, _pos, L, _normal, _eye, computeAttenuation(d, _sl.radius), d);
+	return computeLighting(_rootId, _mat, _texColor, _sl.color, _pos, L, _normal, _eye, computeAttenuation(d, _sl.radius), d);
 }
 
-vec3 evalAreaLight(uint _rootId, in AreaLight _al, in Material _mat, vec3 _pos, vec3 _normal, vec3 _eye)
+vec3 evalSunLight(uint _rootId, in vec3 _sunDir, in vec3 _sunColor, in Material _mat, in vec3 _texColor, vec3 _pos, vec3 _normal, vec3 _eye)
+{
+	return computeLighting(_rootId, _mat, _texColor, _sunColor, _pos, -_sunDir, _normal, _eye, 1, 1000);
+}
+
+vec3 evalAreaLight(uint _rootId, in AreaLight _al, in Material _mat, in vec3 _texColor, vec3 _pos, vec3 _normal, vec3 _eye)
 {
 	vec3 areaNormal = normalize(cross(_al.width, _al.height));
 	vec3 res = vec3(0,0,0);
@@ -97,7 +102,7 @@ vec3 evalAreaLight(uint _rootId, in AreaLight _al, in Material _mat, vec3 _pos, 
 			float areaAtt = clamp(dot(areaNormal, -L), 0, 1);
 			float att = computeAttenuation(d, _al.attenuationRadius);
 
-			res += computeLighting(_rootId, _mat, _al.color, _pos, L, _normal, _eye, att * areaAtt, d);
+			res += computeLighting(_rootId, _mat, _texColor, _al.color, _pos, L, _normal, _eye, att * areaAtt, d);
 		}
 	}
 

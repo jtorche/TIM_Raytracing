@@ -7,13 +7,14 @@
 vec3 evalLighting(uint _rootId, uint lightIndex, uint _matId, in Ray _ray, in ClosestHit _hit)
 {
 	vec3 normal = getHitNormal(_hit);
+	vec3 texColor = getHitColor(_hit);
 
 	switch(g_BvhLightData[lightIndex].iparam)
 	{
 		case Light_Sphere:
-		return evalSphereLight(_rootId, loadSphereLight(lightIndex), g_BvhMaterialData[_matId], _ray.from + _ray.dir * _hit.t, normal, _ray.from);
+		return evalSphereLight(_rootId, loadSphereLight(lightIndex), g_BvhMaterialData[_matId], texColor, _ray.from + _ray.dir * _hit.t, normal, _ray.from);
 		case Light_Area:
-		return evalAreaLight(_rootId, loadAreaLight(lightIndex), g_BvhMaterialData[_matId], _ray.from + _ray.dir * _hit.t, normal, _ray.from);
+		return evalAreaLight(_rootId, loadAreaLight(lightIndex), g_BvhMaterialData[_matId], texColor, _ray.from + _ray.dir * _hit.t, normal, _ray.from);
 	}
 
 	return vec3(0,0,0);
@@ -37,6 +38,15 @@ vec3 computeDirectLighting(uint rootId, in Ray _ray, in ClosestHit _hit)
 	}
 
 	return totalLight;
+}
+
+vec3 computeSunLighting(uint _rootId, vec3 _sunDir, vec3 _sunColor, uint _matId, in Ray _ray, in ClosestHit _hit)
+{
+	vec3 normal = getHitNormal(_hit);
+	vec3 texColor = getHitColor(_hit);
+
+	return evalSunLight(_rootId, -_sunDir, _sunColor, g_BvhMaterialData[_matId], texColor,
+		                _ray.from + _ray.dir * _hit.t, normal, _ray.from);
 }
 
 #endif

@@ -33,6 +33,9 @@ struct PassData
 	vec4 frustumCorner10;
 	vec4 frustumCorner01;
 	mat4 invProjView;
+
+	vec4 sunDir;
+	vec4 sunColor;
 };
 
 struct PushConstants

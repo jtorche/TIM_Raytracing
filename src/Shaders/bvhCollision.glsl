@@ -199,6 +199,7 @@ void bvh_collide(uint _nid, Ray _ray, inout ClosestHit closestHit)
 			ClosestHit_setDebugColorId(closestHit, objIndex);
 
 			storeHitNormal(closestHit, hit.normal);
+			storeHitColor(closestHit, vec3(1,1,1));
 		}
 	}
 
@@ -211,13 +212,24 @@ void bvh_collide(uint _nid, Ray _ray, inout ClosestHit closestHit)
 
 		if(hasHit)
 		{
-			closestHit.t			= hit.t * OFFSET_RAY_COLLISION;
-			closestHit.mid_objId	= 0x0000FFFF + (triangle.index2_matId & 0xFFFF0000);
-			closestHit.nid			= _nid;
-			ClosestHit_setDebugColorId(closestHit, triIndex);
+			vec4 color = vec4(1,1,1,1);
+			uint matId = (triangle.index2_matId & 0xFFFF0000) >> 16;
+			uint diffuseMap = g_BvhMaterialData[matId].type_ids.y & 0xFFFF;
+			if (diffuseMap < 0xFFFF)
+				color = texture(g_dataTextures[nonuniformEXT(diffuseMap)], hit.uv);
 
-			storeHitNormal(closestHit, hit.normal);
-			storeHitUv(closestHit, hit.uv);
+			hasHit = color.a > 0.5;
+			if (hasHit)
+			{
+				closestHit.t = hit.t * OFFSET_RAY_COLLISION;
+				closestHit.mid_objId = 0x0000FFFF + (triangle.index2_matId & 0xFFFF0000);
+				closestHit.nid = _nid;
+				ClosestHit_setDebugColorId(closestHit, triIndex);
+
+				storeHitColor(closestHit, color.xyz);
+				storeHitNormal(closestHit, hit.normal);
+				storeHitUv(closestHit, hit.uv);
+			}
 		}
 	}
 }
