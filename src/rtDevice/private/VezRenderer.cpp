@@ -62,6 +62,7 @@ namespace tim
             { 
                 VK_KHR_SURFACE_EXTENSION_NAME, 
                 VK_KHR_WIN32_SURFACE_EXTENSION_NAME, 
+                VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME,
             #ifdef _DEBUG
                 VK_EXT_DEBUG_UTILS_EXTENSION_NAME 
             #endif          
@@ -126,12 +127,14 @@ namespace tim
                     const char* enabledExtensions[] =
                     {
                         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+                        VK_KHR_MAINTENANCE_3_EXTENSION_NAME,
                         VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME,
                     };
                     
                     deviceCreateInfo.enabledExtensionCount = _countof(enabledExtensions);
                     deviceCreateInfo.ppEnabledExtensionNames = enabledExtensions;
 
+#if 0 // enable dynamic descriptors indexing for texturing
                     VkPhysicalDeviceDescriptorIndexingFeatures indexingFeatures = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES };
                     indexingFeatures.shaderInputAttachmentArrayDynamicIndexing = VK_TRUE;
                     indexingFeatures.shaderUniformTexelBufferArrayDynamicIndexing = VK_TRUE;
@@ -143,23 +146,11 @@ namespace tim
                     indexingFeatures.shaderInputAttachmentArrayNonUniformIndexing = VK_TRUE;
                     indexingFeatures.shaderUniformTexelBufferArrayNonUniformIndexing = VK_TRUE;
                     indexingFeatures.shaderStorageTexelBufferArrayNonUniformIndexing = VK_TRUE;
-                    deviceCreateInfo.pNext = &indexingFeatures;
-
-                    // Need Vulkan 1_2
-                    // VkPhysicalDeviceVulkan12Features features12 = {};
-                    // features12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
-                    // features12.descriptorIndexing = VK_TRUE;
-                    // features12.shaderInputAttachmentArrayDynamicIndexing = VK_TRUE;
-                    // features12.shaderUniformTexelBufferArrayDynamicIndexing = VK_TRUE;
-                    // features12.shaderStorageTexelBufferArrayDynamicIndexing = VK_TRUE;
-                    // features12.shaderUniformBufferArrayNonUniformIndexing = VK_TRUE;
-                    // features12.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;
-                    // features12.shaderStorageBufferArrayNonUniformIndexing = VK_TRUE;
-                    // features12.shaderStorageImageArrayNonUniformIndexing = VK_TRUE;
-                    // features12.shaderInputAttachmentArrayNonUniformIndexing = VK_TRUE;
-                    // features12.shaderUniformTexelBufferArrayNonUniformIndexing = VK_TRUE;
-                    // features12.shaderStorageTexelBufferArrayNonUniformIndexing = VK_TRUE;
-                    // deviceCreateInfo.pNext = &features12;
+                    indexingFeatures.pNext = nullptr;
+                    
+                    VkPhysicalDeviceFeatures2 features2 = { VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2, &indexingFeatures };
+                    deviceCreateInfo.pNext = &features2;
+#endif
 
                     TIM_VK_VERIFY(vezCreateDevice(physicalDevice, &deviceCreateInfo, &m_vkDevice));
 

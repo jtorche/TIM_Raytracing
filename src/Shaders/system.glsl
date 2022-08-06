@@ -21,6 +21,7 @@ vec4 toLinear(vec4 sRGB)
     return mix(higher, lower, cutoff);
 }
 
+#define DYNAMIC_TEXTURE_INDEXING    0
 
 #define USE_SHADOW					1
 #define COMPUTE_SHADOW_ON_THE_FLY	1

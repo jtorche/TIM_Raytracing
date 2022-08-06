@@ -13,6 +13,7 @@ namespace tim
         void setFrameBufferSize(uvec2 _res);
 
         void linearToSrgb(ImageHandle _inColorBuffer, ImageHandle _outBackbuffer);
+        void copyImage(ImageHandle _src, ImageHandle _dst, uvec2 _dstSize);
 
     private:
 

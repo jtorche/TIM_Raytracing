@@ -215,9 +215,12 @@ void bvh_collide(uint _nid, Ray _ray, inout ClosestHit closestHit)
 			vec4 color = vec4(1,1,1,1);
 			uint matId = (triangle.index2_matId & 0xFFFF0000) >> 16;
 			uint diffuseMap = g_BvhMaterialData[matId].type_ids.y & 0xFFFF;
+			
+		#if DYNAMIC_TEXTURE_INDEXING
 			if (diffuseMap < 0xFFFF)
 				color = texture(g_dataTextures[nonuniformEXT(diffuseMap)], hit.uv);
-
+		#endif
+			
 			hasHit = color.a > 0.5;
 			if (hasHit)
 			{

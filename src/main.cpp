@@ -13,7 +13,9 @@ using namespace tim;
 
 IRenderer * g_renderer = nullptr;
 SimpleCamera camera;
-uvec2 frameResolution = { 800, 600 };
+uvec2 targetFrameResolution = { 400, 300 };
+uvec2 frameResolution = { 400, 300 };
+uvec2 backbufferResolution = { 800, 600 };
 bool g_rebuildBvh = false;
 bool g_windowMinimized = false;
 
@@ -50,6 +52,16 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 
     if (key == GLFW_KEY_P)
         system("pause");
+
+    if (key == GLFW_KEY_1)
+        frameResolution = { 160, 90 };
+    else if (key == GLFW_KEY_2)
+        frameResolution = { 320, 180 };
+    else if (key == GLFW_KEY_3)
+        frameResolution = { 640, 360 };
+    else if (key == GLFW_KEY_4)
+        frameResolution = backbufferResolution;
+
 }
 
 void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
@@ -84,7 +96,7 @@ void window_size_callback(GLFWwindow* window, int width, int height)
     {
         s_width = width;
         s_height = height;
-        frameResolution = uvec2{ u32(width), u32(height) };
+        backbufferResolution = uvec2{ u32(width), u32(height) };
         g_renderer->Resize(s_width, s_height);
     }
 }
@@ -111,7 +123,7 @@ int main(int argc, char* argv[])
 		return -1;
 
     glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-	window = glfwCreateWindow(frameResolution.x, frameResolution.y, "RayTracing", NULL, NULL);
+	window = glfwCreateWindow(backbufferResolution.x, backbufferResolution.y, "RayTracing", NULL, NULL);
 	if (!window)
 	{
 		glfwTerminate();
@@ -130,7 +142,7 @@ int main(int argc, char* argv[])
     ResourceAllocator resourceAllocator(g_renderer);
 
     ShaderCompiler shaderCompiler("./src/Shaders/", getShaderMacros());
-    g_renderer->Init(shaderCompiler , &winHandle, frameResolution.x, frameResolution.y, false);
+    g_renderer->Init(shaderCompiler , &winHandle, backbufferResolution.x, backbufferResolution.y, false);
 
     IRenderContext* context = g_renderer->CreateRenderContext(RenderContextType::Graphics);
     
@@ -181,8 +193,14 @@ int main(int argc, char* argv[])
                 ImageHandle outputColorBuffer = resourceAllocator.allocTexture(imgInfo);
                 rtPass.draw(outputColorBuffer, camera);
 
-                postprocessPass.linearToSrgb(outputColorBuffer, backbuffer);
+                ImageCreateInfo imgInfo2(ImageFormat::RGBA8, frameResolution.x, frameResolution.y, 1, 1, ImageType::Image2D, MemoryType::Default, ImageUsage::Sampled | ImageUsage::Storage);
+                ImageHandle finalOutput = resourceAllocator.allocTexture(imgInfo2);
+
+                postprocessPass.linearToSrgb(outputColorBuffer, finalOutput);
                 resourceAllocator.releaseTexture(outputColorBuffer);
+
+                postprocessPass.copyImage(finalOutput, backbuffer, backbufferResolution);
+                resourceAllocator.releaseTexture(finalOutput);
 
                 context->EndRender();
 
