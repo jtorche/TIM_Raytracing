@@ -30,6 +30,11 @@ layout(std430, set = 0, binding = g_BvhNodes_bind) buffer BvhNodes
 	PackedBVHNode g_BvhNodeData[];
 };
 
+layout(std430, set = 0, binding = g_BlasHeaders_bind) buffer BlasHeaders
+{
+    BlasHeader g_blasHeader[];
+};
+
 layout(std430, set = 0, binding = g_BvhLeafData_bind) buffer BvhLeafData
 {
 	uint g_BvhLeafData[];

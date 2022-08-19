@@ -71,6 +71,12 @@ struct PackedBVHNode
 	vec4 nz;
 };
 
+struct BlasHeader
+{
+	Box aabb;
+	uint rootIndex; // Node index in PackedBVHNode list
+};
+
 struct SphereLight
 {
 	vec3 pos;
