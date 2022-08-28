@@ -12,7 +12,7 @@ namespace tim
 
     struct SunData
     {
-        vec3 sunDir = vec3(0.3, 0.3, -1);
+        vec3 sunDir = vec3(0.3f, 0.3f, -1);
         vec3 sunColor = vec3(1,1,1);
     };
 
@@ -22,7 +22,7 @@ namespace tim
         RayTracingPass(IRenderer* _renderer, IRenderContext* _context, ResourceAllocator& _allocator, TextureManager& _texManager);
         ~RayTracingPass();
 
-        void rebuildBvh(u32 _maxDepth, u32 _maxObjPerNode);
+        void rebuildBvh(u32 _maxBlasPerNode, u32 _maxTriPerNode, bool _useBlas);
         void setBounceRecursionDepth(u32 _depth);
         void setFrameBufferSize(uvec2 _res);
         void draw(ImageHandle _outputBuffer, const SimpleCamera& _camera);
@@ -49,5 +49,6 @@ namespace tim
         uvec2 m_bvhLightOffsetRange;
         uvec2 m_bvhNodeOffsetRange;
         uvec2 m_bvhLeafDataOffsetRange;
+        uvec2 m_bvhBlasHeaderDataOffsetRange;
     };
 }

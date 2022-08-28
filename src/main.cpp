@@ -168,16 +168,22 @@ int main(int argc, char* argv[])
                 if (g_rebuildBvh)
                 {
                     g_rebuildBvh = false;
-                    u32 maxDepth = 5; u32 maxObjPerNode = 8, recursionDepth = 2;
-                    std::cout << "Rebuild bvh, max depth : ";
-                    std::cin >> maxDepth;
-                    std::cout << "Rebuild bvh, max obj per node : ";
-                    std::cin >> maxObjPerNode;
+                    u32 maxTriPerNode = 5; u32 maxBlasPerNode = 8, recursionDepth = 2;
+                    bool useBlas = false;
+                    std::cout << "Use blas ? : ";
+                    std::cin >> useBlas;
+                    std::cout << "Rebuild bvh, max tri per node : ";
+                    std::cin >> maxTriPerNode;
+                    if (useBlas)
+                    {
+                        std::cout << "Rebuild bvh, max blas per node : ";
+                        std::cin >> maxBlasPerNode;
+                    }
                     std::cout << "Rendering recursion depth : ";
                     std::cin >> recursionDepth;
 
                     rtPass.setBounceRecursionDepth(recursionDepth);
-                    rtPass.rebuildBvh(maxDepth, maxObjPerNode);
+                    rtPass.rebuildBvh(maxBlasPerNode, maxTriPerNode, useBlas);
                 }
 
                 g_renderer->BeginFrame();

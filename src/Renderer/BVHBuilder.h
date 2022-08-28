@@ -41,6 +41,13 @@ namespace tim
         };
     };
 
+    struct BlasInstance
+    {
+        u32 blasId;
+        u32 matId;
+        Box aabb;
+    };
+
     enum class CollisionType { Disjoint, Intersect, Contained };
 
     class BVHBuilder
@@ -61,30 +68,38 @@ namespace tim
         void addBox(const Box& _box, const Material& _mat = createLambertianMaterial({ 0.7f, 0.7f, 0.7f }));
         void addTriangle(const BVHGeometry::TriangleData& _triangle, const Material& _mat = createLambertianMaterial({ 0.7f, 0.7f, 0.7f }));
         void addTriangleList(u32 _vertexOffset, u32 _numTriangle, const u32 * _indexData, const Material& _mat = createLambertianMaterial({ 0.7f, 0.7f, 0.7f }));
+        void addBlas(std::unique_ptr<BVHBuilder> _blas);
         void addSphereLight(const SphereLight& _light);
         void addAreaLight(const AreaLight& _light);
-        void build(u32 _maxDepth, u32 _maxObjPerNode, const Box& _sceneSize);
 
+        void buildBlas(u32 _maxObjPerNode);
+        void build(u32 _maxDepth, u32 _maxObjPerNode, bool _useMultipleThreads);
+
+        Box getAABB() const { return m_aabb; }
         u32 getPrimitivesCount() const { return u32(m_objects.size()); }
         u32 getTrianglesCount() const { return u32(m_triangles.size()); }
+        u32 getBlasInstancesCount() const { return u32(m_blasInstances.size()); }
         u32 getLightsCount() const { return u32(m_lights.size()); }
         u32 getNodesCount() const { return u32(m_nodes.size()); }
 
         u32 getBvhGpuSize() const;
 
         // return offset to root node + offset to first primitive list of leafs, offset 0 is for primitive data
-        void fillGpuBuffer(void* _data, uvec2& _triangleOffsetRange, uvec2& _primitiveOffsetRange, uvec2& _materialOffsetRange, uvec2& _lightOffsetRange, uvec2& _nodeOffsetRange, uvec2& m_leafDataOffsetRange);
+        void fillGpuBuffer(void* _data, uvec2& _triangleOffsetRange, uvec2& _primitiveOffsetRange, uvec2& _materialOffsetRange, uvec2& _lightOffsetRange, uvec2& _nodeOffsetRange, uvec2& m_leafDataOffsetRange, uvec2& _blasOffsetRange);
 
     private:
         void addTriangle(const BVHGeometry::TriangleData& _triangle, u32 _materialId);
 
         struct Node;
         using ObjectIt = std::vector<u32>::iterator;
-        void addObjectsRec(u32 _depth, ObjectIt _objectsBegin, ObjectIt _objectsEnd, ObjectIt _trianglesBegin, ObjectIt _trianglesEnd, Node* _curNode);
+        void addObjectsRec(u32 _depth, ObjectIt _objectsBegin, ObjectIt _objectsEnd, 
+                                       ObjectIt _trianglesBegin, ObjectIt _trianglesEnd, 
+                                       ObjectIt _blasBegin, ObjectIt _blasEnd,
+                                       Node* _curNode, bool _useMultipleThreads);
 
         template<typename Fun1, typename Fun2>
-        void searchBestSplit(Node* _curNode, ObjectIt _objectsBegin, ObjectIt _objectsEnd, ObjectIt _trianglesBegin, ObjectIt _trianglesEnd,
-            const Fun1& _movingAxis, const Fun2& _fixedAxis, Box& _leftBox, Box& _rightBox, size_t& _numObjInLeft, size_t& _numObjInRight) const;
+        void searchBestSplit(Node* _curNode, ObjectIt _objectsBegin, ObjectIt _objectsEnd, ObjectIt _trianglesBegin, ObjectIt _trianglesEnd, ObjectIt _blasBegin, ObjectIt _blasEnd,
+                             const Fun1& _movingAxis, const Fun2& _fixedAxis, Box& _leftBox, Box& _rightBox, size_t& _numObjInLeft, size_t& _numObjInRight) const;
 
         void packNodeData(PackedBVHNode* _outNode, const BVHBuilder::Node& _node, u32 _leafDataOffset);
 
@@ -121,12 +136,16 @@ namespace tim
             std::vector<u32> primitiveList; // only if leaf
             std::vector<u32> triangleList; // only if leaf
             std::vector<u32> lightList; // only if leaf
+            std::vector<u32> blasList; // only if leaf
         };
 
+        Box m_aabb;
         std::vector<Node> m_nodes;
         std::vector<Triangle> m_triangles;
         std::vector<Material> m_triangleMaterials;
         std::vector<Primitive> m_objects;
         std::vector<Light> m_lights;
+        std::vector<std::unique_ptr<BVHBuilder>> m_blas;
+        std::vector<BlasInstance> m_blasInstances;
     };
 }

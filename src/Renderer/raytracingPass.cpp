@@ -14,7 +14,7 @@ namespace tim
         : m_frameSize{ 800,600 }, m_renderer{ _renderer }, m_context{ _context }, m_resourceAllocator{ _allocator }, m_textureManager{ _texManager }
     {
         m_rayBounceRecursionDepth = 2;
-        rebuildBvh(20, 12);
+        rebuildBvh(2, 12, true);
 
         system("pause");
     }
@@ -24,7 +24,7 @@ namespace tim
         m_renderer->DestroyBuffer(m_bvhBuffer);
     }
 
-    void RayTracingPass::rebuildBvh(u32 _maxDepth, u32 _maxObjPerNode)
+    void RayTracingPass::rebuildBvh(u32 _maxBlasPerNode, u32 _maxTriPerNode, bool _useBlas)
     {
         if (m_bvhBuffer.ptr != 0)
         {
@@ -36,13 +36,16 @@ namespace tim
         m_bvh = std::make_unique<BVHBuilder>(*m_geometryBuffer);
 
         Scene scene(*m_geometryBuffer.get(), m_textureManager);
-        scene.build(m_bvh.get());
+        scene.build(m_bvh.get(), _useBlas);
 
         m_geometryBuffer->flush(m_renderer);
 
         {
             auto start = std::chrono::system_clock::now();
-            m_bvh->build(_maxDepth, _maxObjPerNode, Box{ vec3{ -100,-100,-100 }, vec3{ 100,100,100 } });
+            m_bvh->buildBlas(_maxTriPerNode);
+
+            const u32 MaxDepth = 20;
+            m_bvh->build(MaxDepth, _useBlas ? _maxBlasPerNode : _maxTriPerNode, !_useBlas);
             m_bvh->dumpStats();
             auto end = std::chrono::system_clock::now();
             std::chrono::duration<double> elapsed_seconds = end - start;
@@ -53,7 +56,7 @@ namespace tim
         std::cout << "Uploading " << (size >> 10) << " Ko of BVH data\n";
         m_bvhBuffer = m_renderer->CreateBuffer(size, MemoryType::Default, BufferUsage::Storage | BufferUsage::Transfer);
         std::unique_ptr<ubyte[]> buffer = std::unique_ptr<ubyte[]>(new ubyte[size]);
-        m_bvh->fillGpuBuffer(buffer.get(), m_bvhTriangleOffsetRange, m_bvhPrimitiveOffsetRange, m_bvhMaterialOffsetRange, m_bvhLightOffsetRange, m_bvhNodeOffsetRange, m_bvhLeafDataOffsetRange);
+        m_bvh->fillGpuBuffer(buffer.get(), m_bvhTriangleOffsetRange, m_bvhPrimitiveOffsetRange, m_bvhMaterialOffsetRange, m_bvhLightOffsetRange, m_bvhNodeOffsetRange, m_bvhLeafDataOffsetRange, m_bvhBlasHeaderDataOffsetRange);
         m_renderer->UploadBuffer(m_bvhBuffer, buffer.get(), size);
     }
 
@@ -121,7 +124,7 @@ namespace tim
             { { m_bvhBuffer, m_bvhMaterialOffsetRange.x, m_bvhMaterialOffsetRange.y }, { 0, g_BvhMaterials_bind } },
             { { m_bvhBuffer, m_bvhLightOffsetRange.x, m_bvhLightOffsetRange.y }, { 0, g_BvhLights_bind } },
             { { m_bvhBuffer, m_bvhNodeOffsetRange.x, m_bvhNodeOffsetRange.y }, { 0, g_BvhNodes_bind } },
-            { { m_bvhBuffer, 0, 0 }, { 0, g_BlasHeaders_bind } },
+            { { m_bvhBuffer, m_bvhBlasHeaderDataOffsetRange.x, m_bvhBlasHeaderDataOffsetRange.y }, { 0, g_BlasHeaders_bind } },
             { { m_bvhBuffer, m_bvhLeafDataOffsetRange.x, m_bvhLeafDataOffsetRange.y }, { 0, g_BvhLeafData_bind } },
             { { reflexionRayBuffer, 0, getRayStorageBufferSize() }, { 0, g_OutReflexionRayBuffer_bind } },
             { { refractionRayBuffer, 0, getRayStorageBufferSize() }, { 0, g_OutRefractionRayBuffer_bind } },
@@ -133,7 +136,7 @@ namespace tim
         arg.m_bufferBindings = bufBinds;
         arg.m_numBufferBindings = _countof(bufBinds);
 
-        PushConstants constants = { m_bvh->getTrianglesCount(), m_bvh->getPrimitivesCount(), m_bvh->getLightsCount(), m_bvh->getNodesCount() };
+        PushConstants constants = { m_bvh->getTrianglesCount(), m_bvh->getBlasInstancesCount(), m_bvh->getPrimitivesCount(), m_bvh->getLightsCount(), m_bvh->getNodesCount() };
         arg.m_constants = &constants;
         arg.m_constantSize = sizeof(constants);
         ShaderFlags flags;
@@ -193,7 +196,7 @@ namespace tim
         arg.m_bufferBindings = &bufBinds[0];
         arg.m_numBufferBindings = (u32)bufBinds.size();
 
-        PushConstants constants = { m_bvh->getTrianglesCount(), m_bvh->getPrimitivesCount(), m_bvh->getLightsCount(), m_bvh->getNodesCount() };
+        PushConstants constants = { m_bvh->getTrianglesCount(), m_bvh->getBlasInstancesCount(), m_bvh->getPrimitivesCount(), m_bvh->getLightsCount(), m_bvh->getNodesCount() };
         arg.m_constants = &constants;
         arg.m_constantSize = sizeof(constants);
         arg.m_key = { TIM_HASH32(rayBouncePass.comp), flags };

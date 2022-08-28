@@ -57,6 +57,7 @@ vec3 rayTrace(in PassData _passData, in Ray _ray, out ClosestHit _hitResult)
 	vec3 lit = vec3(0,0,0);
 	if(closestHit.t < TMAX)
 	{
+#if !DEBUG_GEOMETRY
 	#if NO_BVH
 		for(uint i=0 ; i<g_Constants.numLights ; ++i)
 			lit += evalLighting(rootId, i, getMaterialId(closestHit), _ray, closestHit);
@@ -66,7 +67,7 @@ vec3 rayTrace(in PassData _passData, in Ray _ray, out ClosestHit _hitResult)
 
 		   lit += computeSunLighting(rootId, _passData.sunDir.xyz, _passData.sunColor.xyz, getMaterialId(closestHit), _ray, closestHit);
 
-#if DEBUG_GEOMETRY
+#else
 		   vec3 dbgColor[8] = 
 		   {
 			   vec3(1,0,0),

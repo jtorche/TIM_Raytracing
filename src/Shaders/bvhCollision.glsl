@@ -168,12 +168,13 @@ bool hitPrimitiveFast(uint objIndex, Ray r, float tmax)
 	return false;
 }
 
-uvec3 unpackObjectCount(uint _packed)
+uvec4 unpackObjectCount(uint _packed)
 {
-	uvec3 v;
+	uvec4 v;
 	v.x = _packed & ((1 << TriangleBitCount) - 1);
-	v.y = (_packed >> TriangleBitCount) & ((1 << PrimitiveBitCount) - 1);
-	v.z = (_packed >> (TriangleBitCount + PrimitiveBitCount)) & ((1 << LightBitCount) - 1);
+	v.y = (_packed >> TriangleBitCount) & ((1 << BlasBitCount) - 1);
+	v.z = (_packed >> (TriangleBitCount + BlasBitCount)) & ((1 << PrimitiveBitCount) - 1);
+	v.w = (_packed >> (TriangleBitCount + BlasBitCount + PrimitiveBitCount)) & ((1 << LightBitCount) - 1);
 	return v;
 }
 
@@ -181,13 +182,14 @@ void bvh_collide(uint _nid, Ray _ray, inout ClosestHit closestHit)
 {
 	_nid = _nid & NID_MASK;
 	uint leafDataOffset = g_BvhNodeData[_nid].nid.w;
-	uvec3 unpackedLeafDat = unpackObjectCount(g_BvhLeafData[leafDataOffset]);
+	uvec4 unpackedLeafDat = unpackObjectCount(g_BvhLeafData[leafDataOffset]);
 	uint numTriangles = unpackedLeafDat.x;
-	uint numObjects = unpackedLeafDat.y;
+	uint numBlas = unpackedLeafDat.y;
+	uint numObjects = unpackedLeafDat.z;
 
 	for(uint i=0 ; i<numObjects ; ++i)
 	{
-		uint objIndex = g_BvhLeafData[1 + leafDataOffset + numTriangles + i];
+		uint objIndex = g_BvhLeafData[1 + leafDataOffset + numTriangles + numBlas + i];
 		Hit hit;
 		bool hasHit = hitPrimitive(objIndex, _ray, closestHit.t, hit);
 
@@ -235,19 +237,40 @@ void bvh_collide(uint _nid, Ray _ray, inout ClosestHit closestHit)
 			}
 		}
 	}
+
+	for (uint i = 0; i < numBlas; ++i)
+	{
+		uint blasIndex = g_BvhLeafData[1 + leafDataOffset + numTriangles + i];
+
+		Hit hit;
+		Box box = { g_blasHeader[blasIndex].minExtent, g_blasHeader[blasIndex].maxExtent };
+		bool hasHit = HitBox(_ray, box, 0, closestHit.t, hit);
+
+		if (hasHit)
+		{
+			closestHit.t = hit.t * OFFSET_RAY_COLLISION;
+			closestHit.mid_objId = 0x0000FFFF + (g_blasHeader[blasIndex].matId & 0xFFFF0000);
+			closestHit.nid = _nid;
+			ClosestHit_setDebugColorId(closestHit, blasIndex);
+
+			storeHitNormal(closestHit, hit.normal);
+			storeHitColor(closestHit, vec3(1, 1, 1));
+		}
+	}
 }
 
 bool bvh_collide_fast(uint _nid, Ray _ray, float tmax)
 {
 	_nid = _nid & NID_MASK;
 	uint leafDataOffset = g_BvhNodeData[_nid].nid.w;
-	uvec3 unpackedLeafDat = unpackObjectCount(g_BvhLeafData[leafDataOffset]);
+	uvec4 unpackedLeafDat = unpackObjectCount(g_BvhLeafData[leafDataOffset]);
 	uint numTriangles = unpackedLeafDat.x;
-	uint numObjects = unpackedLeafDat.y;
+	uint numBlas = unpackedLeafDat.y;
+	uint numObjects = unpackedLeafDat.z;
 
 	for(uint i=0 ; i<numObjects ; ++i)
 	{
-		uint objIndex = g_BvhLeafData[1 + leafDataOffset + numTriangles + i];
+		uint objIndex = g_BvhLeafData[1 + leafDataOffset + numTriangles + numBlas + i];
 		if(hitPrimitiveFast(objIndex, _ray, tmax))
 			return true;
 	}
@@ -262,6 +285,15 @@ bool bvh_collide_fast(uint _nid, Ray _ray, float tmax)
 			return true;
 	}
 
+	for (uint i = 0; i < numBlas; ++i)
+	{
+		uint blasIndex = g_BvhLeafData[1 + leafDataOffset + numTriangles + i];
+
+		Box box = { g_blasHeader[blasIndex].minExtent, g_blasHeader[blasIndex].maxExtent };
+		if (CollideBox(_ray, box, 0, tmax, true) >= 0)
+			return true;
+	}
+
 	return false;
 }
 
@@ -269,6 +301,7 @@ bool bvh_collide_fast(uint _nid, Ray _ray, float tmax)
 void brutForceTraverse(Ray _ray, inout ClosestHit closestHit)
 {
 	closestHit.nid = 0xFFFFffff;
+	uint debugObjIndex = 0;
 	for(uint i=0 ; i<g_Constants.numPrimitives ; ++i)
 	{
 		Hit hit;
@@ -276,8 +309,11 @@ void brutForceTraverse(Ray _ray, inout ClosestHit closestHit)
 
 		closestHit.t =			hasHit ? hit.t * OFFSET_RAY_COLLISION	: closestHit.t;
 		closestHit.normal =		hasHit ? hit.normal						: closestHit.normal;
-		closestHit.mid_objId =	hasHit ? i | (g_BvhPrimitiveData[i].iparam & 0xFFFF0000) : closestHit.mid_objId;
-		ClosestHit_setDebugColorId(closestHit, i);
+		closestHit.mid_objId =	hasHit ? (i | (g_BvhPrimitiveData[i].iparam & 0xFFFF0000)) : closestHit.mid_objId;
+
+		debugObjIndex++;
+		if(hasHit)
+			ClosestHit_setDebugColorId(closestHit, debugObjIndex);
 	}
 
 	for(uint i=0 ; i<g_Constants.numTriangles ; ++i)
@@ -289,7 +325,26 @@ void brutForceTraverse(Ray _ray, inout ClosestHit closestHit)
 		closestHit.normal =		hasHit ? hit.normal							: closestHit.normal;
 		closestHit.uv =			hasHit ? hit.uv								: closestHit.uv;
 		closestHit.mid_objId =	hasHit ? 0x0000FFFF | (g_BvhTriangleData[i].index2_matId & 0xFFFF0000) : closestHit.mid_objId;
-		ClosestHit_setDebugColorId(closestHit, i);
+
+		debugObjIndex++;
+		if (hasHit)
+			ClosestHit_setDebugColorId(closestHit, debugObjIndex);
+	}
+
+	for (uint i = 0; i < g_Constants.numBlas; ++i)
+	{
+		Hit hit;
+
+		Box box = { g_blasHeader[i].minExtent, g_blasHeader[i].maxExtent };
+		bool hasHit = HitBox(_ray, box, 0, closestHit.t, hit);
+	
+		closestHit.t = hasHit ? hit.t * OFFSET_RAY_COLLISION : closestHit.t;
+		closestHit.normal = hasHit ? hit.normal : closestHit.normal;
+		closestHit.mid_objId = hasHit ? (0x0000FFFF | (g_blasHeader[i].matId & 0xFFFF0000)) : closestHit.mid_objId;
+
+		debugObjIndex++;
+		if(hasHit)
+			ClosestHit_setDebugColorId(closestHit, debugObjIndex);
 	}
 }
 #endif

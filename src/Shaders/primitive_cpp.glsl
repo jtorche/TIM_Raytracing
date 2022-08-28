@@ -15,9 +15,10 @@
 #define Material_PBR			5
 
 // used to pack node data
-#define TriangleBitCount 18
-#define PrimitiveBitCount 9
-#define LightBitCount 5
+#define TriangleBitCount 12
+#define PrimitiveBitCount 8
+#define LightBitCount 4
+#define BlasBitCount 8
 
 struct Ray
 {
@@ -73,7 +74,9 @@ struct PackedBVHNode
 
 struct BlasHeader
 {
-	Box aabb;
+	vec3 minExtent;
+	uint matId;
+	vec3 maxExtent;
 	uint rootIndex; // Node index in PackedBVHNode list
 };
 

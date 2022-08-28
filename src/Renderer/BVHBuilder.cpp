@@ -3,6 +3,8 @@
 
 #include "TriBoxCollision.hpp"
 #include <thread>
+#include <algorithm>
+#include <execution>
 #include "shaders/struct_cpp.glsl"
 
 namespace tim
@@ -256,6 +258,15 @@ namespace tim
         m_lights.push_back({ _light });
     }
 
+    void BVHBuilder::addBlas(std::unique_ptr<BVHBuilder> _blas)
+    {
+        TIM_ASSERT(_blas->m_triangleMaterials.size() == 1);
+        u32 matId = (u32)m_triangleMaterials.size();
+        m_triangleMaterials.push_back(_blas->m_triangleMaterials[0]);
+        m_blasInstances.push_back({ u32(m_blas.size()), matId, {} });
+        m_blas.push_back(std::move(_blas));
+    }
+
     void BVHBuilder::dumpStats() const
     {
         std::cout << "BVHBuilder stats:\n";
@@ -265,7 +276,17 @@ namespace tim
         std::cout << " - max triangles: " << m_stats.maxTriangle << "\n\n";
     }
 
-    void BVHBuilder::build(u32 _maxDepth, u32 _maxObjPerNode, const Box& _sceneSize)
+    void BVHBuilder::buildBlas(u32 _maxObjPerNode)
+    {
+        std::for_each(std::execution::par, m_blas.begin(), m_blas.end(),
+            [_maxObjPerNode](auto& blas)
+            {
+                constexpr u32 maxDepth = 16;
+                blas->build(maxDepth, _maxObjPerNode, false);
+            });
+    }
+
+    void BVHBuilder::build(u32 _maxDepth, u32 _maxObjPerNode, bool _useMultipleThreads)
     {
         m_maxDepth = _maxDepth;
         m_maxObjPerNode = _maxObjPerNode;
@@ -273,12 +294,12 @@ namespace tim
         m_stats = {};
 
         m_nodes.clear();
-        m_nodes.reserve(size_t(1) << (m_maxDepth + 1));
+        m_nodes.reserve((m_triangles.size() + m_objects.size() + m_blasInstances.size()) * 2);
         m_nodes.push_back({});
-        m_nodes.back().extent = _sceneSize;
 
         // Compute true AABB of the scene
-        Box tightBox = m_objects.empty() ? getAABB(m_triangles[0]) : getAABB(m_objects[0]);
+        Box tightBox = { {  std::numeric_limits<float>::max(),  std::numeric_limits<float>::max(),  std::numeric_limits<float>::max() },
+                         { -std::numeric_limits<float>::max(), -std::numeric_limits<float>::max(), -std::numeric_limits<float>::max() } };
         for (u32 i = 1; i < m_objects.size(); ++i)
         {
             Box box = getAABB(m_objects[i]);
@@ -291,6 +312,14 @@ namespace tim
             tightBox.minExtent = linalg::min_(tightBox.minExtent, box.minExtent);
             tightBox.maxExtent = linalg::max_(tightBox.maxExtent, box.maxExtent);
         }
+        for (u32 i = 0; i < m_blasInstances.size(); ++i)
+        {
+            m_blasInstances[i].aabb = m_blas[m_blasInstances[i].blasId]->getAABB();
+            tightBox.minExtent = linalg::min_(tightBox.minExtent, m_blasInstances[i].aabb.minExtent);
+            tightBox.maxExtent = linalg::max_(tightBox.maxExtent, m_blasInstances[i].aabb.maxExtent);
+        }
+        m_aabb = tightBox;
+        m_nodes.back().extent = m_aabb;
 
         // Clamp with user's values
         m_nodes.back().extent.minExtent = linalg::max_(m_nodes.back().extent.minExtent, tightBox.minExtent);
@@ -304,7 +333,11 @@ namespace tim
         for (u32 i = 0; i < m_triangles.size(); ++i)
             triangleIds[i] = i;
 
-        addObjectsRec(0, objectsIds.begin(), objectsIds.end(), triangleIds.begin(), triangleIds.end(), &m_nodes[0]);
+        std::vector<u32> blasIds(m_blasInstances.size());
+        for (u32 i = 0; i < m_blasInstances.size(); ++i)
+            blasIds[i] = i;
+
+        addObjectsRec(0, objectsIds.begin(), objectsIds.end(), triangleIds.begin(), triangleIds.end(), blasIds.begin(), blasIds.end(), &m_nodes[0], _useMultipleThreads);
 
         m_stats.meanDepth /= m_stats.numLeafs;
         m_stats.meanTriangle /= m_stats.numLeafs;
@@ -312,10 +345,13 @@ namespace tim
         TIM_ASSERT(m_nodes.size() < g_MaxNodeCount);
     }
 
-    void BVHBuilder::addObjectsRec(u32 _depth, ObjectIt _objectsBegin, ObjectIt _objectsEnd, ObjectIt _trianglesBegin, ObjectIt _trianglesEnd, BVHBuilder::Node* _curNode)
+    void BVHBuilder::addObjectsRec(u32 _depth, ObjectIt _objectsBegin, ObjectIt _objectsEnd, 
+                                               ObjectIt _trianglesBegin, ObjectIt _trianglesEnd, 
+                                               ObjectIt _blasBegin, ObjectIt _blasEnd, BVHBuilder::Node* _curNode, bool _useMultipleThreads)
     {
         size_t numObjects = std::distance(_objectsBegin, _objectsEnd) + std::distance(_trianglesBegin, _trianglesEnd);
-        if (numObjects <= m_maxObjPerNode || _depth >= m_maxDepth)
+
+        auto fillLeaf = [&]()
         {
             m_stats.numLeafs++;
             m_stats.meanDepth += _depth;
@@ -328,33 +364,42 @@ namespace tim
             for (auto it = _trianglesBegin; it != _trianglesEnd && _curNode->triangleList.size() < (1u << TriangleBitCount); ++it)
                 _curNode->triangleList.push_back(*it);
 
+            for (auto it = _blasBegin; it != _blasEnd && _curNode->blasList.size() < (1u << BlasBitCount); ++it)
+                _curNode->blasList.push_back(*it);
+
             for (size_t i = 0; i < m_lights.size() && _curNode->lightList.size() < (1u << LightBitCount); ++i)
             {
                 const Light& light = m_lights[i];
                 Sphere sphere = getBoundingSphere(light);
 
-                if(sphereBoxCollision(sphere, _curNode->extent) != CollisionType::Disjoint)
+                if (sphereBoxCollision(sphere, _curNode->extent) != CollisionType::Disjoint)
                 {
                     _curNode->lightList.push_back(u32(i));
                 }
             }
+        };
+
+        if (numObjects <= m_maxObjPerNode || _depth >= m_maxDepth)
+        {
+            fillLeaf();
             return;
         }
         else
         {
             _curNode->primitiveList.clear();
             _curNode->triangleList.clear();
+            _curNode->blasList.clear();
 
             Box leftBox[3], rightBox[3];
             size_t numObjInLeft[3] = { 0,0,0 }, numObjInRight[3] = { 0,0,0 };
 
-            searchBestSplit(_curNode, _objectsBegin, _objectsEnd, _trianglesBegin, _trianglesEnd,
+            searchBestSplit(_curNode, _objectsBegin, _objectsEnd, _trianglesBegin, _trianglesEnd, _blasBegin, _blasEnd,
                 [](const vec3& step) { return vec3(step.x, 0, 0); }, [](const vec3& _step) { return vec3{ 0, _step.y, _step.z }; },
                 leftBox[0], rightBox[0], numObjInLeft[0], numObjInRight[0]);
-            searchBestSplit(_curNode, _objectsBegin, _objectsEnd, _trianglesBegin, _trianglesEnd,
+            searchBestSplit(_curNode, _objectsBegin, _objectsEnd, _trianglesBegin, _trianglesEnd, _blasBegin, _blasEnd,
                 [](const vec3& step) { return vec3(0, step.y, 0); }, [](const vec3& _step) { return vec3{ _step.x, 0, _step.z }; },
                 leftBox[1], rightBox[1], numObjInLeft[1], numObjInRight[1]);
-            searchBestSplit(_curNode, _objectsBegin, _objectsEnd, _trianglesBegin, _trianglesEnd,
+            searchBestSplit(_curNode, _objectsBegin, _objectsEnd, _trianglesBegin, _trianglesEnd, _blasBegin, _blasEnd,
                 [](const vec3& step) { return vec3(0, 0, step.z); }, [](const vec3& _step) { return vec3{ _step.x, _step.y, 0 }; },
                 leftBox[2], rightBox[2], numObjInLeft[2], numObjInRight[2]);
 
@@ -372,6 +417,9 @@ namespace tim
             std::vector<u32> triangleLeft; triangleLeft.reserve(numObjInLeft[bestSplit]);
             std::vector<u32> triangleRight; triangleRight.reserve(numObjInRight[bestSplit]);
 
+            std::vector<u32> blasLeft; blasLeft.reserve(numObjInLeft[bestSplit]);
+            std::vector<u32> blasRight; blasRight.reserve(numObjInRight[bestSplit]);
+
             for (auto it = _objectsBegin; it != _objectsEnd; ++it)
             {
                 if (primitiveBoxCollision(m_objects[*it], leftBox[bestSplit]) != CollisionType::Disjoint)
@@ -386,6 +434,21 @@ namespace tim
                     triangleLeft.push_back(*it);
                 if (triangleBoxCollision(m_triangles[*it], rightBox[bestSplit]) != CollisionType::Disjoint)
                     triangleRight.push_back(*it);
+            }
+
+            for (auto it = _blasBegin; it != _blasEnd; ++it)
+            {
+                if (boxBoxCollision(m_blasInstances[*it].aabb, leftBox[bestSplit]) != CollisionType::Disjoint)
+                    blasLeft.push_back(*it);
+                if (boxBoxCollision(m_blasInstances[*it].aabb, rightBox[bestSplit]) != CollisionType::Disjoint)
+                    blasRight.push_back(*it);
+            }
+
+            if (objectLeft.size() + triangleLeft.size() + blasLeft.size() == numObjects && 
+                objectRight.size() + triangleRight.size() + blasRight.size() == numObjects)
+            {
+                fillLeaf();
+                return;
             }
 
             m_mutex.lock();
@@ -407,32 +470,32 @@ namespace tim
             leftNode.sibling = &rightNode;
             rightNode.sibling = &leftNode;
 
-            if (_depth < 3)
+            if (_depth < 3 && _useMultipleThreads)
             {
                 std::thread th1([&]()
                 {
-                    addObjectsRec(_depth + 1, objectLeft.begin(), objectLeft.end(), triangleLeft.begin(), triangleLeft.end(), &leftNode);
+                    addObjectsRec(_depth + 1, objectLeft.begin(), objectLeft.end(), triangleLeft.begin(), triangleLeft.end(), blasLeft.begin(), blasLeft.end(), &leftNode, _useMultipleThreads);
                 });
                 std::thread th2([&]()
                 {
-                    addObjectsRec(_depth + 1, objectRight.begin(), objectRight.end(), triangleRight.begin(), triangleRight.end(), &rightNode);
+                    addObjectsRec(_depth + 1, objectRight.begin(), objectRight.end(), triangleRight.begin(), triangleRight.end(), blasRight.begin(), blasRight.end(), &rightNode, _useMultipleThreads);
                 });
                 th1.join();
                 th2.join();
             }
             else
             {
-                addObjectsRec(_depth + 1, objectLeft.begin(), objectLeft.end(), triangleLeft.begin(), triangleLeft.end(), &leftNode);
-                addObjectsRec(_depth + 1, objectRight.begin(), objectRight.end(), triangleRight.begin(), triangleRight.end(), &rightNode);
+                addObjectsRec(_depth + 1, objectLeft.begin(), objectLeft.end(), triangleLeft.begin(), triangleLeft.end(), blasLeft.begin(), blasLeft.end(), &leftNode, false);
+                addObjectsRec(_depth + 1, objectRight.begin(), objectRight.end(), triangleRight.begin(), triangleRight.end(), blasRight.begin(), blasRight.end(), &rightNode, false);
             }
         }
     }
 
     template<typename Fun1, typename Fun2>
     void BVHBuilder::searchBestSplit(BVHBuilder::Node* _curNode, 
-        ObjectIt _objectsBegin, ObjectIt _objectsEnd, ObjectIt _trianglesBegin, ObjectIt _trianglesEnd,
-        const Fun1& _movingAxis, const Fun2& _fixedAxis,
-        Box& _leftBox, Box& _rightBox, size_t& _numObjInLeft, size_t& _numObjInRight) const
+                                     ObjectIt _objectsBegin, ObjectIt _objectsEnd, ObjectIt _trianglesBegin, ObjectIt _trianglesEnd, ObjectIt _blasBegin, ObjectIt _blasEnd,
+                                     const Fun1& _movingAxis, const Fun2& _fixedAxis,
+                                     Box& _leftBox, Box& _rightBox, size_t& _numObjInLeft, size_t& _numObjInRight) const
     {
         size_t numObjects = std::distance(_objectsBegin, _objectsEnd) + std::distance(_trianglesBegin, _trianglesEnd);
 
@@ -451,6 +514,12 @@ namespace tim
                 bool collide = triangleBoxCollision(m_triangles[_id], leftBox) != CollisionType::Disjoint;
                 return collide;
             });
+            numObjInLeft += std::count_if(_blasBegin, _blasEnd, [&](u32 _id)
+            {
+                const u32 blasId = m_blasInstances[_id].blasId;
+                bool collide = boxBoxCollision(m_blas[blasId]->m_aabb, leftBox) != CollisionType::Disjoint;
+                return collide;
+            });
 
             size_t numObjInRight = std::count_if(_objectsBegin, _objectsEnd, [&](u32 _id)
             {
@@ -460,6 +529,12 @@ namespace tim
             numObjInRight += std::count_if(_trianglesBegin, _trianglesEnd, [&](u32 _id)
             {
                 bool collide = triangleBoxCollision(m_triangles[_id], rightBox) != CollisionType::Disjoint;
+                return collide;
+            });
+            numObjInRight += std::count_if(_blasBegin, _blasEnd, [&](u32 _id)
+            {
+                const u32 blasId = m_blasInstances[_id].blasId;
+                bool collide = boxBoxCollision(m_blas[blasId]->m_aabb, rightBox) != CollisionType::Disjoint;
                 return collide;
             });
 
@@ -494,15 +569,26 @@ namespace tim
 
     u32 BVHBuilder::getBvhGpuSize() const
     {
-        u32 size = alignUp<u32>((u32)m_nodes.size() * sizeof(PackedBVHNode), m_bufferAlignment);
-        size += alignUp<u32>((u32)(m_triangleMaterials.size() + m_objects.size()) * sizeof(Material), m_bufferAlignment);
+        u32 size = alignUp<u32>((u32)(m_triangleMaterials.size() + m_objects.size()) * sizeof(Material), m_bufferAlignment);
         size += alignUp<u32>((u32)m_triangles.size() * sizeof(Triangle), m_bufferAlignment);
         size += alignUp<u32>((u32)m_objects.size() * sizeof(PackedPrimitive), m_bufferAlignment);
         size += alignUp<u32>((u32)m_lights.size() * sizeof(PackedLight), m_bufferAlignment);
-        for (const BVHBuilder::Node& n : m_nodes)
+        size += alignUp<u32>((u32)m_blasInstances.size() * sizeof(BlasHeader), m_bufferAlignment);
+
+        auto sizeOfNodes = [this](const std::vector<Node>& _nodes)
         {
-            size += (u32)(1 + n.triangleList.size() + n.primitiveList.size() + n.lightList.size()) * sizeof(u32);
-        }
+            u32 size = 0;
+            size += alignUp<u32>((u32)_nodes.size() * sizeof(PackedBVHNode), m_bufferAlignment);
+            for (const BVHBuilder::Node& n : _nodes)
+                size += (u32)(1 + n.triangleList.size() + n.primitiveList.size() + n.lightList.size() + n.blasList.size()) * sizeof(u32);
+
+            return size;
+        };
+        size += sizeOfNodes(m_nodes);
+
+        for (const auto& blas : m_blas)
+            size += sizeOfNodes(blas->m_nodes);
+
         return size;
     }
 
@@ -601,10 +687,20 @@ namespace tim
         }
     }
 
-    void BVHBuilder::fillGpuBuffer(void* _data, uvec2& _triangleOffsetRange, uvec2& _primitiveOffsetRange, uvec2& _materialOffsetRange, uvec2& _lightOffsetRange, uvec2& _nodeOffsetRange, uvec2& _leafDataOffsetRange)
+    void BVHBuilder::fillGpuBuffer(void* _data, uvec2& _triangleOffsetRange, uvec2& _primitiveOffsetRange, 
+                                   uvec2& _materialOffsetRange, uvec2& _lightOffsetRange, uvec2& _nodeOffsetRange, uvec2& _leafDataOffsetRange, uvec2& _blasOffsetRange)
     {
         ubyte* out = (ubyte*)_data;
         ubyte* prevout = out;
+
+        // Save blas header data write pointer
+        ubyte* blasHeaderWritePtr = out;
+        u32 blasHeaderBufferSize = u32(m_blasInstances.size() * sizeof(BlasHeader));
+        _blasOffsetRange = { (u32)std::distance((ubyte*)_data, out), blasHeaderBufferSize };
+        _blasOffsetRange.y = std::max(m_bufferAlignment, _blasOffsetRange.y);
+
+        out = prevout + alignUp(blasHeaderBufferSize, m_bufferAlignment);
+        prevout = out;
 
         // Store triangle data
         u32 triangleBufferSize = u32(m_triangles.size() * sizeof(Triangle));
@@ -699,30 +795,45 @@ namespace tim
         prevout = out;
 
         // Store node data
-        u32 nodeBufferSize = u32(m_nodes.size() * sizeof(PackedBVHNode));
+        std::vector<Node> nodes = m_nodes;
+        std::vector<u32> blasRootIndex(m_blas.size());
+        // merge blas nodes
+        for (u32 i = 0; i < m_blas.size(); ++i)
+        {
+            blasRootIndex[i] = u32(nodes.size());
+            nodes.insert(nodes.end(), m_blas[i]->m_nodes.begin(), m_blas[i]->m_nodes.end());
+        }
+
+        u32 nodeBufferSize = u32(nodes.size() * sizeof(PackedBVHNode));
         _nodeOffsetRange = { (u32)std::distance((ubyte*)_data, out), nodeBufferSize };
         _nodeOffsetRange.y = std::max(m_bufferAlignment, _nodeOffsetRange.y);
 
         u32* objectListBegin = reinterpret_cast<u32*>(out + alignUp(nodeBufferSize, m_bufferAlignment));
         u32* objectListCurPtr = objectListBegin;
 
-        for (const BVHBuilder::Node& n : m_nodes)
+        for (const BVHBuilder::Node& n : nodes)
         {
             PackedBVHNode* node = reinterpret_cast<PackedBVHNode*>(out);
-            u32 leafDataIndex = (n.triangleList.size() + n.primitiveList.size()) == 0 ? u32(-1) : u32(objectListCurPtr - objectListBegin);
+            u32 leafDataIndex = (n.triangleList.size() + n.blasList.size() + n.primitiveList.size()) == 0 ? u32(-1) : u32(objectListCurPtr - objectListBegin);
             packNodeData(node, n, leafDataIndex);
 
-            static_assert(TriangleBitCount + PrimitiveBitCount + LightBitCount == 32);
+            static_assert(TriangleBitCount + PrimitiveBitCount + LightBitCount + BlasBitCount == 32);
             TIM_ASSERT(u32(n.triangleList.size()) < (1 << TriangleBitCount));
+            TIM_ASSERT(u32(n.blasList.size()) < (1 << BlasBitCount));
             TIM_ASSERT(u32(n.primitiveList.size()) < (1 << PrimitiveBitCount));
             TIM_ASSERT(u32(n.lightList.size()) < (1 << LightBitCount));
 
-            u32 packedTriObjLightCount = u32(n.triangleList.size()) + (u32(n.primitiveList.size()) << TriangleBitCount) + (u32(n.lightList.size()) << (TriangleBitCount + PrimitiveBitCount));
+            u32 packedCount = u32(n.triangleList.size()) + 
+                              (u32(n.blasList.size()) << TriangleBitCount) + 
+                              (u32(n.primitiveList.size()) << (TriangleBitCount + BlasBitCount)) + 
+                              (u32(n.lightList.size()) << (TriangleBitCount + BlasBitCount + PrimitiveBitCount));
 
-            *objectListCurPtr = packedTriObjLightCount;
+            *objectListCurPtr = packedCount;
             ++objectListCurPtr;
             memcpy(objectListCurPtr, n.triangleList.data(), sizeof(u32) * n.triangleList.size());
             objectListCurPtr += n.triangleList.size();
+            memcpy(objectListCurPtr, n.blasList.data(), sizeof(u32)* n.blasList.size());
+            objectListCurPtr += n.blasList.size();
             memcpy(objectListCurPtr, n.primitiveList.data(), sizeof(u32) * n.primitiveList.size());
             objectListCurPtr += n.primitiveList.size();
             memcpy(objectListCurPtr, n.lightList.data(), sizeof(u32) * n.lightList.size());
@@ -731,6 +842,21 @@ namespace tim
         }
 
         _leafDataOffsetRange = { (u32)std::distance((ubyte*)_data, (ubyte*)objectListBegin), (u32)std::distance((ubyte*)objectListBegin, (ubyte*)objectListCurPtr) };
+
+        // Fill blas header data
+        for (u32 i = 0; i < m_blasInstances.size(); ++i)
+        {
+            const u32 blasId = m_blasInstances[i].blasId;
+
+            BlasHeader* header = reinterpret_cast<BlasHeader*>(blasHeaderWritePtr);
+
+            header->minExtent = m_blasInstances[i].aabb.minExtent;
+            header->maxExtent = m_blasInstances[i].aabb.maxExtent;
+            header->matId = m_blasInstances[i].matId;
+            header->rootIndex = blasRootIndex[blasId];
+
+            blasHeaderWritePtr += sizeof(BlasHeader);
+        }
     }
 }
 

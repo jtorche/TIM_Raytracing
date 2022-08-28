@@ -17,7 +17,7 @@ namespace tim
         Scene(BVHGeometry& _geometryBuffer, TextureManager& _texManager);
         ~Scene() = default;
 
-        void build(BVHBuilder* _bvh);
+        void build(BVHBuilder* _bvh, bool _useBlas);
 
     private:
         BVHGeometry& m_geometryBuffer;
@@ -25,8 +25,8 @@ namespace tim
 
         void addOBJ(const fs::path& _path, vec3 _pos, vec3 _scale, BVHBuilder* _builder, const Material& _mat, bool _swapYZ = false);
         void addOBJWithMtl(const fs::path& _path, vec3 _pos, vec3 _scale, BVHBuilder* _builder, bool _swapYZ = false);
-
         void addOBJInner(const fs::path& _path, vec3 _pos, vec3 _scale, BVHBuilder* _builder, const Material* _mat, bool _swapYZ = false);
 
+        void loadBlas(const fs::path& _path, vec3 _pos, vec3 _scale, std::vector<std::unique_ptr<BVHBuilder>>& _blas, const Material* _mat = nullptr, bool _swapYZ = false);
     };
 }

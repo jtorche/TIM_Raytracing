@@ -42,6 +42,7 @@ struct PassData
 struct PushConstants
 {
 	uint numTriangles;
+	uint numBlas;
 	uint numPrimitives;
 	uint numLights;
 	uint numNodes;
