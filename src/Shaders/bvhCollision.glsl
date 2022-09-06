@@ -244,7 +244,7 @@ void bvh_collide(uint _nid, Ray _ray, inout ClosestHit closestHit)
 
 		Hit hit;
 		Box box = { g_blasHeader[blasIndex].minExtent, g_blasHeader[blasIndex].maxExtent };
-		bool hasHit = HitBox(_ray, box, 0, closestHit.t, hit);
+		bool hasHit = !isPointInBox(box, _ray.from) && HitBox(_ray, box, 0, closestHit.t, hit);
 
 		if (hasHit)
 		{
@@ -290,8 +290,12 @@ bool bvh_collide_fast(uint _nid, Ray _ray, float tmax)
 		uint blasIndex = g_BvhLeafData[1 + leafDataOffset + numTriangles + i];
 
 		Box box = { g_blasHeader[blasIndex].minExtent, g_blasHeader[blasIndex].maxExtent };
-		if (CollideBox(_ray, box, 0, tmax, true) >= 0)
-			return true;
+
+		if (!isPointInBox(box, _ray.from))
+		{
+			if (CollideBox(_ray, box, 0, tmax, true) >= 0)
+				return true;
+		}
 	}
 
 	return false;
@@ -336,7 +340,7 @@ void brutForceTraverse(Ray _ray, inout ClosestHit closestHit)
 		Hit hit;
 
 		Box box = { g_blasHeader[i].minExtent, g_blasHeader[i].maxExtent };
-		bool hasHit = HitBox(_ray, box, 0, closestHit.t, hit);
+		bool hasHit = !isPointInBox(box, _ray.from) && HitBox(_ray, box, 0, closestHit.t, hit);
 	
 		closestHit.t = hasHit ? hit.t * OFFSET_RAY_COLLISION : closestHit.t;
 		closestHit.normal = hasHit ? hit.normal : closestHit.normal;

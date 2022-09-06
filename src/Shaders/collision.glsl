@@ -14,6 +14,12 @@ Ray createRay(vec3 _from, vec3 _dir)
 	return r;
 }
 
+bool isPointInBox(in Box _box, vec3 _point)
+{
+    return _point.x > _box.minExtent.x && _point.y > _box.minExtent.y && _point.z > _box.minExtent.z &&
+           _point.x < _box.maxExtent.x && _point.y < _box.maxExtent.y && _point.z < _box.maxExtent.z;
+}
+
 float CollideBox(Ray _ray, Box _box, float tmin, float tmax, bool returnTmin)
 {
 #if !NO_RAY_INVDIR

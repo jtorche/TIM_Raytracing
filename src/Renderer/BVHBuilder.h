@@ -74,6 +74,7 @@ namespace tim
 
         void buildBlas(u32 _maxObjPerNode);
         void build(u32 _maxDepth, u32 _maxObjPerNode, bool _useMultipleThreads);
+        void computeSceneAABB();
 
         Box getAABB() const { return m_aabb; }
         u32 getPrimitivesCount() const { return u32(m_objects.size()); }
@@ -99,7 +100,7 @@ namespace tim
 
         template<typename Fun1, typename Fun2>
         void searchBestSplit(Node* _curNode, ObjectIt _objectsBegin, ObjectIt _objectsEnd, ObjectIt _trianglesBegin, ObjectIt _trianglesEnd, ObjectIt _blasBegin, ObjectIt _blasEnd,
-                             const Fun1& _movingAxis, const Fun2& _fixedAxis, Box& _leftBox, Box& _rightBox, size_t& _numObjInLeft, size_t& _numObjInRight) const;
+                             const Fun1& _movingAxis, const Fun2& _fixedAxis, Box& _leftBox, Box& _rightBox, u32& _numObjInLeft, u32& _numObjInRight) const;
 
         void packNodeData(PackedBVHNode* _outNode, const BVHBuilder::Node& _node, u32 _leafDataOffset);
 
@@ -119,7 +120,9 @@ namespace tim
         {
             u32 numLeafs = 0;
             u32 maxTriangle = 0;
+            u32 maxBlas = 0;
             float meanTriangle = 0;
+            float meanBlas = 0;
             float meanDepth = 0;
         };
         Stats m_stats;
@@ -127,7 +130,10 @@ namespace tim
         const BVHGeometry& m_geometryBuffer;
 
         struct Node
-        {
+        { 
+            Node(size_t _nid) : nid{ u32(_nid) } {}
+
+            u32 nid = u32(-1);
             Box extent;
             Node* parent = nullptr;
             Node* sibling = nullptr;
@@ -140,7 +146,7 @@ namespace tim
         };
 
         Box m_aabb;
-        std::vector<Node> m_nodes;
+        std::vector<std::unique_ptr<Node>> m_nodes;
         std::vector<Triangle> m_triangles;
         std::vector<Material> m_triangleMaterials;
         std::vector<Primitive> m_objects;

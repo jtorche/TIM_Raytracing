@@ -268,7 +268,9 @@ namespace tim
         _bvh->addBox(Box{ { -dim*20, -dim * 0.1 + dim, 0 }, { dim * 20, dim * 0.1 + dim, dim * 2 } }, redMat);
         _bvh->addBox(Box{ { -dim*20, -dim * 0.1 - dim, 0 }, { dim * 20, dim * 0.1 - dim, dim * 2 } }, blueMat);
 
+    #ifdef _DEBUG
         _bvh->addBox(Box{ { -dim * 40, -dim * 40, -dim }, { dim * 40, dim * 40, 0 } }, suzanneMat);
+    #endif
 
         u32 texFlame = m_texManager.loadTexture("./data/image/flame.png");
         u32 texDot = m_texManager.loadTexture("./data/image/tex.png");
