@@ -288,11 +288,11 @@ namespace tim
             [_maxObjPerNode](auto& blas)
             {
                 constexpr u32 maxDepth = 16;
-                
                 //blas->computeSceneAABB();
                 blas->build(maxDepth, _maxObjPerNode, false);
-                blas->dumpStats();
             });
+
+        // std::for_each(std::execution::seq, m_blas.begin(), m_blas.end(), [](auto& blas) { blas->dumpStats(); });
     }
 
     void BVHBuilder::build(u32 _maxDepth, u32 _maxObjPerNode, bool _useMultipleThreads)
@@ -376,15 +376,39 @@ namespace tim
         m_aabb = tightBox;
     }
 
-#define USE_VOLUME_HEURISITC 0
+#define USE_AvgObjGain_HEURISTIC 1
 
     static float computeAvgObjGain(u32 _numObjLeft, float _boxVolumeLeft, u32 _numObjRight, float _boxVolumeRight, u32 _totalNumObjects)
     {
         // A cube has 6 faces, 2 of them will go through both leafs if we face them. So we have 1/3 chance to go through both leafs.
         constexpr float inv3 = 1.f / 3;
-        float avgObjAfterSplit = inv3 * (_numObjLeft + _numObjRight) + 2 * inv3 * (_numObjLeft * _boxVolumeLeft + _numObjRight * _boxVolumeRight) / (_boxVolumeLeft + _boxVolumeRight);
+
+        // float avgObjAfterSplit = inv3 * (_numObjLeft + _numObjRight) + 2 * inv3 * (_numObjLeft * _boxVolumeLeft + _numObjRight * _boxVolumeRight) / (_boxVolumeLeft + _boxVolumeRight);
+        float avgObjAfterSplit = inv3 * _totalNumObjects + 2 * inv3 * (_numObjLeft * _boxVolumeLeft + _numObjRight * _boxVolumeRight) / (_boxVolumeLeft + _boxVolumeRight);
 
         return std::max(0.f, float(_totalNumObjects) - avgObjAfterSplit);
+    }
+
+    // return if split0 is better than split1
+    static bool compareSplit(u32 _numObjInLeft[], u32 _numObjInRight[], const Box& _leftBox0, const Box& _rightBox0, const Box& _leftBox1, const Box& _rightBox1)
+    {
+        u32 sum0 = _numObjInLeft[0] + _numObjInRight[0];
+        u32 sum1 = _numObjInLeft[1] + _numObjInRight[1];
+
+        u32 max0 = std::max(_numObjInLeft[0], _numObjInRight[0]);
+        u32 max1 = std::max(_numObjInLeft[1], _numObjInRight[1]);
+
+        if (max0 != max1)
+            return max0 < max1;
+        else if (sum0 != sum1)
+            return sum0 < sum1;
+        else
+        {
+            float volumeDiff0 = std::fabs(getBoxVolume(_leftBox0) - getBoxVolume(_rightBox0));
+            float volumeDiff1 = std::fabs(getBoxVolume(_leftBox1) - getBoxVolume(_rightBox1));
+
+            return volumeDiff0 < volumeDiff1;
+        }
     }
 
     void BVHBuilder::addObjectsRec(u32 _depth, ObjectIt _objectsBegin, ObjectIt _objectsEnd, 
@@ -447,23 +471,17 @@ namespace tim
                 leftBox[2], rightBox[2], numObjInLeft[2], numObjInRight[2]);
 
             // search for best homogeneous split
-            auto getBestSplit = [&](u32 s0, u32 s1)
+            auto getBestSplit = [&](u32 s0, u32 s1) -> u32
             {
-            #if USE_VOLUME_HEURISITC
+            #if USE_AvgObjGain_HEURISTIC
                 float score0 = computeAvgObjGain(numObjInLeft[s0], getBoxVolume(leftBox[s0]), numObjInRight[s0], getBoxVolume(rightBox[s0]), numObjects);
                 float score1 = computeAvgObjGain(numObjInLeft[s1], getBoxVolume(leftBox[s1]), numObjInRight[s1], getBoxVolume(rightBox[s1]), numObjects);
 
                 return score0 > score1 ? s0 : s1;
             #else
-                // best worst case
-                u32 sumS0 = u32(numObjInLeft[s0]) + u32(numObjInRight[s0]);
-                u32 sumS1 = u32(numObjInLeft[s1] + numObjInRight[s1]);
-                u32 maxS0 = u32(std::max(numObjInLeft[s0], numObjInRight[s0]));
-                u32 maxS1 = u32(std::max(numObjInLeft[s1], numObjInRight[s1]));
-                if(maxS0 == maxS1)
-                    return sumS0 < sumS1 ? s0 : s1;
-                else 
-                    return maxS0 < maxS1 ? s0 : s1;
+                u32 numLefts[2] = { numObjInLeft[s0], numObjInLeft[s1] };
+                u32 numRights[2] = { numObjInRight[s0], numObjInRight[s1] };
+                return compareSplit(numLefts, numRights, leftBox[s0], rightBox[s0], leftBox[s1], rightBox[s1]) ? s0 : s1;
             #endif
             };
 
@@ -604,7 +622,7 @@ namespace tim
 
         vec3 boxDim = _curNode->extent.maxExtent - _curNode->extent.minExtent;
 
-        if (numObjects > 512)
+        if (numObjects > 256)
         {
             vec2 searchBestCut = { 0, 1 };
             for (u32 i = 0; i < 32; ++i)
@@ -633,21 +651,8 @@ namespace tim
             _numObjInLeft = u32(-1);
             _numObjInRight = u32(-1);
 
-        #if USE_VOLUME_HEURISITC
+        #if USE_AvgObjGain_HEURISTIC
             float score = 0;
-        #else
-            auto isBetter = [&](u32 numObjInLeft, u32 numObjInRight)
-            {
-                // best worst case
-                u32 sumS0 = numObjInLeft + numObjInRight;
-                u32 sumS1 = _numObjInLeft + _numObjInRight;
-                u32 maxS0 = std::max(numObjInLeft, numObjInRight);
-                u32 maxS1 = std::max(_numObjInLeft, _numObjInRight);
-                if (maxS0 == maxS1)
-                    return sumS0 < sumS1;
-                else
-                    return maxS0 < maxS1;
-            };
         #endif  
 
             vec3 fixedStep = _fixedAxis(boxDim);
@@ -661,9 +666,9 @@ namespace tim
                     u32 numObjInLeft, numObjInRight;
                     std::tie(numObjInLeft, numObjInRight) = processSplit(leftBox, rightBox);
 
-                #if USE_VOLUME_HEURISITC
+                #if USE_AvgObjGain_HEURISTIC
                     float curScore = computeAvgObjGain(numObjInLeft, getBoxVolume(leftBox), numObjInRight, getBoxVolume(rightBox), numObjects);
-                    if (curScore > score)
+                    if (curScore >= score)
                     {
                         _leftBox = leftBox;
                         _rightBox = rightBox;
@@ -672,7 +677,9 @@ namespace tim
                         score = curScore;
                     }
                 #else
-                    if(isBetter(numObjInLeft, numObjInRight))
+                    u32 numLefts[2] = { numObjInLeft, _numObjInLeft };
+                    u32 numRights[2] = { numObjInRight, _numObjInRight };
+                    if (compareSplit(numLefts, numRights, leftBox, rightBox, _leftBox, _rightBox))
                     {
                         _leftBox = leftBox;
                         _rightBox = rightBox;
@@ -683,30 +690,46 @@ namespace tim
                 }
             };
 
+#define USE_BRUTEFORCE_HEURISTIC 0
+#if USE_BRUTEFORCE_HEURISTIC
+            constexpr u32 NumSteps = 1024 * 16;
+            for (u32 i = 0; i < NumSteps; ++i)
+            {
+                float newCut = (i + 0.5f) / NumSteps;
+                processStep(_movingAxis(boxDim * newCut));
+            }
+#else
             processStep(_movingAxis(boxDim * 0.5f));
 
-            vec3 delta = vec3(float(1e-6), float(1e-6), float(1e-6));
+            auto convertToStep = [&](vec3 _absPoint) -> vec3
+            {
+                vec3 step = _absPoint - _curNode->extent.minExtent;
+                return _movingAxis(step);
+            };
+
+            const vec3 delta = vec3(float(1e-6), float(1e-6), float(1e-6));
             std::for_each(_blasBegin, _blasEnd, [&](u32 _id)
             {
                 const u32 blasId = m_blasInstances[_id].blasId;
                 Box box = m_blas[blasId]->m_aabb;
-                processStep(_movingAxis(box.minExtent - delta));
-                processStep(_movingAxis(box.maxExtent + delta));
+                processStep(convertToStep(box.minExtent - delta));
+                processStep(convertToStep(box.maxExtent + delta));
             });
 
             std::for_each(_objectsBegin, _objectsEnd, [&](u32 _id)
             {
                 Box box = getAABB(m_objects[_id]);
-                processStep(_movingAxis(box.minExtent - delta));
-                processStep(_movingAxis(box.maxExtent + delta));
+                processStep(convertToStep(box.minExtent - delta));
+                processStep(convertToStep(box.maxExtent + delta));
             });
 
             std::for_each(_trianglesBegin, _trianglesEnd, [&](u32 _id)
             {
                 Box box = getAABB(m_triangles[_id]);
-                processStep(_movingAxis(box.minExtent - delta));
-                processStep(_movingAxis(box.maxExtent + delta));
+                processStep(convertToStep(box.minExtent - delta));
+                processStep(convertToStep(box.maxExtent + delta));
             });
+#endif
         }
     }
 
