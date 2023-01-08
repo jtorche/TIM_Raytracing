@@ -178,6 +178,46 @@ uvec4 unpackObjectCount(uint _packed)
 	return v;
 }
 
+void tlas_collide(uint _nid, Ray _ray, inout ClosestHit closestHit)
+{
+	_nid = _nid & NID_MASK;
+	uint leafDataOffset = g_BvhNodeData[_nid].nid.w;
+	uvec4 unpackedLeafDat = unpackObjectCount(g_BvhLeafData[leafDataOffset]);
+	uint numTriangles = unpackedLeafDat.x;
+	uint numBlas = unpackedLeafDat.y;
+	uint numObjects = unpackedLeafDat.z;
+
+	for (uint i = 0; i < numObjects; ++i)
+	{
+		uint objIndex = g_BvhLeafData[1 + leafDataOffset + numTriangles + numBlas + i];
+		Hit hit;
+		bool hasHit = hitPrimitive(objIndex, _ray, closestHit.t, hit);
+
+		if (hasHit)
+		{
+			closestHit.t = hit.t * OFFSET_RAY_COLLISION;
+			closestHit.mid_objId = objIndex + (g_BvhPrimitiveData[objIndex].iparam & 0xFFFF0000);
+			closestHit.nid = _nid;
+			ClosestHit_setDebugColorId(closestHit, objIndex);
+
+			storeHitNormal(closestHit, hit.normal);
+			storeHitColor(closestHit, vec3(1, 1, 1));
+		}
+	}
+
+	for (uint i = 0; i < numBlas; ++i)
+	{
+		uint blasIndex = g_BvhLeafData[1 + leafDataOffset + numTriangles + i];
+
+		Hit hit;
+		Box box = { g_blasHeader[blasIndex].minExtent, g_blasHeader[blasIndex].maxExtent };
+		if (HitBox(_ray, box, 0, closestHit.t, hit))
+		{
+
+		}
+	}
+}
+
 void bvh_collide(uint _nid, Ray _ray, inout ClosestHit closestHit)
 {
 	_nid = _nid & NID_MASK;
@@ -282,6 +322,48 @@ bool bvh_collide_fast(uint _nid, Ray _ray, float tmax)
 		loadTriangleVertices(p0, p1, p2, g_BvhTriangleData[triIndex]);
 
 		if(CollideTriangle(_ray, p0, p1, p2, tmax) > 0)
+			return true;
+	}
+
+	for (uint i = 0; i < numBlas; ++i)
+	{
+		uint blasIndex = g_BvhLeafData[1 + leafDataOffset + numTriangles + i];
+
+		Box box = { g_blasHeader[blasIndex].minExtent, g_blasHeader[blasIndex].maxExtent };
+
+		if (!isPointInBox(box, _ray.from))
+		{
+			if (CollideBox(_ray, box, 0, tmax, true) >= 0)
+				return true;
+		}
+	}
+
+	return false;
+}
+
+bool tlas_collide_fast(uint _nid, Ray _ray, float tmax)
+{
+	_nid = _nid & NID_MASK;
+	uint leafDataOffset = g_BvhNodeData[_nid].nid.w;
+	uvec4 unpackedLeafDat = unpackObjectCount(g_BvhLeafData[leafDataOffset]);
+	uint numTriangles = unpackedLeafDat.x;
+	uint numBlas = unpackedLeafDat.y;
+	uint numObjects = unpackedLeafDat.z;
+
+	for (uint i = 0; i < numObjects; ++i)
+	{
+		uint objIndex = g_BvhLeafData[1 + leafDataOffset + numTriangles + numBlas + i];
+		if (hitPrimitiveFast(objIndex, _ray, tmax))
+			return true;
+	}
+
+	for (uint i = 0; i < numTriangles; ++i)
+	{
+		uint triIndex = g_BvhLeafData[1 + leafDataOffset + i];
+		vec3 p0, p1, p2;
+		loadTriangleVertices(p0, p1, p2, g_BvhTriangleData[triIndex]);
+
+		if (CollideTriangle(_ray, p0, p1, p2, tmax) > 0)
 			return true;
 	}
 

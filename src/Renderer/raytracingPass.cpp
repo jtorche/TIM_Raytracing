@@ -14,7 +14,7 @@ namespace tim
         : m_frameSize{ 800,600 }, m_renderer{ _renderer }, m_context{ _context }, m_resourceAllocator{ _allocator }, m_textureManager{ _texManager }
     {
         m_rayBounceRecursionDepth = 2;
-        rebuildBvh(2, 12, true);
+        rebuildBvh(2, 12, false);
 
         system("pause");
     }

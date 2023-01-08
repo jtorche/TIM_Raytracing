@@ -254,19 +254,23 @@ namespace tim
         Material pbrMatMetal = BVHBuilder::createPbrMaterial({ 0.9f, 0.9f, 0.9f }, 1);
 
         _bvh->addSphere({ { 0, 0, 4.1f }, 0.08f }, BVHBuilder::createEmissiveMaterial({ 1, 1, 1 }));
-        _bvh->addSphereLight({ { 0, 0, 4.1f }, 15, { 2, 2, 2 }, 0.1f });
+        _bvh->addSphereLight({ { 0, 0, 4.1f }, 30, { 2, 2, 2 }, 0.1f });
 
         _bvh->addSphere({ { -9.18164f , 3.32356f , 6.98306f }, 0.05f }, BVHBuilder::createEmissiveMaterial({ 1,0.2f,0.2f }));
-        _bvh->addSphereLight({ { -9.18164f , 3.32356f , 6.98306f }, 8, { 3,0.5,0.5 }, 0.1f });
+        _bvh->addSphereLight({ { -9.18164f , 3.32356f , 6.98306f }, 16, { 3,0.5,0.5 }, 0.1f });
 
         _bvh->addSphere({ {  2.0f, 0, 1.3f }, 0.2f }, pbrMatMetal);
         _bvh->addSphere({ {  0.5f, 0, 1.3f }, 0.2f }, BVHBuilder::createTransparentMaterial({ 1,0.6f,0.6f }, 1.05f, 0.05f));
         _bvh->addSphere({ { -1.5f, 0, 1.3f }, 0.2f }, BVHBuilder::createPbrMaterial({ 1,0.6f,0.6f }, 0));
 
-        const float dim = 0.3f;
-        _bvh->addBox(Box{ { -dim, -dim*0.1, 0 }, { dim, dim * 0.1, dim*2 } }, redGlassMat);
-        _bvh->addBox(Box{ { -dim*20, -dim * 0.1 + dim, 0 }, { dim * 20, dim * 0.1 + dim, dim * 2 } }, redMat);
-        _bvh->addBox(Box{ { -dim*20, -dim * 0.1 - dim, 0 }, { dim * 20, dim * 0.1 - dim, dim * 2 } }, blueMat);
+        //const float dim = 0.4f;
+        //_bvh->addBox(Box{ { -dim, -dim*0.1, 0 }, { dim, dim * 0.1, dim*2 } }, redGlassMat);
+        //
+        //for (u32 i = 0; i < 10; ++i)
+        //{
+        //    _bvh->addBox(Box{ { -6.f + i*dim*3, -dim * 0.1 + dim, 0 }, { -6.f + i * dim * 3 + dim * 2.f, dim * 0.1 + dim, dim * 2 } }, redMat);
+        //    _bvh->addBox(Box{ {-6.f + i * dim * 3, -dim * 0.1 - dim, 0 }, { -6.f + i * dim * 3 + dim * 2.f, dim * 0.1 - dim, dim * 2 } }, blueMat);
+        //}
 
     #ifdef _DEBUG
         _bvh->addBox(Box{ { -dim * 40, -dim * 40, -dim }, { dim * 40, dim * 40, 0 } }, suzanneMat);
