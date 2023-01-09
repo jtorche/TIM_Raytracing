@@ -31,7 +31,7 @@ vec3 rayTrace(in PassData _passData, in Ray _ray, out ClosestHit _hitResult)
 	#if DEBUG_BVH_TRAVERSAL
 
 	const uint numColors = 5;
-	const uint step = 150;
+	const uint step = 75;
 	const uint maxTraversal = step * numColors;
 	vec3 dbgColor[6] =
 	{
@@ -57,7 +57,10 @@ vec3 rayTrace(in PassData _passData, in Ray _ray, out ClosestHit _hitResult)
 	vec3 lit = vec3(0,0,0);
 	if(closestHit.t < TMAX)
 	{
-#if !DEBUG_GEOMETRY
+#if !DEBUG_GEOMETRY && !DEBUG_BVH
+	#if NO_LIGHTING
+		lit = getHitColor(closestHit);
+	#else
 	#if NO_BVH
 		for(uint i=0 ; i<g_Constants.numLights ; ++i)
 			lit += evalLighting(rootId, i, getMaterialId(closestHit), _ray, closestHit);
@@ -66,9 +69,10 @@ vec3 rayTrace(in PassData _passData, in Ray _ray, out ClosestHit _hitResult)
 	#endif
 
 		   lit += computeSunLighting(rootId, _passData.sunDir.xyz, _passData.sunColor.xyz, getMaterialId(closestHit), _ray, closestHit);
+	#endif
 
 #else
-		   vec3 dbgColor[8] = 
+		   vec3 dbgColor[14] = 
 		   {
 			   vec3(1,0,0),
 			   vec3(0,1,0),
@@ -76,11 +80,22 @@ vec3 rayTrace(in PassData _passData, in Ray _ray, out ClosestHit _hitResult)
 			   vec3(1,1,0),
 			   vec3(1,0,1),
 			   vec3(0,1,1),
+
+			   vec3(1,0.5,0),
+			   vec3(1,0,0.5),
+			   vec3(0,1,0.5),
+			   vec3(0.5,1,0),
+			   vec3(0.5,0,1),
+			   vec3(0,0.5,1),
+
 			   vec3(0.3,0.3,0.3),
 			   vec3(0.7,0.7,0.7)
 		   };
-
-		   lit = dbgColor[closestHit.dbgColorId % 8];
+		   #if DEBUG_GEOMETRY
+		   lit = dbgColor[closestHit.dbgColorId % 14];
+		   #else
+		   lit = dbgColor[closestHit.nid % 14];
+		   #endif
 #endif
 	}
 
