@@ -147,7 +147,8 @@ int main(int argc, char* argv[])
     IRenderContext* context = g_renderer->CreateRenderContext(RenderContextType::Graphics);
     
     {
-        TextureManager textureManager(g_renderer);
+        const u32 downScaleFactor = 8;
+        TextureManager textureManager(g_renderer, downScaleFactor);
         textureManager.loadTexture("./data/image/ibl_brdf_lut.png");
         RayTracingPass rtPass(g_renderer, context, resourceAllocator, textureManager);
         PostprocessPass postprocessPass(g_renderer, context);

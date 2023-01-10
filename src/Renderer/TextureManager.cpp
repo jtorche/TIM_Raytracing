@@ -4,7 +4,7 @@
 
 namespace tim
 {
-    TextureManager::TextureManager(IRenderer* _renderer) : m_renderer{ _renderer }
+    TextureManager::TextureManager(IRenderer* _renderer, u32 _downscaleFactor) : m_renderer{ _renderer }, m_downscaleFactor{ _downscaleFactor }
     {
         ImageCreateInfo creationInfo(ImageFormat::RGBA8, 8, 8, 1, 1, ImageType::Image2D, MemoryType::Default, ImageUsage::Sampled | ImageUsage::Transfer);
         m_defaultTexture = m_renderer->CreateImage(creationInfo);
@@ -39,6 +39,15 @@ namespace tim
 
         u32 w = FreeImage_GetWidth(img);
         u32 h = FreeImage_GetHeight(img);
+
+        if (m_downscaleFactor > 1 && w % m_downscaleFactor == 0 && h % m_downscaleFactor == 0)
+        {
+            w = w / m_downscaleFactor;
+            h = h / m_downscaleFactor;
+            FIBITMAP* prev_img = img;
+            img = FreeImage_Rescale(prev_img, w, h, FILTER_BILINEAR);
+        }
+
         u32 bpp = FreeImage_GetBPP(img);
 
         if (bpp < 32)

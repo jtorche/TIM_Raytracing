@@ -10,7 +10,7 @@ namespace tim
     class TextureManager
     {
     public: 
-        TextureManager(IRenderer * _renderer);
+        TextureManager(IRenderer * _renderer, u32 _downscaleFactor);
         ~TextureManager();
 
         u16 loadTexture(const std::string& _path);
@@ -19,6 +19,7 @@ namespace tim
 
     private:
         IRenderer * m_renderer;
+        const u32 m_downscaleFactor;
         ImageHandle m_images[TEXTURE_ARRAY_SIZE];
         SamplerType m_samplingMode[TEXTURE_ARRAY_SIZE];
         ImageHandle m_defaultTexture;
