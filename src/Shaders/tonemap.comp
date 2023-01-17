@@ -1,0 +1,26 @@
+#version 450
+#extension GL_EXT_scalar_block_layout : enable
+
+#include "system.glsl"
+#include "struct_cpp.glsl"
+#include "tonemapFunctions.glsl"
+
+layout(set = 0, binding = 0, rgba16f) uniform image2D g_input;
+layout(set = 0, binding = 1, rgba8) uniform writeonly image2D g_output;
+
+layout(push_constant) uniform pushConstantBlock
+{
+    ivec4 g_frameSize;
+};
+
+layout (local_size_x = LOCAL_SIZE, local_size_y = LOCAL_SIZE) in;
+void main()
+{
+    ivec2 pixelCoord = ivec2(gl_GlobalInvocationID.x, gl_NumWorkGroups.y * LOCAL_SIZE - gl_GlobalInvocationID.y);
+    if (pixelCoord.x < g_frameSize.x && pixelCoord.y < g_frameSize.y)
+    {
+        vec4 col = imageLoad(g_input, pixelCoord);
+		col.xyz = whitePreservingLumaBasedReinhardToneMapping(col.xyz);
+        imageStore(g_output, pixelCoord, col);
+    }
+}

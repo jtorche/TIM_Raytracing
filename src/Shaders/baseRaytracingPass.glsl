@@ -27,9 +27,13 @@ vec3 rayTrace(in PassData _passData, in Ray _ray, out ClosestHit _hitResult)
 #if NO_BVH
 	brutForceTraverse(_ray, closestHit);
 #else
+	#if USE_TRAVERSE_TLAS
+	uint numTraversal = traverseTlas(_ray, rootId, closestHit);
+	#else
 	uint numTraversal = traverseBvh(_ray, rootId, closestHit);
-	#if DEBUG_BVH_TRAVERSAL
+	#endif
 
+	#if DEBUG_BVH_TRAVERSAL
 	const uint numColors = 5;
 	const uint step = 75;
 	const uint maxTraversal = step * numColors;

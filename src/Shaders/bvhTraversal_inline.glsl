@@ -46,7 +46,7 @@ uint traverseBvh(Ray r, uint rootId, inout ClosestHit closestHit)
 		if(bvh_isLeaf(nodeId)) 
 		{
 	#ifdef TLAS_COLLIDE
-			tlas_collide(nodeId, r, closestHit);
+			numTraversal += tlas_collide(nodeId, r, closestHit);
 	#else
 			bvh_collide(nodeId, r, closestHit);
 	#endif

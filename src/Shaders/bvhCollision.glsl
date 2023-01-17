@@ -178,8 +178,10 @@ uvec4 unpackObjectCount(uint _packed)
 	return v;
 }
 
-void tlas_collide(uint _nid, Ray _ray, inout ClosestHit closestHit)
+uint tlas_collide(uint _nid, Ray _ray, inout ClosestHit closestHit)
 {
+	uint numTraversal = 0;
+
 	_nid = _nid & NID_MASK;
 	uint leafDataOffset = g_BvhNodeData[_nid].nid.w;
 	uvec4 unpackedLeafDat = unpackObjectCount(g_BvhLeafData[leafDataOffset]);
@@ -208,14 +210,16 @@ void tlas_collide(uint _nid, Ray _ray, inout ClosestHit closestHit)
 	for (uint i = 0; i < numBlas; ++i)
 	{
 		uint blasIndex = g_BvhLeafData[1 + leafDataOffset + numTriangles + i];
-
+	
 		Hit hit;
 		Box box = { g_blasHeader[blasIndex].minExtent, g_blasHeader[blasIndex].maxExtent };
 		if (HitBox(_ray, box, 0, closestHit.t, hit))
 		{
-
+			numTraversal += traverseBvh(_ray, g_blasHeader[blasIndex].rootIndex, closestHit);
 		}
 	}
+
+	return numTraversal;
 }
 
 void bvh_collide(uint _nid, Ray _ray, inout ClosestHit closestHit)
@@ -227,6 +231,7 @@ void bvh_collide(uint _nid, Ray _ray, inout ClosestHit closestHit)
 	uint numBlas = unpackedLeafDat.y;
 	uint numObjects = unpackedLeafDat.z;
 
+	#if !USE_TRAVERSE_TLAS
 	for(uint i=0 ; i<numObjects ; ++i)
 	{
 		uint objIndex = g_BvhLeafData[1 + leafDataOffset + numTriangles + numBlas + i];
@@ -244,6 +249,7 @@ void bvh_collide(uint _nid, Ray _ray, inout ClosestHit closestHit)
 			storeHitColor(closestHit, vec3(1,1,1));
 		}
 	}
+	#endif
 
 	for(uint i=0 ; i<numTriangles ; ++i)
 	{
@@ -278,6 +284,7 @@ void bvh_collide(uint _nid, Ray _ray, inout ClosestHit closestHit)
 		}
 	}
 
+	#if !USE_TRAVERSE_TLAS
 	for (uint i = 0; i < numBlas; ++i)
 	{
 		uint blasIndex = g_BvhLeafData[1 + leafDataOffset + numTriangles + i];
@@ -297,6 +304,7 @@ void bvh_collide(uint _nid, Ray _ray, inout ClosestHit closestHit)
 			storeHitColor(closestHit, vec3(1, 1, 1));
 		}
 	}
+	#endif
 }
 
 bool bvh_collide_fast(uint _nid, Ray _ray, float tmax)
@@ -308,12 +316,14 @@ bool bvh_collide_fast(uint _nid, Ray _ray, float tmax)
 	uint numBlas = unpackedLeafDat.y;
 	uint numObjects = unpackedLeafDat.z;
 
+	#if !USE_TRAVERSE_TLAS
 	for(uint i=0 ; i<numObjects ; ++i)
 	{
 		uint objIndex = g_BvhLeafData[1 + leafDataOffset + numTriangles + numBlas + i];
 		if(hitPrimitiveFast(objIndex, _ray, tmax))
 			return true;
 	}
+	#endif
 
 	for(uint i=0 ; i<numTriangles ; ++i)
 	{
@@ -325,6 +335,7 @@ bool bvh_collide_fast(uint _nid, Ray _ray, float tmax)
 			return true;
 	}
 
+	#if !USE_TRAVERSE_TLAS
 	for (uint i = 0; i < numBlas; ++i)
 	{
 		uint blasIndex = g_BvhLeafData[1 + leafDataOffset + numTriangles + i];
@@ -337,6 +348,7 @@ bool bvh_collide_fast(uint _nid, Ray _ray, float tmax)
 				return true;
 		}
 	}
+	#endif
 
 	return false;
 }

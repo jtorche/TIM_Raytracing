@@ -14,6 +14,7 @@ namespace tim
 
         void linearToSrgb(ImageHandle _inColorBuffer, ImageHandle _outBackbuffer);
         void copyImage(ImageHandle _src, ImageHandle _dst, uvec2 _dstSize);
+        void tonemapPass(ImageHandle _src, ImageHandle _dst);
 
     private:
 

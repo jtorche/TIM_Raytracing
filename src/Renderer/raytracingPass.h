@@ -13,7 +13,7 @@ namespace tim
     struct SunData
     {
         vec3 sunDir = vec3(0.3f, 0.3f, -1);
-        vec3 sunColor = vec3(1,1,1);
+        vec3 sunColor = vec3(3,3,3);
     };
 
     class RayTracingPass
@@ -26,6 +26,8 @@ namespace tim
         void setBounceRecursionDepth(u32 _depth);
         void setFrameBufferSize(uvec2 _res);
         void draw(ImageHandle _outputBuffer, const SimpleCamera& _camera);
+
+        void setSunData(const SunData& _data);
 
     private:
         void drawBounce(u32 _depth, BufferView _passData, BufferHandle _inputRayBuffer, ImageHandle _outputImage);

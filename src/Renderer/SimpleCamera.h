@@ -27,6 +27,7 @@ namespace tim
         const mat4& getViewMat() const { return m_viewMat; }
         const vec3& getPos() const { return pos; }
         const vec3& getDir() const { return dir; }
+        const vec3& getUp() const { return up; }
 
     private:
         bool m_left = false, m_right = false, m_forward = false, m_backward = false;

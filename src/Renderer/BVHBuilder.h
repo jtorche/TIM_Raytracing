@@ -88,6 +88,9 @@ namespace tim
         // return offset to root node + offset to first primitive list of leafs, offset 0 is for primitive data
         void fillGpuBuffer(void* _data, uvec2& _triangleOffsetRange, uvec2& _primitiveOffsetRange, uvec2& _materialOffsetRange, uvec2& _lightOffsetRange, uvec2& _nodeOffsetRange, uvec2& m_leafDataOffsetRange, uvec2& _blasOffsetRange);
 
+        // Helpers
+        void fillTriangles(byte* _outData) const;
+
     private:
         void addTriangle(const BVHGeometry::TriangleData& _triangle, u32 _materialId);
 

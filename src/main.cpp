@@ -18,6 +18,8 @@ uvec2 frameResolution = { 400, 300 };
 uvec2 backbufferResolution = { 800, 600 };
 bool g_rebuildBvh = false;
 bool g_windowMinimized = false;
+bool g_editSun = false;
+SunData g_sunData;
 
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
@@ -29,6 +31,24 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
 
     if (key == GLFW_KEY_F10 && action == GLFW_PRESS)
         g_renderer->InvalidateShaders();
+
+    if (key == GLFW_KEY_L && action == GLFW_PRESS)
+    { 
+        float sunValue = 1;
+        std::cout << "Sun intensity : "; std::cin >> sunValue;
+        g_sunData.sunColor = { sunValue, sunValue, sunValue };
+    }
+    else
+    {
+        if (key == GLFW_KEY_1)
+            frameResolution = { 160, 90 };
+        else if (key == GLFW_KEY_2)
+            frameResolution = { 320, 180 };
+        else if (key == GLFW_KEY_3)
+            frameResolution = { 640, 360 };
+        else if (key == GLFW_KEY_4)
+            frameResolution = backbufferResolution;
+    }
 
     if (key == GLFW_KEY_W)
         forward = action == GLFW_PRESS || action == GLFW_REPEAT;
@@ -53,15 +73,6 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
     if (key == GLFW_KEY_P)
         system("pause");
 
-    if (key == GLFW_KEY_1)
-        frameResolution = { 160, 90 };
-    else if (key == GLFW_KEY_2)
-        frameResolution = { 320, 180 };
-    else if (key == GLFW_KEY_3)
-        frameResolution = { 640, 360 };
-    else if (key == GLFW_KEY_4)
-        frameResolution = backbufferResolution;
-
 }
 
 void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
@@ -73,6 +84,11 @@ void mouse_button_callback(GLFWwindow* window, int button, int action, int mods)
     else
         leftButton = false;
 
+    if (button == GLFW_MOUSE_BUTTON_RIGHT && (action == GLFW_PRESS || action == GLFW_REPEAT))
+        g_editSun = true;
+    else
+        g_editSun = false;
+
     camera.setMouseButton(leftButton);
 }
 
@@ -81,7 +97,24 @@ void cursor_position_callback(GLFWwindow* window, double xpos, double ypos)
     static double prevX = 0;
     static double prevY = 0;
 
-    camera.setMouseDelta(float(prevX - xpos), float(prevY - ypos));
+    float ddx = float(prevX - xpos);
+    float ddy = float(prevY - ypos);
+
+    if (g_editSun)
+    {
+        vec3 horizontalAxis = linalg::cross(camera.getDir(), camera.getUp());
+        vec3 forwardAxis = camera.getDir(); forwardAxis.z = 0.f;
+        forwardAxis = linalg::normalize(forwardAxis);
+
+        vec4 xRot = linalg::rotation_quat<float>(forwardAxis, ddx * 0.01f);
+        vec4 yRot = linalg::rotation_quat<float>(horizontalAxis, ddy * 0.01f);
+
+        g_sunData.sunDir = linalg::qrot(xRot, g_sunData.sunDir);
+        g_sunData.sunDir = linalg::qrot(yRot, g_sunData.sunDir);
+        g_sunData.sunDir = linalg::normalize(g_sunData.sunDir);
+    }
+    else
+        camera.setMouseDelta(ddx, ddy);
 
     prevX = xpos;
     prevY = ypos;
@@ -195,6 +228,7 @@ int main(int argc, char* argv[])
 
                 postprocessPass.setFrameBufferSize(frameResolution);
                 rtPass.setFrameBufferSize(frameResolution);
+                rtPass.setSunData(g_sunData);
 
                 ImageCreateInfo imgInfo(ImageFormat::RGBA16F, frameResolution.x, frameResolution.y, 1, 1, ImageType::Image2D, MemoryType::Default);
                 ImageHandle outputColorBuffer = resourceAllocator.allocTexture(imgInfo);
@@ -203,7 +237,7 @@ int main(int argc, char* argv[])
                 ImageCreateInfo imgInfo2(ImageFormat::RGBA8, frameResolution.x, frameResolution.y, 1, 1, ImageType::Image2D, MemoryType::Default, ImageUsage::Sampled | ImageUsage::Storage);
                 ImageHandle finalOutput = resourceAllocator.allocTexture(imgInfo2);
 
-                postprocessPass.linearToSrgb(outputColorBuffer, finalOutput);
+                postprocessPass.tonemapPass(outputColorBuffer, finalOutput);
                 resourceAllocator.releaseTexture(outputColorBuffer);
 
                 postprocessPass.copyImage(finalOutput, backbuffer, backbufferResolution);

@@ -70,6 +70,11 @@ namespace tim
         m_rayBounceRecursionDepth = _depth;
     }
 
+    void RayTracingPass::setSunData(const SunData& _data)
+    {
+        m_sunData = _data;
+    }
+
     u32 RayTracingPass::getRayStorageBufferSize() const
     {
         return m_frameSize.x * m_frameSize.y * sizeof(IndirectLightRay);

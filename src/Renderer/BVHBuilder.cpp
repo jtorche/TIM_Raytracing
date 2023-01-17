@@ -707,7 +707,7 @@ namespace tim
                 return _movingAxis(step);
             };
 
-            const vec3 delta = vec3(float(1e-6), float(1e-6), float(1e-6));
+            const vec3 delta = vec3(float(1e-3), float(1e-3), float(1e-3));
             std::for_each(_blasBegin, _blasEnd, [&](u32 _id)
             {
                 const u32 blasId = m_blasInstances[_id].blasId;
@@ -736,7 +736,12 @@ namespace tim
     u32 BVHBuilder::getBvhGpuSize() const
     {
         u32 size = alignUp<u32>((u32)(m_triangleMaterials.size() + m_objects.size()) * sizeof(Material), m_bufferAlignment);
-        size += alignUp<u32>((u32)m_triangles.size() * sizeof(Triangle), m_bufferAlignment);
+
+        u32 numberOfTriangles = (u32)m_triangles.size();
+        for (u32 i = 0; i < m_blas.size(); ++i)
+            numberOfTriangles += m_blas[i]->getTrianglesCount();
+
+        size += alignUp<u32>(numberOfTriangles * sizeof(Triangle), m_bufferAlignment);
         size += alignUp<u32>((u32)m_objects.size() * sizeof(PackedPrimitive), m_bufferAlignment);
         size += alignUp<u32>((u32)m_lights.size() * sizeof(PackedLight), m_bufferAlignment);
         size += alignUp<u32>((u32)m_blasInstances.size() * sizeof(BlasHeader), m_bufferAlignment);
@@ -869,17 +874,27 @@ namespace tim
         prevout = out;
 
         // Store triangle data
-        u32 triangleBufferSize = u32(m_triangles.size() * sizeof(Triangle));
+        u32 totalTriangleCount = u32(m_triangles.size());
+        std::vector<u32> blasTriangleOffset(m_blas.size());
+        for (u32 i = 0; i < m_blas.size(); ++i)
+        {
+            blasTriangleOffset[i] = totalTriangleCount;
+            totalTriangleCount += m_blas[i]->getTrianglesCount();
+        }
+
+        u32 triangleBufferSize = u32(totalTriangleCount * sizeof(Triangle));
         _triangleOffsetRange = { (u32)std::distance((ubyte*)_data, out), triangleBufferSize };
         _triangleOffsetRange.y = std::max(m_bufferAlignment, _triangleOffsetRange.y);
         
-        for (u32 i = 0; i < m_triangles.size(); ++i)
+        fillTriangles(out);
+        out += sizeof(Triangle) * getTrianglesCount();
+
+        for (u32 i = 0; i < m_blas.size(); ++i)
         {
-            Triangle * tri = reinterpret_cast<Triangle*>(out);
-            *tri = m_triangles[i];
-        
-            out += sizeof(Triangle);
+            m_blas[i]->fillTriangles(out);
+            out += sizeof(Triangle) * m_blas[i]->getTrianglesCount();
         }
+        
         out = prevout + alignUp(triangleBufferSize, m_bufferAlignment);
         prevout = out;
 
@@ -966,6 +981,7 @@ namespace tim
             nodes.push_back(n.get());
 
         std::vector<u32> blasRootIndex(m_blas.size());
+
         // merge blas nodes
         for (u32 i = 0; i < m_blas.size(); ++i)
         {
@@ -973,6 +989,11 @@ namespace tim
             for (auto& n : m_blas[i]->m_nodes)
             {
                 n->nid += blasRootIndex[i];
+                TIM_ASSERT(n->lightList.empty() && n->blasList.empty() && n->primitiveList.empty());
+
+                for (u32& triangleIndex : n->triangleList)
+                    triangleIndex += blasTriangleOffset[i];
+
                 nodes.push_back(n.get());
             }
         }
@@ -1029,6 +1050,17 @@ namespace tim
             header->rootIndex = blasRootIndex[blasId];
 
             blasHeaderWritePtr += sizeof(BlasHeader);
+        }
+    }
+
+    void BVHBuilder::fillTriangles(byte* _outData) const
+    {
+        for (u32 i = 0; i < m_triangles.size(); ++i)
+        {
+            Triangle* tri = reinterpret_cast<Triangle*>(_outData);
+            *tri = m_triangles[i];
+
+            _outData += sizeof(Triangle);
         }
     }
 }
