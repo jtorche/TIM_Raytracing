@@ -8,6 +8,7 @@
 #define Epsilon 0.00001
 
 bool traverseBvhFast(Ray r, uint rootId, float tmax);
+bool traverseTlasFast(Ray r, uint rootId, float tmax);
 vec3 computePbrLighting(vec3 albedo, float metalness, vec3 lightColor, vec3 v, vec3 l, vec3 n);
 
 #define g_LightCapThreshold 255.0
@@ -43,8 +44,11 @@ vec3 computeLighting(uint rootId, in Material _mat, vec3 _texColor, vec3 _lightC
 		#if !NO_RAY_INVDIR   
 		shadowRay.invdir = vec3(1,1,1) / L;
 		#endif
+	#if USE_TRAVERSE_TLAS
+		float shadow = traverseTlasFast(shadowRay, rootId, shadowRayLength) ? 0 : 1;
+	#else
 		float shadow = traverseBvhFast(shadowRay, rootId, shadowRayLength) ? 0 : 1;
-	
+	#endif
 		lit *= shadow;
 	}
 	#endif
@@ -55,10 +59,13 @@ vec3 computeLighting(uint rootId, in Material _mat, vec3 _texColor, vec3 _lightC
 vec3 evalSphereLight(uint _rootId, in SphereLight _sl, in Material _mat, in vec3 _texColor, vec3 _pos, vec3 _normal, vec3 _eye)
 {
 	float d = length(_sl.pos - _pos);
-	vec3 L = (_sl.pos - _pos) / d;
-	d = max(0.01, d - _sl.sphereRadius);
+	if(d < _sl.radius)
+	{
+		vec3 L = (_sl.pos - _pos) / d;
+		d = max(0.01, d - _sl.sphereRadius);
 
-	return computeLighting(_rootId, _mat, _texColor, _sl.color, _pos, L, _normal, _eye, computeAttenuation(d, _sl.radius), d);
+		return computeLighting(_rootId, _mat, _texColor, _sl.color, _pos, L, _normal, _eye, computeAttenuation(d, _sl.radius), d);
+	}
 }
 
 vec3 evalSunLight(uint _rootId, in vec3 _sunDir, in vec3 _sunColor, in Material _mat, in vec3 _texColor, vec3 _pos, vec3 _normal, vec3 _eye)

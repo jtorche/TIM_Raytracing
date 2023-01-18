@@ -284,6 +284,7 @@ namespace tim
         std::for_each(std::execution::seq, m_blas.begin(), m_blas.end(),
 #else
         std::for_each(std::execution::par, m_blas.begin(), m_blas.end(),
+        //std::for_each(std::execution::seq, m_blas.begin(), m_blas.end(),
 #endif
             [_maxObjPerNode](auto& blas)
             {
@@ -293,6 +294,13 @@ namespace tim
             });
 
         // std::for_each(std::execution::seq, m_blas.begin(), m_blas.end(), [](auto& blas) { blas->dumpStats(); });
+    }
+
+    static Box adjustAABB(Box _box)
+    {
+        _box.maxExtent += vec3(float(1e-4));
+        _box.minExtent -= vec3(float(1e-4));
+        return _box;
     }
 
     void BVHBuilder::build(u32 _maxDepth, u32 _maxObjPerNode, bool _useMultipleThreads)
@@ -327,7 +335,7 @@ namespace tim
             tightBox.minExtent = linalg::min_(tightBox.minExtent, m_blasInstances[i].aabb.minExtent);
             tightBox.maxExtent = linalg::max_(tightBox.maxExtent, m_blasInstances[i].aabb.maxExtent);
         }
-        m_aabb = tightBox;
+        m_aabb = adjustAABB(tightBox);
         m_nodes.back()->extent = m_aabb;
 
         std::vector<u32> objectsIds(m_objects.size());
@@ -373,7 +381,7 @@ namespace tim
             tightBox.minExtent = linalg::min_(tightBox.minExtent, m_blasInstances[i].aabb.minExtent);
             tightBox.maxExtent = linalg::max_(tightBox.maxExtent, m_blasInstances[i].aabb.maxExtent);
         }
-        m_aabb = tightBox;
+        m_aabb = adjustAABB(tightBox);
     }
 
 #define USE_AvgObjGain_HEURISTIC 1
@@ -418,8 +426,25 @@ namespace tim
         _curNode->primitiveList.clear();
         _curNode->triangleList.clear();
         _curNode->blasList.clear();
+        _curNode->lightList.clear();
 
         u32 numObjects = u32(std::distance(_objectsBegin, _objectsEnd) + std::distance(_trianglesBegin, _trianglesEnd) + std::distance(_blasBegin, _blasEnd));
+        
+        auto fillLights = [&]()
+        {
+            // Fill lights for each node
+            for (u32 i = 0; i < m_lights.size() && _curNode->lightList.size() < (1u << LightBitCount); ++i)
+            {
+                const Light& light = m_lights[i];
+                Sphere sphere = getBoundingSphere(light);
+
+                if (sphereBoxCollision(sphere, _curNode->extent) != CollisionType::Disjoint)
+                    _curNode->lightList.push_back(u32(i));
+            }
+        };
+
+        if (m_isTlas) // in tlas mode, we can step in each node to compute lighting
+            fillLights();
 
         auto fillLeaf = [&]()
         {
@@ -440,14 +465,8 @@ namespace tim
             for (auto it = _blasBegin; it != _blasEnd && _curNode->blasList.size() < (1u << BlasBitCount); ++it)
                 _curNode->blasList.push_back(*it);
 
-            for (u32 i = 0; i < m_lights.size() && _curNode->lightList.size() < (1u << LightBitCount); ++i)
-            {
-                const Light& light = m_lights[i];
-                Sphere sphere = getBoundingSphere(light);
-
-                if (sphereBoxCollision(sphere, _curNode->extent) != CollisionType::Disjoint)
-                    _curNode->lightList.push_back(u32(i));
-            }
+            if (!m_isTlas)
+                fillLights();
         };
 
         if (numObjects <= m_maxObjPerNode || _depth >= m_maxDepth)
@@ -524,8 +543,9 @@ namespace tim
             u32 numObjRight = u32(objectRight.size() + triangleRight.size() + blasRight.size());
             float avgObjGainAfterSplit = computeAvgObjGain(numObjLeft, getBoxVolume(leftBox[bestSplit]), numObjRight, getBoxVolume(rightBox[bestSplit]), u32(numObjects));
 
-            if (avgObjGainAfterSplit <= 4) // we consider that 4 objects gain is the cost of one level of BVH traversal
+            if (avgObjGainAfterSplit <= 4 && _depth != 0) // small bug when only one node
             {
+                // we consider that 4 objects gain is the cost of one level of BVH traversal
                 fillLeaf();
                 return;
             }
@@ -566,6 +586,43 @@ namespace tim
             {
                 addObjectsRec(_depth + 1, objectLeft.begin(), objectLeft.end(), triangleLeft.begin(), triangleLeft.end(), blasLeft.begin(), blasLeft.end(), &leftNode, false);
                 addObjectsRec(_depth + 1, objectRight.begin(), objectRight.end(), triangleRight.begin(), triangleRight.end(), blasRight.begin(), blasRight.end(), &rightNode, false);
+            }
+
+            if (m_isTlas)
+            {
+                auto mergeCommonItems = [](std::vector<u32>& _left, std::vector<u32>& _right)
+                {
+                    std::sort(_left.begin(), _left.end());
+                    std::sort(_right.begin(), _right.end());
+                    std::vector<u32> commonItems(std::min(_right.size(), _left.size()));
+                    auto it = std::set_intersection(_left.begin(), _left.end(), _right.begin(), _right.end(), commonItems.begin());
+
+                    commonItems.resize(std::distance(commonItems.begin(), it));
+                    std::vector<u32> newLeft; newLeft.reserve(_left.size() - commonItems.size());
+                    std::vector<u32> newRight; newRight.reserve(_right.size() - commonItems.size());
+
+                    auto itLeft = _left.begin();
+                    auto itRight = _right.begin();
+                    for (u32 i : commonItems)
+                    {
+                        while (*itLeft != i) newLeft.push_back(*(itLeft++));
+                        while (*itRight != i) newRight.push_back(*(itRight++));
+
+                        // skip common item
+                        ++itLeft;
+                        ++itRight;
+                    }
+
+                    while (itLeft != _left.end()) newLeft.push_back(*(itLeft++));
+                    while (itRight != _right.end()) newRight.push_back(*(itRight++));
+
+                    _left = std::move(newLeft);
+                    _right = std::move(newRight);
+                    return commonItems;
+                };
+                
+                _curNode->blasList = std::move(mergeCommonItems(leftNode.blasList, rightNode.blasList));
+                _curNode->primitiveList = std::move(mergeCommonItems(leftNode.primitiveList, rightNode.primitiveList));
             }
         }
     }
@@ -1007,31 +1064,34 @@ namespace tim
 
         for (const BVHBuilder::Node* n : nodes)
         {
-            PackedBVHNode* node = reinterpret_cast<PackedBVHNode*>(out);
             u32 leafDataIndex = u32(objectListCurPtr - objectListBegin);
-            packNodeData(node, *n, leafDataIndex);
 
+            // First write node data (objects, triangles and lights)
             static_assert(TriangleBitCount + PrimitiveBitCount + LightBitCount + BlasBitCount == 32);
             TIM_ASSERT(u32(n->triangleList.size()) < (1 << TriangleBitCount));
             TIM_ASSERT(u32(n->blasList.size()) < (1 << BlasBitCount));
             TIM_ASSERT(u32(n->primitiveList.size()) < (1 << PrimitiveBitCount));
             TIM_ASSERT(u32(n->lightList.size()) < (1 << LightBitCount));
 
-            u32 packedCount = u32(n->triangleList.size()) + 
-                              (u32(n->blasList.size()) << TriangleBitCount) + 
-                              (u32(n->primitiveList.size()) << (TriangleBitCount + BlasBitCount)) + 
-                              (u32(n->lightList.size()) << (TriangleBitCount + BlasBitCount + PrimitiveBitCount));
+            u32 packedCount = u32(n->triangleList.size()) +
+                (u32(n->blasList.size()) << TriangleBitCount) +
+                (u32(n->primitiveList.size()) << (TriangleBitCount + BlasBitCount)) +
+                (u32(n->lightList.size()) << (TriangleBitCount + BlasBitCount + PrimitiveBitCount));
 
             *objectListCurPtr = packedCount;
             ++objectListCurPtr;
             memcpy(objectListCurPtr, n->triangleList.data(), sizeof(u32) * n->triangleList.size());
             objectListCurPtr += n->triangleList.size();
-            memcpy(objectListCurPtr, n->blasList.data(), sizeof(u32)* n->blasList.size());
+            memcpy(objectListCurPtr, n->blasList.data(), sizeof(u32) * n->blasList.size());
             objectListCurPtr += n->blasList.size();
             memcpy(objectListCurPtr, n->primitiveList.data(), sizeof(u32) * n->primitiveList.size());
             objectListCurPtr += n->primitiveList.size();
             memcpy(objectListCurPtr, n->lightList.data(), sizeof(u32) * n->lightList.size());
             objectListCurPtr += n->lightList.size();
+
+            // Then write the BVH node itself
+            PackedBVHNode* node = reinterpret_cast<PackedBVHNode*>(out);
+            packNodeData(node, *n, packedCount != 0 ? leafDataIndex : 0xFFFFffff);
             out += sizeof(PackedBVHNode);
         }
 

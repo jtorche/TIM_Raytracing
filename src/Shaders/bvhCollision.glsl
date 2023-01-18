@@ -180,15 +180,17 @@ uvec4 unpackObjectCount(uint _packed)
 
 uint tlas_collide(uint _nid, Ray _ray, inout ClosestHit closestHit)
 {
-	uint numTraversal = 0;
-
 	_nid = _nid & NID_MASK;
 	uint leafDataOffset = g_BvhNodeData[_nid].nid.w;
+	if(leafDataOffset == 0xFFFFffff)
+		return 0; // early out if empty node
+
 	uvec4 unpackedLeafDat = unpackObjectCount(g_BvhLeafData[leafDataOffset]);
 	uint numTriangles = unpackedLeafDat.x;
 	uint numBlas = unpackedLeafDat.y;
 	uint numObjects = unpackedLeafDat.z;
 
+	uint numTraversal = 0;
 	for (uint i = 0; i < numObjects; ++i)
 	{
 		uint objIndex = g_BvhLeafData[1 + leafDataOffset + numTriangles + numBlas + i];
@@ -215,7 +217,14 @@ uint tlas_collide(uint _nid, Ray _ray, inout ClosestHit closestHit)
 		Box box = { g_blasHeader[blasIndex].minExtent, g_blasHeader[blasIndex].maxExtent };
 		if (HitBox(_ray, box, 0, closestHit.t, hit))
 		{
+			uint prevNid = closestHit.nid;
 			numTraversal += traverseBvh(_ray, g_blasHeader[blasIndex].rootIndex, closestHit);
+
+			if(prevNid != closestHit.nid) // has hit
+			{
+				closestHit.nid = _nid;
+				closestHit.mid_objId = 0x0000FFFF;
+			}
 		}
 	}
 
@@ -355,39 +364,33 @@ bool bvh_collide_fast(uint _nid, Ray _ray, float tmax)
 
 bool tlas_collide_fast(uint _nid, Ray _ray, float tmax)
 {
+	uint numTraversal = 0;
+
 	_nid = _nid & NID_MASK;
 	uint leafDataOffset = g_BvhNodeData[_nid].nid.w;
+	if(leafDataOffset == 0xFFFFffff)
+		return false; // early out if empty node
+
 	uvec4 unpackedLeafDat = unpackObjectCount(g_BvhLeafData[leafDataOffset]);
 	uint numTriangles = unpackedLeafDat.x;
 	uint numBlas = unpackedLeafDat.y;
 	uint numObjects = unpackedLeafDat.z;
 
-	for (uint i = 0; i < numObjects; ++i)
+	for(uint i=0 ; i<numObjects ; ++i)
 	{
 		uint objIndex = g_BvhLeafData[1 + leafDataOffset + numTriangles + numBlas + i];
-		if (hitPrimitiveFast(objIndex, _ray, tmax))
-			return true;
-	}
-
-	for (uint i = 0; i < numTriangles; ++i)
-	{
-		uint triIndex = g_BvhLeafData[1 + leafDataOffset + i];
-		vec3 p0, p1, p2;
-		loadTriangleVertices(p0, p1, p2, g_BvhTriangleData[triIndex]);
-
-		if (CollideTriangle(_ray, p0, p1, p2, tmax) > 0)
+		if(hitPrimitiveFast(objIndex, _ray, tmax))
 			return true;
 	}
 
 	for (uint i = 0; i < numBlas; ++i)
 	{
 		uint blasIndex = g_BvhLeafData[1 + leafDataOffset + numTriangles + i];
-
-		Box box = { g_blasHeader[blasIndex].minExtent, g_blasHeader[blasIndex].maxExtent };
-
-		if (!isPointInBox(box, _ray.from))
+	
+		Box box = { g_blasHeader[blasIndex].minExtent, g_blasHeader[blasIndex].maxExtent };	
+		if (CollideBox(_ray, box, 0, tmax, true) >= 0)
 		{
-			if (CollideBox(_ray, box, 0, tmax, true) >= 0)
+			if(traverseBvhFast(_ray, g_blasHeader[blasIndex].rootIndex, tmax))
 				return true;
 		}
 	}

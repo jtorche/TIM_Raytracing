@@ -60,7 +60,7 @@ namespace tim
         static Material createTransparentMaterial(vec3 _color, float _refractionIndice, float _reflectivity);
         static void setTextureMaterial(Material& _mat, u32 _texture0, u32 _texture1);
 
-        BVHBuilder(const BVHGeometry& _geometry) : m_geometryBuffer{ _geometry } {}
+        BVHBuilder(const std::string& _name, const BVHGeometry& _geometry, bool _isTlas) : m_name{ _name }, m_isTlas { _isTlas }, m_geometryBuffer{ _geometry } {}
 
         void dumpStats() const;
 
@@ -114,8 +114,10 @@ namespace tim
         CollisionType primitiveSphereCollision(const Primitive& _prim, const Sphere& _sphere) const;
 
     private:
+        std::string m_name;
         const u32 m_bufferAlignment = 32;
         u32 m_maxDepth = 0, m_maxObjPerNode = 0;
+        bool m_isTlas;
         std::mutex m_mutex;
 
         // stats for leaf node

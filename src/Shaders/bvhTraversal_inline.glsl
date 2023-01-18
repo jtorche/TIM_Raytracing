@@ -17,6 +17,11 @@ uint traverseBvh(Ray r, uint rootId, inout ClosestHit closestHit)
 		while(!bvh_isLeaf(nodeId))
 		{
 			numTraversal++;
+
+		#ifdef TLAS_COLLIDE
+			numTraversal += tlas_collide(nodeId, r, closestHit);
+		#endif
+
 			uint child0Id, child1Id;
 			bvh_getChildId(nodeId, child0Id, child1Id);
 

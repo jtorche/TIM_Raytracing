@@ -14,7 +14,7 @@ namespace tim
         : m_frameSize{ 800,600 }, m_renderer{ _renderer }, m_context{ _context }, m_resourceAllocator{ _allocator }, m_textureManager{ _texManager }
     {
         m_rayBounceRecursionDepth = 2;
-        rebuildBvh(2, 12, false);
+        rebuildBvh(1, 8, false);
 
         system("pause");
     }
@@ -24,7 +24,7 @@ namespace tim
         m_renderer->DestroyBuffer(m_bvhBuffer);
     }
 
-    void RayTracingPass::rebuildBvh(u32 _maxBlasPerNode, u32 _maxTriPerNode, bool _useBlas)
+    void RayTracingPass::rebuildBvh(u32 _maxBlasPerNode, u32 _maxTriPerNode, bool _useTlasBlas)
     {
         if (m_bvhBuffer.ptr != 0)
         {
@@ -33,10 +33,10 @@ namespace tim
         }
 
         m_geometryBuffer = std::make_unique<BVHGeometry>(m_renderer, 1024 * 1024);
-        m_bvh = std::make_unique<BVHBuilder>(*m_geometryBuffer);
+        m_bvh = std::make_unique<BVHBuilder>("Scene", * m_geometryBuffer, _useTlasBlas);
 
         Scene scene(*m_geometryBuffer.get(), m_textureManager);
-        scene.build(m_bvh.get(), _useBlas);
+        scene.build(m_bvh.get(), _useTlasBlas);
 
         m_geometryBuffer->flush(m_renderer);
 
@@ -45,7 +45,7 @@ namespace tim
             m_bvh->buildBlas(_maxTriPerNode);
 
             const u32 MaxDepth = 20;
-            m_bvh->build(MaxDepth, _useBlas ? _maxBlasPerNode : _maxTriPerNode, !_useBlas);
+            m_bvh->build(MaxDepth, _useTlasBlas ? _maxBlasPerNode : _maxTriPerNode, !_useTlasBlas);
             m_bvh->dumpStats();
             auto end = std::chrono::system_clock::now();
             std::chrono::duration<double> elapsed_seconds = end - start;

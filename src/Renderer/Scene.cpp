@@ -219,7 +219,7 @@ namespace tim
                 if (data.vertexData.size() < (1u << 16))
                 {
                     Material blasMaterial = _mat ? *_mat : (data.materialId >= 0 ? materials[data.materialId] : BVHBuilder::createLambertianMaterial({ 0.9f, 0.9f, 0.9f }));
-                    _blas.emplace_back() = std::make_unique<BVHBuilder>(m_geometryBuffer);
+                    _blas.emplace_back() = std::make_unique<BVHBuilder>(shapes[objId].name, m_geometryBuffer, false);
                    
                     u32 vertexOffset = m_geometryBuffer.addTriangleList((u32)data.vertexData.size(), &data.vertexData[0], &data.normalData[0], &data.texcoordData[0]);
                     TIM_ASSERT(data.indexData.size() % 3 == 0);
@@ -237,7 +237,7 @@ namespace tim
         }
     }
 
-    void Scene::build(BVHBuilder* _bvh, bool _useBlas)
+    void Scene::build(BVHBuilder* _bvh, bool _useTlasBlas)
     {
 #if 1
         const float DIMXY = 3.1f;
@@ -279,7 +279,7 @@ namespace tim
         u32 texFlame = m_texManager.loadTexture("./data/image/flame.png");
         u32 texDot = m_texManager.loadTexture("./data/image/tex.png");
 
-        if (!_useBlas)
+        if (!_useTlasBlas)
         {
             BVHBuilder::setTextureMaterial(suzanneMat, texFlame, 0);
             addOBJ("./data/suzanne.obj", { -2.5f, 0, 1.3f }, vec3(1), _bvh, suzanneMat);
