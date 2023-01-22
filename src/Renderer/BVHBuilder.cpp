@@ -298,8 +298,8 @@ namespace tim
 
     static Box adjustAABB(Box _box)
     {
-        _box.maxExtent += vec3(float(1e-4));
-        _box.minExtent -= vec3(float(1e-4));
+        _box.maxExtent += vec3(float(1e-5));
+        _box.minExtent -= vec3(float(1e-5));
         return _box;
     }
 
@@ -569,6 +569,7 @@ namespace tim
             leftNode.sibling = &rightNode;
             rightNode.sibling = &leftNode;
 
+#ifndef _DEBUG
             if (_depth < 3 && _useMultipleThreads)
             {
                 std::thread th1([&]()
@@ -583,6 +584,7 @@ namespace tim
                 th2.join();
             }
             else
+#endif
             {
                 addObjectsRec(_depth + 1, objectLeft.begin(), objectLeft.end(), triangleLeft.begin(), triangleLeft.end(), blasLeft.begin(), blasLeft.end(), &leftNode, false);
                 addObjectsRec(_depth + 1, objectRight.begin(), objectRight.end(), triangleRight.begin(), triangleRight.end(), blasRight.begin(), blasRight.end(), &rightNode, false);
@@ -764,7 +766,7 @@ namespace tim
                 return _movingAxis(step);
             };
 
-            const vec3 delta = vec3(float(1e-3), float(1e-3), float(1e-3));
+            const vec3 delta = vec3(float(1e-5), float(1e-5), float(1e-5));
             std::for_each(_blasBegin, _blasEnd, [&](u32 _id)
             {
                 const u32 blasId = m_blasInstances[_id].blasId;
