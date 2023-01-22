@@ -159,6 +159,22 @@ namespace tim
         }
     }
 
+    Box mergeBox(const Box& _b1, const Box& _b2)
+    {
+        Box box;
+        box.minExtent = linalg::min_(_b1.minExtent, _b2.minExtent);
+        box.maxExtent = linalg::max_(_b1.maxExtent, _b2.maxExtent);
+        return box;
+    }
+
+    Box intersectionBox(const Box& _b1, const Box& _b2)
+    {
+        Box box;
+        box.minExtent = linalg::max_(_b1.minExtent, _b2.minExtent);
+        box.maxExtent = linalg::min_(_b1.maxExtent, _b2.maxExtent);
+        return box;
+    }
+
     Material BVHBuilder::createLambertianMaterial(vec3 _color)
     {
         Material mat;
@@ -278,19 +294,23 @@ namespace tim
         std::cout << " - max blas: " << m_stats.maxBlas << "\n";
     }
 
-    void BVHBuilder::buildBlas(u32 _maxObjPerNode)
+    void BVHBuilder::setParameters(const BVHBuildParameters& _params)
+    {
+        m_params = _params;
+    }
+
+    void BVHBuilder::buildBlas(const BVHBuildParameters& _params)
     {
 #ifdef _DEBUG
         std::for_each(std::execution::seq, m_blas.begin(), m_blas.end(),
 #else
-        std::for_each(std::execution::par, m_blas.begin(), m_blas.end(),
-        //std::for_each(std::execution::seq, m_blas.begin(), m_blas.end(),
+        //std::for_each(std::execution::par, m_blas.begin(), m_blas.end(),
+        std::for_each(std::execution::seq, m_blas.begin(), m_blas.end(),
 #endif
-            [_maxObjPerNode](auto& blas)
+            [&_params](auto& blas)
             {
-                constexpr u32 maxDepth = 16;
-                //blas->computeSceneAABB();
-                blas->build(maxDepth, _maxObjPerNode, false);
+                blas->setParameters(_params);
+                blas->build(false);
             });
 
         // std::for_each(std::execution::seq, m_blas.begin(), m_blas.end(), [](auto& blas) { blas->dumpStats(); });
@@ -303,11 +323,9 @@ namespace tim
         return _box;
     }
 
-    void BVHBuilder::build(u32 _maxDepth, u32 _maxObjPerNode, bool _useMultipleThreads)
+ //#pragma optimize("", off)
+    void BVHBuilder::build(bool _useMultipleThreads)
     {
-        m_maxDepth = _maxDepth;
-        m_maxObjPerNode = _maxObjPerNode;
-
         m_stats = {};
 
         m_nodes.clear();
@@ -350,7 +368,7 @@ namespace tim
         for (u32 i = 0; i < m_blasInstances.size(); ++i)
             blasIds[i] = i;
 
-        addObjectsRec(0, objectsIds.begin(), objectsIds.end(), triangleIds.begin(), triangleIds.end(), blasIds.begin(), blasIds.end(), m_nodes[0].get(), _useMultipleThreads);
+        addObjectsRec(0, 0xFFFFffff, objectsIds.begin(), objectsIds.end(), triangleIds.begin(), triangleIds.end(), blasIds.begin(), blasIds.end(), m_nodes[0].get(), _useMultipleThreads);
 
         m_stats.meanDepth /= m_stats.numLeafs;
         m_stats.meanTriangle /= m_stats.numLeafs;
@@ -384,44 +402,60 @@ namespace tim
         m_aabb = adjustAABB(tightBox);
     }
 
-#define USE_AvgObjGain_HEURISTIC 1
-
-    static float computeAvgObjGain(u32 _numObjLeft, float _boxVolumeLeft, u32 _numObjRight, float _boxVolumeRight, u32 _totalNumObjects)
+    float BVHBuilder::computeAvgObjGain(const SplitData& _data)
     {
+        u32 total = _data.numItemsInBoth + _data.numUniqueItemsLeft + _data.numUniqueItemsRight;
+
         // A cube has 6 faces, 2 of them will go through both leafs if we face them. So we have 1/3 chance to go through both leafs.
         constexpr float inv3 = 1.f / 3;
 
         // float avgObjAfterSplit = inv3 * (_numObjLeft + _numObjRight) + 2 * inv3 * (_numObjLeft * _boxVolumeLeft + _numObjRight * _boxVolumeRight) / (_boxVolumeLeft + _boxVolumeRight);
-        float avgObjAfterSplit = inv3 * _totalNumObjects + 2 * inv3 * (_numObjLeft * _boxVolumeLeft + _numObjRight * _boxVolumeRight) / (_boxVolumeLeft + _boxVolumeRight);
+        float boxVolumeLeft = getBoxVolume(_data.leftBox);
+        float boxVolumeRight = getBoxVolume(_data.rightBox);
+        float avgObjAfterSplit = inv3 * total + 2 * inv3 * (_data.numItemsLeft * boxVolumeLeft + _data.numItemsRight * boxVolumeRight) / (boxVolumeLeft + boxVolumeRight);
 
-        return std::max(0.f, float(_totalNumObjects) - avgObjAfterSplit);
+        return std::max(0.f, float(total) - avgObjAfterSplit);
     }
 
-    // return if split0 is better than split1
-    static bool compareSplit(u32 _numObjInLeft[], u32 _numObjInRight[], const Box& _leftBox0, const Box& _rightBox0, const Box& _leftBox1, const Box& _rightBox1)
+    float BVHBuilder::computeSplitScore(const SplitData& _data)
     {
-        u32 sum0 = _numObjInLeft[0] + _numObjInRight[0];
-        u32 sum1 = _numObjInLeft[1] + _numObjInRight[1];
+        u32 total = _data.numUniqueItemsLeft + _data.numUniqueItemsRight;
+        return float(total - std::max(_data.numUniqueItemsLeft, _data.numUniqueItemsRight));
+    }
 
-        u32 max0 = std::max(_numObjInLeft[0], _numObjInRight[0]);
-        u32 max1 = std::max(_numObjInLeft[1], _numObjInRight[1]);
+    void BVHBuilder::fillLeafData(Node* _curNode, u32 _depth, ObjectIt _objectsBegin, ObjectIt _objectsEnd, ObjectIt _trianglesBegin, ObjectIt _trianglesEnd, ObjectIt _blasBegin, ObjectIt _blasEnd)
+    {
+        const u32 numBlasAndObj = u32(std::distance(_blasBegin, _blasEnd) + std::distance(_objectsBegin, _objectsEnd));
+        m_stats.numLeafs++;
+        m_stats.meanDepth += _depth;
+        m_stats.meanTriangle += u32(std::distance(_trianglesBegin, _trianglesEnd));
+        m_stats.meanBlas += u32(numBlasAndObj);
+        m_stats.maxTriangle = std::max<u32>(m_stats.maxTriangle, (u32)std::distance(_trianglesBegin, _trianglesEnd));
+        m_stats.maxBlas = std::max<u32>(m_stats.maxBlas, u32(numBlasAndObj));
 
-        if (max0 != max1)
-            return max0 < max1;
-        else if (sum0 != sum1)
-            return sum0 < sum1;
-        else
+        for (auto it = _objectsBegin; it != _objectsEnd && _curNode->primitiveList.size() < (1u << PrimitiveBitCount); ++it)
+            _curNode->primitiveList.push_back(*it);
+
+        for (auto it = _trianglesBegin; it != _trianglesEnd && _curNode->triangleList.size() < (1u << TriangleBitCount); ++it)
+            _curNode->triangleList.push_back(*it);
+
+        for (auto it = _blasBegin; it != _blasEnd && _curNode->blasList.size() < (1u << BlasBitCount); ++it)
+            _curNode->blasList.push_back(*it);
+
+        for (u32 i = 0; i < m_lights.size() && _curNode->lightList.size() < (1u << LightBitCount); ++i)
         {
-            float volumeDiff0 = std::fabs(getBoxVolume(_leftBox0) - getBoxVolume(_rightBox0));
-            float volumeDiff1 = std::fabs(getBoxVolume(_leftBox1) - getBoxVolume(_rightBox1));
+            const Light& light = m_lights[i];
+            Sphere sphere = getBoundingSphere(light);
 
-            return volumeDiff0 < volumeDiff1;
+            if (sphereBoxCollision(sphere, _curNode->extent) != CollisionType::Disjoint)
+                _curNode->lightList.push_back(u32(i));
         }
     }
 
-    void BVHBuilder::addObjectsRec(u32 _depth, ObjectIt _objectsBegin, ObjectIt _objectsEnd, 
-                                               ObjectIt _trianglesBegin, ObjectIt _trianglesEnd, 
-                                               ObjectIt _blasBegin, ObjectIt _blasEnd, BVHBuilder::Node* _curNode, bool _useMultipleThreads)
+    void BVHBuilder::addObjectsRec(u32 _depth, u32 _numUniqueItems,
+                                   ObjectIt _objectsBegin, ObjectIt _objectsEnd, 
+                                   ObjectIt _trianglesBegin, ObjectIt _trianglesEnd, 
+                                   ObjectIt _blasBegin, ObjectIt _blasEnd, BVHBuilder::Node* _curNode, bool _useMultipleThreads)
     {
         _curNode->primitiveList.clear();
         _curNode->triangleList.clear();
@@ -429,126 +463,51 @@ namespace tim
         _curNode->lightList.clear();
 
         u32 numObjects = u32(std::distance(_objectsBegin, _objectsEnd) + std::distance(_trianglesBegin, _trianglesEnd) + std::distance(_blasBegin, _blasEnd));
-        
-        auto fillLights = [&]()
+
+        // Fill leafs
+        if (_depth > 0 && (_numUniqueItems <= m_params.minObjPerNode || _depth >= m_params.maxDepth))
         {
-            // Fill lights for each node
-            for (u32 i = 0; i < m_lights.size() && _curNode->lightList.size() < (1u << LightBitCount); ++i)
-            {
-                const Light& light = m_lights[i];
-                Sphere sphere = getBoundingSphere(light);
-
-                if (sphereBoxCollision(sphere, _curNode->extent) != CollisionType::Disjoint)
-                    _curNode->lightList.push_back(u32(i));
-            }
-        };
-
-        if (m_isTlas) // in tlas mode, we can step in each node to compute lighting
-            fillLights();
-
-        auto fillLeaf = [&]()
-        {
-            const u32 numBlasAndObj = u32(std::distance(_blasBegin, _blasEnd) + std::distance(_objectsBegin, _objectsEnd));
-            m_stats.numLeafs++;
-            m_stats.meanDepth += _depth;
-            m_stats.meanTriangle += u32(std::distance(_trianglesBegin, _trianglesEnd));
-            m_stats.meanBlas += u32(numBlasAndObj);
-            m_stats.maxTriangle = std::max<u32>(m_stats.maxTriangle, (u32)std::distance(_trianglesBegin, _trianglesEnd));
-            m_stats.maxBlas = std::max<u32>(m_stats.maxBlas, u32(numBlasAndObj));
-
-            for (auto it = _objectsBegin; it != _objectsEnd && _curNode->primitiveList.size() < (1u << PrimitiveBitCount); ++it)
-                _curNode->primitiveList.push_back(*it);
-
-            for (auto it = _trianglesBegin; it != _trianglesEnd && _curNode->triangleList.size() < (1u << TriangleBitCount); ++it)
-                _curNode->triangleList.push_back(*it);
-
-            for (auto it = _blasBegin; it != _blasEnd && _curNode->blasList.size() < (1u << BlasBitCount); ++it)
-                _curNode->blasList.push_back(*it);
-
-            if (!m_isTlas)
-                fillLights();
-        };
-
-        if (numObjects <= m_maxObjPerNode || _depth >= m_maxDepth)
-        {
-            fillLeaf();
+            fillLeafData(_curNode, _depth, _objectsBegin, _objectsEnd, _trianglesBegin, _trianglesEnd, _blasBegin, _blasEnd);
             return;
         }
         else
         {
-            Box leftBox[3], rightBox[3];
-            u32 numObjInLeft[3] = { 0,0,0 }, numObjInRight[3] = { 0,0,0 };
-
+            SplitData splitData[3];
             searchBestSplit(_curNode, _objectsBegin, _objectsEnd, _trianglesBegin, _trianglesEnd, _blasBegin, _blasEnd,
-                [](const vec3& step) { return vec3(step.x, 0, 0); }, [](const vec3& _step) { return vec3{ 0, _step.y, _step.z }; },
-                leftBox[0], rightBox[0], numObjInLeft[0], numObjInRight[0]);
+                [](const vec3& step) { return vec3(step.x, 0, 0); }, [](const vec3& _step) { return vec3{ 0, _step.y, _step.z }; }, splitData[0]);
             searchBestSplit(_curNode, _objectsBegin, _objectsEnd, _trianglesBegin, _trianglesEnd, _blasBegin, _blasEnd,
-                [](const vec3& step) { return vec3(0, step.y, 0); }, [](const vec3& _step) { return vec3{ _step.x, 0, _step.z }; },
-                leftBox[1], rightBox[1], numObjInLeft[1], numObjInRight[1]);
+                [](const vec3& step) { return vec3(0, step.y, 0); }, [](const vec3& _step) { return vec3{ _step.x, 0, _step.z }; }, splitData[1]);
             searchBestSplit(_curNode, _objectsBegin, _objectsEnd, _trianglesBegin, _trianglesEnd, _blasBegin, _blasEnd,
-                [](const vec3& step) { return vec3(0, 0, step.z); }, [](const vec3& _step) { return vec3{ _step.x, _step.y, 0 }; },
-                leftBox[2], rightBox[2], numObjInLeft[2], numObjInRight[2]);
+                [](const vec3& step) { return vec3(0, 0, step.z); }, [](const vec3& _step) { return vec3{ _step.x, _step.y, 0 }; }, splitData[2]);
 
             // search for best homogeneous split
             auto getBestSplit = [&](u32 s0, u32 s1) -> u32
             {
-            #if USE_AvgObjGain_HEURISTIC
-                float score0 = computeAvgObjGain(numObjInLeft[s0], getBoxVolume(leftBox[s0]), numObjInRight[s0], getBoxVolume(rightBox[s0]), numObjects);
-                float score1 = computeAvgObjGain(numObjInLeft[s1], getBoxVolume(leftBox[s1]), numObjInRight[s1], getBoxVolume(rightBox[s1]), numObjects);
-
-                return score0 > score1 ? s0 : s1;
-            #else
-                u32 numLefts[2] = { numObjInLeft[s0], numObjInLeft[s1] };
-                u32 numRights[2] = { numObjInRight[s0], numObjInRight[s1] };
-                return compareSplit(numLefts, numRights, leftBox[s0], rightBox[s0], leftBox[s1], rightBox[s1]) ? s0 : s1;
-            #endif
+                return computeSplitScore(splitData[s0]) > computeSplitScore(splitData[s1]) ? s0 : s1;
             };
 
-            u32 bestSplit = getBestSplit(getBestSplit(0, 1), 2);
-            std::vector<u32> objectLeft; objectLeft.reserve(numObjInLeft[bestSplit]);
-            std::vector<u32> objectRight; objectRight.reserve(numObjInRight[bestSplit]);
+            u32 bestSplitIndex = getBestSplit(getBestSplit(0, 1), 2);
+            const SplitData& bestSplit = splitData[bestSplitIndex];
 
-            std::vector<u32> triangleLeft; triangleLeft.reserve(numObjInLeft[bestSplit]);
-            std::vector<u32> triangleRight; triangleRight.reserve(numObjInRight[bestSplit]);
+            //if (bestSplit.numItemsRight == 224 && bestSplit.numItemsLeft == 1)
+            //{
+            //    vec3 dim = bestSplit.leftBox.maxExtent - bestSplit.leftBox.minExtent;
+            //    std::cout << dim.x << " " << dim.y << " " << dim.z << std::endl;
+            //    dim = bestSplit.rightBox.maxExtent - bestSplit.rightBox.minExtent;
+            //    std::cout << dim.x << " " << dim.y << " " << dim.z << std::endl;
+            //    std::cout << "--------------------------\n";
+            //
+            //    __debugbreak();
+            //}
 
-            std::vector<u32> blasLeft; blasLeft.reserve(numObjInLeft[bestSplit]);
-            std::vector<u32> blasRight; blasRight.reserve(numObjInRight[bestSplit]);
-
-            for (auto it = _objectsBegin; it != _objectsEnd; ++it)
+            if (numObjects - bestSplit.numItemsLeft < m_params.minObjGain && numObjects - bestSplit.numItemsRight < m_params.minObjGain)
             {
-                if (primitiveBoxCollision(m_objects[*it], leftBox[bestSplit]) != CollisionType::Disjoint)
-                    objectLeft.push_back(*it);
-                if (primitiveBoxCollision(m_objects[*it], rightBox[bestSplit]) != CollisionType::Disjoint)
-                    objectRight.push_back(*it);
-            }
-
-            for (auto it = _trianglesBegin; it != _trianglesEnd; ++it)
-            {
-                if (triangleBoxCollision(m_triangles[*it], leftBox[bestSplit]) != CollisionType::Disjoint)
-                    triangleLeft.push_back(*it);
-                if (triangleBoxCollision(m_triangles[*it], rightBox[bestSplit]) != CollisionType::Disjoint)
-                    triangleRight.push_back(*it);
-            }
-
-            for (auto it = _blasBegin; it != _blasEnd; ++it)
-            {
-                if (boxBoxCollision(m_blasInstances[*it].aabb, leftBox[bestSplit]) != CollisionType::Disjoint)
-                    blasLeft.push_back(*it);
-                if (boxBoxCollision(m_blasInstances[*it].aabb, rightBox[bestSplit]) != CollisionType::Disjoint)
-                    blasRight.push_back(*it);
-            }
-
-            
-            u32 numObjLeft = u32(objectLeft.size() + triangleLeft.size() + blasLeft.size());
-            u32 numObjRight = u32(objectRight.size() + triangleRight.size() + blasRight.size());
-            float avgObjGainAfterSplit = computeAvgObjGain(numObjLeft, getBoxVolume(leftBox[bestSplit]), numObjRight, getBoxVolume(rightBox[bestSplit]), u32(numObjects));
-
-            if (avgObjGainAfterSplit <= 4 && _depth != 0) // small bug when only one node
-            {
-                // we consider that 4 objects gain is the cost of one level of BVH traversal
-                fillLeaf();
+                fillLeafData(_curNode, _depth, _objectsBegin, _objectsEnd, _trianglesBegin, _trianglesEnd, _blasBegin, _blasEnd);
                 return;
             }
+
+            SplitData bestSplitData;
+            fillSplitData<true>(bestSplitData, _curNode->extent, bestSplit.leftBox, bestSplit.rightBox, _objectsBegin, _objectsEnd, _trianglesBegin, _trianglesEnd, _blasBegin, _blasEnd);
 
             m_mutex.lock();
             m_nodes.push_back(std::make_unique<Node>(m_nodes.size()));
@@ -558,127 +517,192 @@ namespace tim
             Node& rightNode = *m_nodes.back();
             m_mutex.unlock();
 
-            leftNode.extent = leftBox[bestSplit];
+            leftNode.extent = adjustAABB(bestSplitData.leftBox);
             leftNode.parent = _curNode;
             _curNode->left = &leftNode;
 
-            rightNode.extent = rightBox[bestSplit];
+            rightNode.extent = adjustAABB(bestSplitData.rightBox);
             rightNode.parent = _curNode;
             _curNode->right = &rightNode;
 
             leftNode.sibling = &rightNode;
             rightNode.sibling = &leftNode;
 
-#ifndef _DEBUG
+            auto& objectLeft = bestSplitData.objectLeft;
+            auto& objectRight = bestSplitData.objectRight;
+
+            auto& triangleLeft = bestSplitData.triangleLeft;
+            auto& triangleRight = bestSplitData.triangleRight;
+
+            auto& blasLeft = bestSplitData.blasLeft;
+            auto& blasRight = bestSplitData.blasRight;
+
+        #ifndef _DEBUG
             if (_depth < 3 && _useMultipleThreads)
             {
                 std::thread th1([&]()
                 {
-                    addObjectsRec(_depth + 1, objectLeft.begin(), objectLeft.end(), triangleLeft.begin(), triangleLeft.end(), blasLeft.begin(), blasLeft.end(), &leftNode, _useMultipleThreads);
+                    addObjectsRec(_depth + 1, bestSplitData.numUniqueItemsLeft,
+                                  objectLeft.begin(), objectLeft.end(), triangleLeft.begin(), triangleLeft.end(), blasLeft.begin(), blasLeft.end(), &leftNode, _useMultipleThreads);
                 });
                 std::thread th2([&]()
                 {
-                    addObjectsRec(_depth + 1, objectRight.begin(), objectRight.end(), triangleRight.begin(), triangleRight.end(), blasRight.begin(), blasRight.end(), &rightNode, _useMultipleThreads);
+                    addObjectsRec(_depth + 1, bestSplitData.numUniqueItemsRight,
+                                  objectRight.begin(), objectRight.end(), triangleRight.begin(), triangleRight.end(), blasRight.begin(), blasRight.end(), &rightNode, _useMultipleThreads);
                 });
                 th1.join();
                 th2.join();
             }
             else
-#endif
+        #endif
             {
-                addObjectsRec(_depth + 1, objectLeft.begin(), objectLeft.end(), triangleLeft.begin(), triangleLeft.end(), blasLeft.begin(), blasLeft.end(), &leftNode, false);
-                addObjectsRec(_depth + 1, objectRight.begin(), objectRight.end(), triangleRight.begin(), triangleRight.end(), blasRight.begin(), blasRight.end(), &rightNode, false);
-            }
+                addObjectsRec(_depth + 1, bestSplitData.numUniqueItemsLeft,
+                              objectLeft.begin(), objectLeft.end(), triangleLeft.begin(), triangleLeft.end(), blasLeft.begin(), blasLeft.end(), &leftNode, false);
 
-            if (m_isTlas)
-            {
-                auto mergeCommonItems = [](std::vector<u32>& _left, std::vector<u32>& _right)
-                {
-                    std::sort(_left.begin(), _left.end());
-                    std::sort(_right.begin(), _right.end());
-                    std::vector<u32> commonItems(std::min(_right.size(), _left.size()));
-                    auto it = std::set_intersection(_left.begin(), _left.end(), _right.begin(), _right.end(), commonItems.begin());
-
-                    commonItems.resize(std::distance(commonItems.begin(), it));
-                    std::vector<u32> newLeft; newLeft.reserve(_left.size() - commonItems.size());
-                    std::vector<u32> newRight; newRight.reserve(_right.size() - commonItems.size());
-
-                    auto itLeft = _left.begin();
-                    auto itRight = _right.begin();
-                    for (u32 i : commonItems)
-                    {
-                        while (*itLeft != i) newLeft.push_back(*(itLeft++));
-                        while (*itRight != i) newRight.push_back(*(itRight++));
-
-                        // skip common item
-                        ++itLeft;
-                        ++itRight;
-                    }
-
-                    while (itLeft != _left.end()) newLeft.push_back(*(itLeft++));
-                    while (itRight != _right.end()) newRight.push_back(*(itRight++));
-
-                    _left = std::move(newLeft);
-                    _right = std::move(newRight);
-                    return commonItems;
-                };
-                
-                _curNode->blasList = std::move(mergeCommonItems(leftNode.blasList, rightNode.blasList));
-                _curNode->primitiveList = std::move(mergeCommonItems(leftNode.primitiveList, rightNode.primitiveList));
+                addObjectsRec(_depth + 1, bestSplitData.numUniqueItemsRight,
+                              objectRight.begin(), objectRight.end(), triangleRight.begin(), triangleRight.end(), blasRight.begin(), blasRight.end(), &rightNode, false);
             }
         }
+    }
+
+    template<bool FillItems>
+    void BVHBuilder::fillSplitData(SplitData& _splitData, const Box& parentBox, const Box& leftBox, const Box& rightBox,
+                                   ObjectIt _objectsBegin, ObjectIt _objectsEnd, ObjectIt _trianglesBegin, ObjectIt _trianglesEnd, ObjectIt _blasBegin, ObjectIt _blasEnd) const
+    {
+        _splitData.leftBox = leftBox;
+        _splitData.rightBox = rightBox;
+
+        const float leftVolume = getBoxVolume(leftBox);
+        const float rightVolume = getBoxVolume(rightBox);
+
+        // This vars are only used if FillItems
+        bool isLeftBoxInitialized = false;
+        bool isRightBoxInitialized = false;
+        Box curLeftBox = leftBox, curRightBox = rightBox;
+
+        auto processObject = [&](auto _fillItems, std::vector<u32>& _itemsLeft, std::vector<u32>& _itemsRight, 
+                                 ObjectIt _begin, ObjectIt _end, auto&& _collideObj, auto&& _getAABB)
+        {
+            for (ObjectIt it = _begin; it != _end; ++it)
+            {
+                bool collideLeft = _collideObj(it, leftBox) != CollisionType::Disjoint;
+                bool collideRight = _collideObj(it, rightBox) != CollisionType::Disjoint;
+                Box aabb = _getAABB(it);
+
+                if (!collideLeft && collideRight)
+                {
+                    _splitData.numItemsRight++;
+                    _splitData.numUniqueItemsRight++;
+                    
+                    if constexpr (_fillItems)
+                    {
+                        _itemsRight.push_back(*it);
+                        _splitData.rightBox = intersectionBox(isRightBoxInitialized ? mergeBox(aabb, _splitData.rightBox) : aabb, curRightBox);
+                        isRightBoxInitialized = true;
+                    }
+                }
+                else if (collideLeft && !collideRight)
+                {
+                    _splitData.numItemsLeft++;
+                    _splitData.numUniqueItemsLeft++;
+                    
+                    if constexpr (_fillItems)
+                    {
+                        _itemsLeft.push_back(*it);
+                        _splitData.leftBox = intersectionBox(isLeftBoxInitialized ? mergeBox(aabb, _splitData.leftBox) : aabb, curLeftBox);
+                        isLeftBoxInitialized = true;
+                    }
+                }
+                else // the item is in both left and right AABBs
+                {
+                    float smallestVolume = std::min(leftVolume, rightVolume);
+                    float diffLeft = getBoxVolume(intersectionBox(mergeBox(leftBox, aabb), parentBox)) - leftVolume;
+                    float diffRight = getBoxVolume(intersectionBox(mergeBox(rightBox, aabb), parentBox)) - rightVolume;    
+
+                    auto addInBothNodes = [&]()
+                    {
+                        _splitData.numItemsInBoth++;
+                        _splitData.numItemsLeft++;
+                        _splitData.numItemsRight++;
+
+                        if constexpr (_fillItems)
+                        {
+                            _itemsLeft.push_back(*it);
+                            _itemsRight.push_back(*it);
+
+                            _splitData.leftBox = intersectionBox(isLeftBoxInitialized ? mergeBox(aabb, _splitData.leftBox) : aabb, curLeftBox);
+                            isLeftBoxInitialized = true;
+                            
+                            _splitData.rightBox = intersectionBox(isRightBoxInitialized ? mergeBox(aabb, _splitData.rightBox) : aabb, curRightBox);
+                            isRightBoxInitialized = true;
+                        }
+                    };
+
+                    if (diffLeft < diffRight) // better to add in left
+                    {
+                        if ((diffLeft / smallestVolume) >= m_params.expandNodeVolumeThreshold)
+                        {
+                            // big items added in both side to avoid increasing the size of the AABB to much
+                            addInBothNodes();
+                        }
+                        else
+                        {
+                            _splitData.numItemsLeft++;
+                            _splitData.numUniqueItemsLeft++;
+
+                            if constexpr (_fillItems)
+                            {
+                                _itemsLeft.push_back(*it);
+                                _splitData.leftBox = intersectionBox(isLeftBoxInitialized ? mergeBox(_splitData.leftBox, aabb) : aabb, parentBox);
+                                curLeftBox = intersectionBox(mergeBox(aabb, curLeftBox), parentBox);
+                                isLeftBoxInitialized = true;
+                            }
+                        }
+                    }
+                    else // better to add in right
+                    {
+                        if ((diffRight / smallestVolume) >= m_params.expandNodeVolumeThreshold)
+                        {
+                            // big items added in both side to avoid increasing the size of the AABB to much
+                            addInBothNodes();
+                        }
+                        else
+                        {
+                            _splitData.numItemsRight++;
+                            _splitData.numUniqueItemsRight++;
+
+                            if constexpr (_fillItems)
+                            {
+                                _itemsRight.push_back(*it);
+                                _splitData.rightBox = intersectionBox(isRightBoxInitialized ? mergeBox(_splitData.rightBox, aabb) : aabb, parentBox);
+                                curRightBox = intersectionBox(mergeBox(aabb, curRightBox), parentBox);
+                                isRightBoxInitialized = true;
+                            }
+                        }
+                    }
+                }
+            }
+        };
+
+        processObject(std::integral_constant<bool, FillItems>{}, _splitData.objectLeft, _splitData.objectRight, _objectsBegin, _objectsEnd,
+            [&](ObjectIt it, const Box& _box) { return primitiveBoxCollision(m_objects[*it], _box); },
+            [&](ObjectIt it) { return getAABB(m_objects[*it]); });
+
+        processObject(std::integral_constant<bool, FillItems>{}, _splitData.triangleLeft, _splitData.triangleRight, _trianglesBegin, _trianglesEnd,
+            [&](ObjectIt it, const Box& _box) { return triangleBoxCollision(m_triangles[*it], _box); },
+            [&](ObjectIt it) { return getAABB(m_triangles[*it]); });
+
+        processObject(std::integral_constant<bool, FillItems>{}, _splitData.blasLeft, _splitData.blasRight, _blasBegin, _blasEnd,
+            [&](ObjectIt it, const Box& _box) { return boxBoxCollision(m_blasInstances[*it].aabb, _box); },
+            [&](ObjectIt it) { return m_blasInstances[*it].aabb; });
     }
 
     template<typename Fun1, typename Fun2>
     void BVHBuilder::searchBestSplit(BVHBuilder::Node* _curNode,
                                      ObjectIt _objectsBegin, ObjectIt _objectsEnd, ObjectIt _trianglesBegin, ObjectIt _trianglesEnd, ObjectIt _blasBegin, ObjectIt _blasEnd,
-                                     const Fun1& _movingAxis, const Fun2& _fixedAxis,
-                                     Box& _leftBox, Box& _rightBox, u32& _numObjInLeft, u32& _numObjInRight) const
+                                     const Fun1& _movingAxis, const Fun2& _fixedAxis, SplitData& _splitData) const
     {
         u32 numObjects = u32(std::distance(_objectsBegin, _objectsEnd) + std::distance(_trianglesBegin, _trianglesEnd) + std::distance(_blasBegin, _blasEnd));
-
-        auto processSplit = [&](const Box& leftBox, const Box& rightBox) -> std::pair<u32, u32>
-        {
-            if (!checkBox(leftBox) || !checkBox(rightBox))
-                return std::make_pair(0u, 0u);
-
-            u32 numObjInLeft = (u32)std::count_if(_objectsBegin, _objectsEnd, [&](u32 _id)
-                {
-                    bool collide = primitiveBoxCollision(m_objects[_id], leftBox) != CollisionType::Disjoint;
-                    return collide;
-                });
-            numObjInLeft += (u32)std::count_if(_trianglesBegin, _trianglesEnd, [&](u32 _id)
-                {
-                    bool collide = triangleBoxCollision(m_triangles[_id], leftBox) != CollisionType::Disjoint;
-                    return collide;
-                });
-            numObjInLeft += (u32)std::count_if(_blasBegin, _blasEnd, [&](u32 _id)
-                {
-                    const u32 blasId = m_blasInstances[_id].blasId;
-                    bool collide = boxBoxCollision(m_blas[blasId]->m_aabb, leftBox) != CollisionType::Disjoint;
-                    return collide;
-                });
-
-            u32 numObjInRight = (u32)std::count_if(_objectsBegin, _objectsEnd, [&](u32 _id)
-                {
-                    bool collide = primitiveBoxCollision(m_objects[_id], rightBox) != CollisionType::Disjoint;
-                    return collide;
-                });
-            numObjInRight += (u32)std::count_if(_trianglesBegin, _trianglesEnd, [&](u32 _id)
-                {
-                    bool collide = triangleBoxCollision(m_triangles[_id], rightBox) != CollisionType::Disjoint;
-                    return collide;
-                });
-            numObjInRight += (u32)std::count_if(_blasBegin, _blasEnd, [&](u32 _id)
-                {
-                    const u32 blasId = m_blasInstances[_id].blasId;
-                    bool collide = boxBoxCollision(m_blas[blasId]->m_aabb, rightBox) != CollisionType::Disjoint;
-                    return collide;
-                });
-
-            return std::make_pair(numObjInLeft, numObjInRight);
-        };
-
         vec3 boxDim = _curNode->extent.maxExtent - _curNode->extent.minExtent;
 
         if (numObjects > 256)
@@ -689,32 +713,27 @@ namespace tim
                 float newCut = (searchBestCut.x + searchBestCut.y) * 0.5f;
                 vec3 step = _movingAxis(boxDim * newCut);
                 vec3 fixedStep = _fixedAxis(boxDim);
-
-                _leftBox = { _curNode->extent.minExtent, _curNode->extent.minExtent + fixedStep + step };
-                _rightBox = { _curNode->extent.minExtent + step, _curNode->extent.maxExtent };
-
-                std::tie(_numObjInLeft, _numObjInRight) = processSplit(_leftBox, _rightBox);
-
-                u32 absDiff = _numObjInLeft < _numObjInRight ? _numObjInRight - _numObjInLeft : _numObjInLeft - _numObjInRight;
-                if (absDiff <= std::max<u32>(numObjects / (16 * 1024), 1)) // best cut have been found
+        
+                Box leftBox = { _curNode->extent.minExtent, _curNode->extent.minExtent + fixedStep + step };
+                Box rightBox = { _curNode->extent.minExtent + step, _curNode->extent.maxExtent };
+        
+                _splitData = {};
+                fillSplitData<false>(_splitData, _curNode->extent, leftBox, rightBox, _objectsBegin, _objectsEnd, _trianglesBegin, _trianglesEnd, _blasBegin, _blasEnd);
+        
+                u32 absDiff = _splitData.numItemsLeft < _splitData.numItemsRight ? _splitData.numItemsRight - _splitData.numItemsLeft : _splitData.numItemsLeft - _splitData.numItemsRight;
+                if (absDiff <= std::max<u32>(numObjects / (16*1024), 1)) // best cut have been found
                     break;
-
-                if (_numObjInLeft > _numObjInRight) // take left
+        
+                if (_splitData.numItemsLeft > _splitData.numItemsRight)
                     searchBestCut.y = newCut;
-                else                                // take right
+                else
                     searchBestCut.x = newCut;
             }
         }
         else
         {
-            _numObjInLeft = u32(-1);
-            _numObjInRight = u32(-1);
-
-        #if USE_AvgObjGain_HEURISTIC
-            float score = 0;
-        #endif  
-
             vec3 fixedStep = _fixedAxis(boxDim);
+            float score = 0;
             auto processStep = [&](vec3 step)
             {
                 Box leftBox = { _curNode->extent.minExtent, _curNode->extent.minExtent + fixedStep + step };
@@ -722,42 +741,18 @@ namespace tim
 
                 if (checkBox(leftBox) && checkBox(rightBox))
                 {
-                    u32 numObjInLeft, numObjInRight;
-                    std::tie(numObjInLeft, numObjInRight) = processSplit(leftBox, rightBox);
+                    SplitData splitData;
+                    fillSplitData<false>(splitData, _curNode->extent, leftBox, rightBox, _objectsBegin, _objectsEnd, _trianglesBegin, _trianglesEnd, _blasBegin, _blasEnd);
 
-                #if USE_AvgObjGain_HEURISTIC
-                    float curScore = computeAvgObjGain(numObjInLeft, getBoxVolume(leftBox), numObjInRight, getBoxVolume(rightBox), numObjects);
-                    if (curScore >= score)
+                    float currentScore = computeSplitScore(splitData);
+                    if (currentScore > score)
                     {
-                        _leftBox = leftBox;
-                        _rightBox = rightBox;
-                        _numObjInLeft = numObjInLeft;
-                        _numObjInRight = numObjInRight;
-                        score = curScore;
+                        score = currentScore;
+                        _splitData = std::move(splitData);
                     }
-                #else
-                    u32 numLefts[2] = { numObjInLeft, _numObjInLeft };
-                    u32 numRights[2] = { numObjInRight, _numObjInRight };
-                    if (compareSplit(numLefts, numRights, leftBox, rightBox, _leftBox, _rightBox))
-                    {
-                        _leftBox = leftBox;
-                        _rightBox = rightBox;
-                        _numObjInLeft = numObjInLeft;
-                        _numObjInRight = numObjInRight;
-                    }
-                #endif
                 }
             };
 
-#define USE_BRUTEFORCE_HEURISTIC 0
-#if USE_BRUTEFORCE_HEURISTIC
-            constexpr u32 NumSteps = 1024 * 16;
-            for (u32 i = 0; i < NumSteps; ++i)
-            {
-                float newCut = (i + 0.5f) / NumSteps;
-                processStep(_movingAxis(boxDim * newCut));
-            }
-#else
             processStep(_movingAxis(boxDim * 0.5f));
 
             auto convertToStep = [&](vec3 _absPoint) -> vec3
@@ -788,7 +783,6 @@ namespace tim
                 processStep(convertToStep(box.minExtent - delta));
                 processStep(convertToStep(box.maxExtent + delta));
             });
-#endif
         }
     }
 

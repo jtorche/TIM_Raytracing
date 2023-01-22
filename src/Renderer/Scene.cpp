@@ -253,6 +253,7 @@ namespace tim
         Material pbrMat = BVHBuilder::createPbrMaterial({ 0.9f, 0.9f, 0.9f }, 0);
         Material pbrMatMetal = BVHBuilder::createPbrMaterial({ 0.9f, 0.9f, 0.9f }, 1);
 
+    #ifndef _DEBUG
         _bvh->addSphere({ { 0, 0, 4.1f }, 0.08f }, BVHBuilder::createEmissiveMaterial({ 1, 1, 1 }));
         _bvh->addSphereLight({ { 0, 0, 4.1f }, 30, { 2, 2, 2 }, 0.1f });
 
@@ -262,18 +263,8 @@ namespace tim
         _bvh->addSphere({ {  2.0f, 0, 1.3f }, 0.2f }, pbrMatMetal);
         _bvh->addSphere({ {  0.5f, 0, 1.3f }, 0.2f }, BVHBuilder::createTransparentMaterial({ 1,0.6f,0.6f }, 1.05f, 0.05f));
         _bvh->addSphere({ { -1.5f, 0, 1.3f }, 0.2f }, BVHBuilder::createPbrMaterial({ 1,0.6f,0.6f }, 0));
-
-        //const float dim = 0.4f;
-        //_bvh->addBox(Box{ { -dim, -dim*0.1, 0 }, { dim, dim * 0.1, dim*2 } }, redGlassMat);
-        //
-        //for (u32 i = 0; i < 10; ++i)
-        //{
-        //    _bvh->addBox(Box{ { -6.f + i*dim*3, -dim * 0.1 + dim, 0 }, { -6.f + i * dim * 3 + dim * 2.f, dim * 0.1 + dim, dim * 2 } }, redMat);
-        //    _bvh->addBox(Box{ {-6.f + i * dim * 3, -dim * 0.1 - dim, 0 }, { -6.f + i * dim * 3 + dim * 2.f, dim * 0.1 - dim, dim * 2 } }, blueMat);
-        //}
-
-    #ifdef _DEBUG
-        _bvh->addBox(Box{ { -dim * 40, -dim * 40, -dim }, { dim * 40, dim * 40, 0 } }, suzanneMat);
+    #else
+        _bvh->addSphereLight({ { 0, 0, 4.1f }, 30, { 2, 2, 2 }, 0.1f });
     #endif
 
         u32 texFlame = m_texManager.loadTexture("./data/image/flame.png");
@@ -281,23 +272,29 @@ namespace tim
 
         if (!_useTlasBlas)
         {
+        #ifndef _DEBUG
             BVHBuilder::setTextureMaterial(suzanneMat, texFlame, 0);
             addOBJ("./data/suzanne.obj", { -2.5f, 0, 1.3f }, vec3(1), _bvh, suzanneMat);
 
             BVHBuilder::setTextureMaterial(suzanneMat, texDot, 0);
             addOBJ("./data/suzanne.obj", { 3.f, 0, 1.3f }, vec3(1), _bvh, suzanneMat);
 
-        #ifndef _DEBUG
             addOBJWithMtl("./data/sponza.obj", {}, vec3(0.01f), _bvh, true);
+        #else
+            BVHBuilder::setTextureMaterial(suzanneMat, texFlame, 0);
+            addOBJ("./data/suzanne.obj", { 0, 0, 0 }, vec3(1), _bvh, suzanneMat);
         #endif  
         }
         else
         {
             std::vector<std::unique_ptr<BVHBuilder>> blas;
+            
+    #ifndef _DEBUG
             loadBlas("./data/suzanne.obj", { -2.5f, 0, 1.3f }, vec3(1), blas, &suzanneMat);
             loadBlas("./data/suzanne.obj", { 3.f, 0, 1.3f }, vec3(1), blas, &suzanneMat);
-    #ifndef _DEBUG
             loadBlas("./data/sponza.obj", {}, vec3(0.01f), blas, nullptr, true);
+    #else
+            loadBlas("./data/suzanne.obj", { 0, 0, 0 }, vec3(1), blas, &suzanneMat);
     #endif
             for (auto& b : blas)
                 _bvh->addBlas(std::move(b));

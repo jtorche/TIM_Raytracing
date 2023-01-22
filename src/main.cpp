@@ -6,6 +6,7 @@
 #include "Renderer/SimpleCamera.h"
 #include "Renderer/shaderMacros.h"
 #include "Renderer/TextureManager.h"
+#include "Renderer/BVHBuilder.h"
 
 #include <iostream>
 
@@ -202,22 +203,29 @@ int main(int argc, char* argv[])
                 if (g_rebuildBvh)
                 {
                     g_rebuildBvh = false;
-                    u32 maxTriPerNode = 5; u32 maxBlasPerNode = 8, recursionDepth = 2;
-                    bool useBlas = false;
-                    std::cout << "Use blas ? : ";
-                    std::cin >> useBlas;
-                    std::cout << "Rebuild bvh, max tri per node : ";
-                    std::cin >> maxTriPerNode;
-                    if (useBlas)
+                    BVHBuildParameters params = {};
+                    BVHBuildParameters tlasParams = {};
+                    u32 recursionDepth = 2;
+                    bool useTlas = false;
+                    std::cout << "Use tlas ? : "; std::cin >> useTlas;
+                   
+
+                    if (useTlas)
                     {
-                        std::cout << "Rebuild bvh, max blas per node : ";
-                        std::cin >> maxBlasPerNode;
+                        std::cout << "Tlas Params, min blas per node : "; std::cin >> tlasParams.minObjPerNode;
+                        tlasParams.minObjGain = 4;
+                        std::cout << "Tlas Params, volume heuristic : "; std::cin >> tlasParams.expandNodeVolumeThreshold;
                     }
+
+                    std::cout << "Bvh Params, min obj per node : "; std::cin >> params.minObjPerNode;
+                    std::cout << "Bvh Params, min obj gain : "; std::cin >> params.minObjGain;
+                    std::cout << "Bvh Params, volume heuristic : "; std::cin >> params.expandNodeVolumeThreshold;
+
                     std::cout << "Rendering recursion depth : ";
                     std::cin >> recursionDepth;
 
                     rtPass.setBounceRecursionDepth(recursionDepth);
-                    rtPass.rebuildBvh(maxBlasPerNode, maxTriPerNode, useBlas);
+                    rtPass.rebuildBvh(params, tlasParams, useTlas);
                 }
 
                 g_renderer->BeginFrame();

@@ -50,6 +50,14 @@ namespace tim
 
     enum class CollisionType { Disjoint, Intersect, Contained };
 
+    struct BVHBuildParameters
+    {
+        u32 maxDepth = 20;
+        u32 minObjPerNode = 8;
+        u32 minObjGain = 4;
+        float expandNodeVolumeThreshold = 0.25;
+    };
+
     class BVHBuilder
     {
     public:
@@ -72,9 +80,10 @@ namespace tim
         void addSphereLight(const SphereLight& _light);
         void addAreaLight(const AreaLight& _light);
 
-        void buildBlas(u32 _maxObjPerNode);
-        void build(u32 _maxDepth, u32 _maxObjPerNode, bool _useMultipleThreads);
+        void buildBlas(const BVHBuildParameters& _params);
+        void build(bool _useMultipleThreads);
         void computeSceneAABB();
+        void setParameters(const BVHBuildParameters&);
 
         Box getAABB() const { return m_aabb; }
         u32 getPrimitivesCount() const { return u32(m_objects.size()); }
@@ -95,15 +104,26 @@ namespace tim
         void addTriangle(const BVHGeometry::TriangleData& _triangle, u32 _materialId);
 
         struct Node;
+        struct SplitData;
+
         using ObjectIt = std::vector<u32>::iterator;
-        void addObjectsRec(u32 _depth, ObjectIt _objectsBegin, ObjectIt _objectsEnd, 
-                                       ObjectIt _trianglesBegin, ObjectIt _trianglesEnd, 
-                                       ObjectIt _blasBegin, ObjectIt _blasEnd,
-                                       Node* _curNode, bool _useMultipleThreads);
+        void addObjectsRec(u32 _depth, u32 _numUniqueItems,
+                           ObjectIt _objectsBegin, ObjectIt _objectsEnd,
+                           ObjectIt _trianglesBegin, ObjectIt _trianglesEnd, 
+                           ObjectIt _blasBegin, ObjectIt _blasEnd,
+                           Node* _curNode, bool _useMultipleThreads);
 
         template<typename Fun1, typename Fun2>
         void searchBestSplit(Node* _curNode, ObjectIt _objectsBegin, ObjectIt _objectsEnd, ObjectIt _trianglesBegin, ObjectIt _trianglesEnd, ObjectIt _blasBegin, ObjectIt _blasEnd,
-                             const Fun1& _movingAxis, const Fun2& _fixedAxis, Box& _leftBox, Box& _rightBox, u32& _numObjInLeft, u32& _numObjInRight) const;
+                             const Fun1& _movingAxis, const Fun2& _fixedAxis, SplitData& _splitData) const;
+
+        template<bool FillItems>
+        void fillSplitData(SplitData& _splitData, const Box& parentBox, const Box& leftBox, const Box& rightBox,
+                           ObjectIt _objectsBegin, ObjectIt _objectsEnd, ObjectIt _trianglesBegin, ObjectIt _trianglesEnd, ObjectIt _blasBegin, ObjectIt _blasEnd) const;
+
+        void fillLeafData(Node* _curNode, u32 _depth, ObjectIt _objectsBegin, ObjectIt _objectsEnd, ObjectIt _trianglesBegin, ObjectIt _trianglesEnd, ObjectIt _blasBegin, ObjectIt _blasEnd);
+        static float computeAvgObjGain(const SplitData& _data);
+        static float computeSplitScore(const SplitData& _data);
 
         void packNodeData(PackedBVHNode* _outNode, const BVHBuilder::Node& _node, u32 _leafDataOffset);
 
@@ -116,7 +136,7 @@ namespace tim
     private:
         std::string m_name;
         const u32 m_bufferAlignment = 32;
-        u32 m_maxDepth = 0, m_maxObjPerNode = 0;
+        BVHBuildParameters m_params;
         bool m_isTlas;
         std::mutex m_mutex;
 
@@ -148,6 +168,26 @@ namespace tim
             std::vector<u32> triangleList; // only if leaf
             std::vector<u32> lightList; // only if leaf
             std::vector<u32> blasList; // only if leaf
+        };
+
+        struct SplitData
+        {
+            u32 numItemsLeft = 0;
+            u32 numItemsRight = 0;
+            u32 numItemsInBoth = 0;
+            u32 numUniqueItemsLeft = 0;
+            u32 numUniqueItemsRight = 0;
+            Box leftBox;
+            Box rightBox;
+
+            std::vector<u32> objectLeft;
+            std::vector<u32> objectRight;
+
+            std::vector<u32> triangleLeft;
+            std::vector<u32> triangleRight;
+
+            std::vector<u32> blasLeft;
+            std::vector<u32> blasRight;
         };
 
         Box m_aabb;

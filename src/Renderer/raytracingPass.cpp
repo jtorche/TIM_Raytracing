@@ -13,8 +13,9 @@ namespace tim
     RayTracingPass::RayTracingPass(IRenderer* _renderer, IRenderContext* _context, ResourceAllocator& _allocator, TextureManager& _texManager) 
         : m_frameSize{ 800,600 }, m_renderer{ _renderer }, m_context{ _context }, m_resourceAllocator{ _allocator }, m_textureManager{ _texManager }
     {
-        m_rayBounceRecursionDepth = 2;
-        rebuildBvh(1, 8, false);
+        m_rayBounceRecursionDepth = 1;
+
+        rebuildBvh({}, {}, false);
 
         system("pause");
     }
@@ -24,7 +25,7 @@ namespace tim
         m_renderer->DestroyBuffer(m_bvhBuffer);
     }
 
-    void RayTracingPass::rebuildBvh(u32 _maxBlasPerNode, u32 _maxTriPerNode, bool _useTlasBlas)
+    void RayTracingPass::rebuildBvh(const BVHBuildParameters& _bvhParams, const BVHBuildParameters& _tlasParams, bool _useTlasBlas)
     {
         if (m_bvhBuffer.ptr != 0)
         {
@@ -42,10 +43,11 @@ namespace tim
 
         {
             auto start = std::chrono::system_clock::now();
-            m_bvh->buildBlas(_maxTriPerNode);
+            m_bvh->buildBlas(_bvhParams);
 
-            const u32 MaxDepth = 20;
-            m_bvh->build(MaxDepth, _useTlasBlas ? _maxBlasPerNode : _maxTriPerNode, !_useTlasBlas);
+            const bool multithread = !_useTlasBlas;
+            m_bvh->setParameters(_useTlasBlas ? _tlasParams : _bvhParams);
+            m_bvh->build(multithread);
             m_bvh->dumpStats();
             auto end = std::chrono::system_clock::now();
             std::chrono::duration<double> elapsed_seconds = end - start;

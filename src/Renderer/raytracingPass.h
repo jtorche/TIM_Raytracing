@@ -9,6 +9,7 @@ namespace tim
     class BVHBuilder;
     class BVHGeometry;
     class TextureManager;
+    struct BVHBuildParameters;
 
     struct SunData
     {
@@ -22,7 +23,7 @@ namespace tim
         RayTracingPass(IRenderer* _renderer, IRenderContext* _context, ResourceAllocator& _allocator, TextureManager& _texManager);
         ~RayTracingPass();
 
-        void rebuildBvh(u32 _maxBlasPerNode, u32 _maxTriPerNode, bool _useBlas);
+        void rebuildBvh(const BVHBuildParameters& _bvhParams, const BVHBuildParameters& _tlasParams, bool _useTlasBlas);
         void setBounceRecursionDepth(u32 _depth);
         void setFrameBufferSize(uvec2 _res);
         void draw(ImageHandle _outputBuffer, const SimpleCamera& _camera);
