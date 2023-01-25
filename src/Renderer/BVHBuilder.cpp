@@ -285,13 +285,62 @@ namespace tim
 
     void BVHBuilder::dumpStats() const
     {
+        Stats stats;
+        computeStatsRec(stats, m_nodes[0].get(), 0);
+
+        stats.meanTriangle /= stats.numLeafs;
+        stats.meanDepth /= stats.numLeafs;
+
         std::cout << "BVHBuilder stats:\n";
-        std::cout << " - leaf count: " << m_stats.numLeafs << "\n";
-        std::cout << " - mean depth: " << m_stats.meanDepth << "\n";
-        std::cout << " - mean triangles: " << m_stats.meanTriangle << "\n";
-        std::cout << " - mean blas: " << m_stats.meanBlas << "\n";
-        std::cout << " - max triangles: " << m_stats.maxTriangle << "\n";
-        std::cout << " - max blas: " << m_stats.maxBlas << "\n";
+        std::cout << " - leafs count: " << stats.numLeafs << "\n";
+        std::cout << " - mean triangles: " << stats.meanTriangle << "\n";
+        std::cout << " - mean depth: " << stats.meanDepth << "\n";
+        std::cout << " - max triangles: " << stats.maxTriangle << "\n";
+        std::cout << " - max blas: " << stats.maxBlas << "\n";
+        std::cout << " - max depth: " << stats.maxDepth << "\n";
+        std::cout << " - duplicated triangles: " << stats.numDuplicatedTriangle << "\n";
+        std::cout << " - duplicated blas: " << stats.numDuplicatedBlas << "\n";
+
+        for (auto[dupBlas, count] : stats.m_duplicatedBlas)
+        {
+            std::cout << dupBlas << " : " << m_blas[m_blasInstances[dupBlas].blasId]->getTrianglesCount() << " x " << count << std::endl;
+        }
+        system("pause");
+    }
+
+    void BVHBuilder::computeStatsRec(Stats& _stats, Node* _curNode, u32 _depth) const
+    {
+        for (u32 blas : _curNode->blasList)
+        {
+            auto[_, inserted] = _stats.m_allBlas.insert(blas);
+            if (!inserted)
+            {
+                _stats.numDuplicatedBlas++;
+                _stats.m_duplicatedBlas[blas]++;
+            }
+        }
+
+        for (u32 tri : _curNode->triangleList)
+        {
+            auto [_, inserted] = _stats.m_triangles.insert(tri);
+            if (!inserted)
+                _stats.numDuplicatedTriangle++;
+        }
+
+        if (_curNode->left && _curNode->right)
+        {
+            computeStatsRec(_stats, _curNode->left, _depth+1);
+            computeStatsRec(_stats, _curNode->right, _depth+1);
+        }
+        else
+        {
+            _stats.numLeafs++;
+            _stats.maxTriangle = std::max(_stats.maxTriangle, u32(_curNode->triangleList.size()));
+            _stats.maxBlas = std::max(_stats.maxBlas, u32(_curNode->blasList.size()));
+            _stats.maxDepth = std::max(_stats.maxDepth, _depth);
+            _stats.meanTriangle += u32(_curNode->triangleList.size());
+            _stats.meanDepth += _depth;
+        }
     }
 
     void BVHBuilder::setParameters(const BVHBuildParameters& _params)
@@ -304,8 +353,8 @@ namespace tim
 #ifdef _DEBUG
         std::for_each(std::execution::seq, m_blas.begin(), m_blas.end(),
 #else
-        //std::for_each(std::execution::par, m_blas.begin(), m_blas.end(),
-        std::for_each(std::execution::seq, m_blas.begin(), m_blas.end(),
+        std::for_each(std::execution::par, m_blas.begin(), m_blas.end(),
+        // std::for_each(std::execution::seq, m_blas.begin(), m_blas.end(),
 #endif
             [&_params](auto& blas)
             {
@@ -370,10 +419,6 @@ namespace tim
 
         addObjectsRec(0, 0xFFFFffff, objectsIds.begin(), objectsIds.end(), triangleIds.begin(), triangleIds.end(), blasIds.begin(), blasIds.end(), m_nodes[0].get(), _useMultipleThreads);
 
-        m_stats.meanDepth /= m_stats.numLeafs;
-        m_stats.meanTriangle /= m_stats.numLeafs;
-        m_stats.meanBlas /= m_stats.numLeafs;
-
         TIM_ASSERT(m_nodes.size() < g_MaxNodeCount);
     }
 
@@ -426,12 +471,6 @@ namespace tim
     void BVHBuilder::fillLeafData(Node* _curNode, u32 _depth, ObjectIt _objectsBegin, ObjectIt _objectsEnd, ObjectIt _trianglesBegin, ObjectIt _trianglesEnd, ObjectIt _blasBegin, ObjectIt _blasEnd)
     {
         const u32 numBlasAndObj = u32(std::distance(_blasBegin, _blasEnd) + std::distance(_objectsBegin, _objectsEnd));
-        m_stats.numLeafs++;
-        m_stats.meanDepth += _depth;
-        m_stats.meanTriangle += u32(std::distance(_trianglesBegin, _trianglesEnd));
-        m_stats.meanBlas += u32(numBlasAndObj);
-        m_stats.maxTriangle = std::max<u32>(m_stats.maxTriangle, (u32)std::distance(_trianglesBegin, _trianglesEnd));
-        m_stats.maxBlas = std::max<u32>(m_stats.maxBlas, u32(numBlasAndObj));
 
         for (auto it = _objectsBegin; it != _objectsEnd && _curNode->primitiveList.size() < (1u << PrimitiveBitCount); ++it)
             _curNode->primitiveList.push_back(*it);
@@ -561,6 +600,43 @@ namespace tim
 
                 addObjectsRec(_depth + 1, bestSplitData.numUniqueItemsRight,
                               objectRight.begin(), objectRight.end(), triangleRight.begin(), triangleRight.end(), blasRight.begin(), blasRight.end(), &rightNode, false);
+            }
+
+            if (m_isTlas)
+            {
+                auto mergeCommonItems = [](std::vector<u32>& _left, std::vector<u32>& _right)
+                {
+                    std::sort(_left.begin(), _left.end());
+                    std::sort(_right.begin(), _right.end());
+                    std::vector<u32> commonItems(std::min(_right.size(), _left.size()));
+                    auto it = std::set_intersection(_left.begin(), _left.end(), _right.begin(), _right.end(), commonItems.begin());
+
+                    commonItems.resize(std::distance(commonItems.begin(), it));
+                    std::vector<u32> newLeft; newLeft.reserve(_left.size() - commonItems.size());
+                    std::vector<u32> newRight; newRight.reserve(_right.size() - commonItems.size());
+
+                    auto itLeft = _left.begin();
+                    auto itRight = _right.begin();
+                    for (u32 i : commonItems)
+                    {
+                        while (*itLeft != i) newLeft.push_back(*(itLeft++));
+                        while (*itRight != i) newRight.push_back(*(itRight++));
+
+                        // skip common item
+                        ++itLeft;
+                        ++itRight;
+                    }
+
+                    while (itLeft != _left.end()) newLeft.push_back(*(itLeft++));
+                    while (itRight != _right.end()) newRight.push_back(*(itRight++));
+
+                    _left = std::move(newLeft);
+                    _right = std::move(newRight);
+                    return commonItems;
+                };
+
+                _curNode->blasList = std::move(mergeCommonItems(leftNode.blasList, rightNode.blasList));
+                _curNode->primitiveList = std::move(mergeCommonItems(leftNode.primitiveList, rightNode.primitiveList));
             }
         }
     }

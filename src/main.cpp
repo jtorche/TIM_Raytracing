@@ -213,7 +213,7 @@ int main(int argc, char* argv[])
                     if (useTlas)
                     {
                         std::cout << "Tlas Params, min blas per node : "; std::cin >> tlasParams.minObjPerNode;
-                        tlasParams.minObjGain = 4;
+                        std::cout << "Tlas Params, min obj gain : "; std::cin >> tlasParams.minObjGain;
                         std::cout << "Tlas Params, volume heuristic : "; std::cin >> tlasParams.expandNodeVolumeThreshold;
                     }
 

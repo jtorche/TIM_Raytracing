@@ -1,6 +1,7 @@
 #pragma once
 #include "timCore/type.h"
 #include <vector>
+#include <unordered_set>
 
 #include "Shaders/primitive_cpp.glsl"
 #include "BVHGeometry.h"
@@ -133,6 +134,23 @@ namespace tim
         CollisionType primitiveBoxCollision(const Primitive& _prim, const Box& _box) const;
         CollisionType primitiveSphereCollision(const Primitive& _prim, const Sphere& _sphere) const;
 
+        struct Stats
+        {
+            u32 numLeafs = 0;
+            u32 maxTriangle = 0;
+            u32 maxBlas = 0;
+            u32 maxDepth = 0;
+            float meanTriangle = 0;
+            float meanDepth = 0;
+            u32 numDuplicatedTriangle = 0;
+            u32 numDuplicatedBlas = 0;
+
+            std::unordered_set<u32> m_triangles;
+            std::unordered_set<u32> m_allBlas;
+            std::unordered_map<u32, u32> m_duplicatedBlas;
+        };
+        void computeStatsRec(Stats& _stats, Node* _curNode, u32 _depth) const;
+
     private:
         std::string m_name;
         const u32 m_bufferAlignment = 32;
@@ -140,16 +158,6 @@ namespace tim
         bool m_isTlas;
         std::mutex m_mutex;
 
-        // stats for leaf node
-        struct Stats
-        {
-            u32 numLeafs = 0;
-            u32 maxTriangle = 0;
-            u32 maxBlas = 0;
-            float meanTriangle = 0;
-            float meanBlas = 0;
-            float meanDepth = 0;
-        };
         Stats m_stats;
 
         const BVHGeometry& m_geometryBuffer;
