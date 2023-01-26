@@ -205,7 +205,6 @@ uint tlas_collide(uint _nid, Ray _ray, inout ClosestHit closestHit)
 			ClosestHit_setDebugColorId(closestHit, objIndex);
 
 			storeHitNormal(closestHit, hit.normal);
-			storeHitColor(closestHit, vec3(1, 1, 1));
 		}
 	}
 
@@ -223,7 +222,7 @@ uint tlas_collide(uint _nid, Ray _ray, inout ClosestHit closestHit)
 			if(prevNid != closestHit.nid) // has hit
 			{
 				closestHit.nid = _nid;
-				closestHit.mid_objId = 0x0000FFFF;
+				closestHit.mid_objId = (g_blasHeader[blasIndex].matId << 16) | 0x0000FFFF;
 			}
 		}
 	}
@@ -255,7 +254,6 @@ void bvh_collide(uint _nid, Ray _ray, inout ClosestHit closestHit)
 			ClosestHit_setDebugColorId(closestHit, objIndex);
 
 			storeHitNormal(closestHit, hit.normal);
-			storeHitColor(closestHit, vec3(1,1,1));
 		}
 	}
 	#endif
@@ -271,12 +269,6 @@ void bvh_collide(uint _nid, Ray _ray, inout ClosestHit closestHit)
 		{
 			vec4 color = vec4(1,1,1,1);
 			uint matId = (triangle.index2_matId & 0xFFFF0000) >> 16;
-			uint diffuseMap = g_BvhMaterialData[matId].type_ids.y & 0xFFFF;
-			
-		#if DYNAMIC_TEXTURE_INDEXING
-			if (diffuseMap < 0xFFFF)
-				color = texture(g_dataTextures[nonuniformEXT(diffuseMap)], hit.uv);
-		#endif
 			
 			hasHit = color.a > 0.5;
 			if (hasHit)
@@ -286,7 +278,6 @@ void bvh_collide(uint _nid, Ray _ray, inout ClosestHit closestHit)
 				closestHit.nid = _nid;
 				ClosestHit_setDebugColorId(closestHit, triIndex);
 
-				storeHitColor(closestHit, color.xyz);
 				storeHitNormal(closestHit, hit.normal);
 				storeHitUv(closestHit, hit.uv);
 			}
@@ -310,7 +301,6 @@ void bvh_collide(uint _nid, Ray _ray, inout ClosestHit closestHit)
 			ClosestHit_setDebugColorId(closestHit, blasIndex);
 
 			storeHitNormal(closestHit, hit.normal);
-			storeHitColor(closestHit, vec3(1, 1, 1));
 		}
 	}
 	#endif
@@ -441,7 +431,7 @@ void brutForceTraverse(Ray _ray, inout ClosestHit closestHit)
 	
 		closestHit.t = hasHit ? hit.t * OFFSET_RAY_COLLISION : closestHit.t;
 		closestHit.normal = hasHit ? hit.normal : closestHit.normal;
-		closestHit.mid_objId = hasHit ? (0x0000FFFF | (g_blasHeader[i].matId & 0xFFFF0000)) : closestHit.mid_objId;
+		closestHit.mid_objId = hasHit ? (0x0000FFFF | ((g_blasHeader[i].matId << 16) & 0xFFFF0000)) : closestHit.mid_objId;
 
 		debugObjIndex++;
 		if(hasHit)

@@ -57,19 +57,9 @@ layout(std430, set = 1, binding = 2) buffer GeometryData_TexCoord
 layout(set = 0, binding = g_dataTextures_bind) uniform sampler2D g_dataTextures[TEXTURE_ARRAY_SIZE];
 
 #if USE_SHARED_MEM
-shared vec3 g_colorHit[LOCAL_SIZE * LOCAL_SIZE];
 shared vec3 g_normalHit[LOCAL_SIZE * LOCAL_SIZE];
 shared vec2 g_uvHit[LOCAL_SIZE * LOCAL_SIZE];
 #endif
-
-vec3 getHitColor(in ClosestHit _hit)
-{
-#if USE_SHARED_MEM
-    return g_colorHit[gl_LocalInvocationIndex];
-#else
-    return _hit.texColor;
-#endif
-}
 
 vec3 getHitNormal(in ClosestHit _hit)
 {
@@ -86,15 +76,6 @@ vec2 getHitUv(in ClosestHit _hit)
     return g_uvHit[gl_LocalInvocationIndex];
 #else
     return _hit.uv;
-#endif
-}
-
-void storeHitColor(inout ClosestHit _hit, vec3 _color)
-{
-#if USE_SHARED_MEM
-    g_colorHit[gl_LocalInvocationIndex] = _color;
-#else
-    _hit.texColor = _color;
 #endif
 }
 

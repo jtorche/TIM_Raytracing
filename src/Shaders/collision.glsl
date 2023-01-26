@@ -90,7 +90,6 @@ float CollideTriangle(Ray r, vec3 p0, vec3 p1, vec3 p2, float tmax)
 struct ClosestHit
 {
 #if !USE_SHARED_MEM
-    vec3 texColor;
     vec3 normal;
 	vec2 uv;
 #endif

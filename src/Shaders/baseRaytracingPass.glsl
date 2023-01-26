@@ -35,7 +35,7 @@ vec3 rayTrace(in PassData _passData, in Ray _ray, out ClosestHit _hitResult)
 
 	#if DEBUG_BVH_TRAVERSAL
 	const uint numColors = 5;
-	const uint step = 75;
+	const uint step = 50;
 	const uint maxTraversal = step * numColors;
 	vec3 dbgColor[6] =
 	{
@@ -65,14 +65,7 @@ vec3 rayTrace(in PassData _passData, in Ray _ray, out ClosestHit _hitResult)
 	#if NO_LIGHTING
 		lit = getHitColor(closestHit);
 	#else
-		// For now we iterate over all lights because its not correct to fetch lights from BVH node data
-		// We will need an additional spatial struct for lights
-		//lit += computeDirectLighting(rootId, _ray, closestHit);
-
-		for(uint i=0 ; i<g_Constants.numLights ; ++i)
-			lit += evalLighting(rootId, i, getMaterialId(closestHit), _ray, closestHit);
-
-		lit += computeSunLighting(rootId, _passData.sunDir.xyz, _passData.sunColor.xyz, getMaterialId(closestHit), _ray, closestHit);
+		lit += computeDirectLighting(rootId, _ray, _passData, closestHit);
 	#endif
 
 #else
