@@ -539,7 +539,7 @@ namespace tim
             //    __debugbreak();
             //}
 
-            if (numObjects - bestSplit.numItemsLeft < m_params.minObjGain && numObjects - bestSplit.numItemsRight < m_params.minObjGain)
+            if (_depth > 0 && (numObjects - bestSplit.numItemsLeft < m_params.minObjGain && numObjects - bestSplit.numItemsRight < m_params.minObjGain))
             {
                 fillLeafData(_curNode, _depth, _objectsBegin, _objectsEnd, _trianglesBegin, _trianglesEnd, _blasBegin, _blasEnd);
                 return;
