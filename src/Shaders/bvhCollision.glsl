@@ -218,12 +218,6 @@ uint tlas_collide(uint _nid, Ray _ray, inout ClosestHit closestHit)
 		{
 			uint prevNid = closestHit.nid;
 			numTraversal += traverseBvh(_ray, g_blasHeader[blasIndex].rootIndex, closestHit);
-
-			if(prevNid != closestHit.nid) // has hit
-			{
-				closestHit.nid = _nid;
-				closestHit.mid_objId = (g_blasHeader[blasIndex].matId << 16) | 0x0000FFFF;
-			}
 		}
 	}
 

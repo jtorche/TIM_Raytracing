@@ -99,7 +99,7 @@ namespace tim
         void fillGpuBuffer(void* _data, uvec2& _triangleOffsetRange, uvec2& _primitiveOffsetRange, uvec2& _materialOffsetRange, uvec2& _lightOffsetRange, uvec2& _nodeOffsetRange, uvec2& m_leafDataOffsetRange, uvec2& _blasOffsetRange);
 
         // Helpers
-        void fillTriangles(byte* _outData) const;
+        void fillTriangles(byte* _outData, u32 _matIdOffset = 0) const;
 
     private:
         void addTriangle(const BVHGeometry::TriangleData& _triangle, u32 _materialId);
@@ -205,6 +205,7 @@ namespace tim
         std::vector<Primitive> m_objects;
         std::vector<Light> m_lights;
         std::vector<std::unique_ptr<BVHBuilder>> m_blas;
+        std::vector<u32> m_blasMaterialIdOffset;
         std::vector<BlasInstance> m_blasInstances;
     };
 }

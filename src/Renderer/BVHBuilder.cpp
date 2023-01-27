@@ -277,9 +277,11 @@ namespace tim
     void BVHBuilder::addBlas(std::unique_ptr<BVHBuilder> _blas)
     {
         TIM_ASSERT(_blas->m_triangleMaterials.size() == 1);
-        u32 matId = (u32)m_triangleMaterials.size();
+        u32 matIdOffset = (u32)m_triangleMaterials.size();
+        m_blasMaterialIdOffset.push_back(matIdOffset);
         m_triangleMaterials.push_back(_blas->m_triangleMaterials[0]);
-        m_blasInstances.push_back({ u32(m_blas.size()), matId, {} });
+
+        m_blasInstances.push_back({ u32(m_blas.size()), matIdOffset, {} });
         m_blas.push_back(std::move(_blas));
     }
 
@@ -1020,7 +1022,7 @@ namespace tim
 
         for (u32 i = 0; i < m_blas.size(); ++i)
         {
-            m_blas[i]->fillTriangles(out);
+            m_blas[i]->fillTriangles(out, m_blasMaterialIdOffset[i]);
             out += sizeof(Triangle) * m_blas[i]->getTrianglesCount();
         }
         
@@ -1185,12 +1187,13 @@ namespace tim
         }
     }
 
-    void BVHBuilder::fillTriangles(byte* _outData) const
+    void BVHBuilder::fillTriangles(byte* _outData, u32 _matIdOffset) const
     {
         for (u32 i = 0; i < m_triangles.size(); ++i)
         {
             Triangle* tri = reinterpret_cast<Triangle*>(_outData);
             *tri = m_triangles[i];
+            tri->index2_matId += (_matIdOffset << 16);
 
             _outData += sizeof(Triangle);
         }
