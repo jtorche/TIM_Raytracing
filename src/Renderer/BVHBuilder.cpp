@@ -281,7 +281,7 @@ namespace tim
         m_blasMaterialIdOffset.push_back(matIdOffset);
         m_triangleMaterials.push_back(_blas->m_triangleMaterials[0]);
 
-        m_blasInstances.push_back({ u32(m_blas.size()), matIdOffset, {} });
+        m_blasInstances.push_back({ u32(m_blas.size()), {} });
         m_blas.push_back(std::move(_blas));
     }
 
@@ -1180,7 +1180,6 @@ namespace tim
 
             header->minExtent = m_blasInstances[i].aabb.minExtent;
             header->maxExtent = m_blasInstances[i].aabb.maxExtent;
-            header->matId = m_blasInstances[i].matId;
             header->rootIndex = blasRootIndex[blasId];
 
             blasHeaderWritePtr += sizeof(BlasHeader);

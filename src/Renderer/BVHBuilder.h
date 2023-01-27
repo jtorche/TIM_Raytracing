@@ -45,7 +45,6 @@ namespace tim
     struct BlasInstance
     {
         u32 blasId;
-        u32 matId;
         Box aabb;
     };
 
