@@ -79,6 +79,7 @@ namespace tim
         void addBlas(std::unique_ptr<BVHBuilder> _blas);
         void addSphereLight(const SphereLight& _light);
         void addAreaLight(const AreaLight& _light);
+        void mergeBlas(const std::unique_ptr<BVHBuilder>& _blas);
 
         void buildBlas(const BVHBuildParameters& _params);
         void build(bool _useMultipleThreads);

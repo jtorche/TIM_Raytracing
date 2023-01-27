@@ -246,7 +246,7 @@ namespace tim
         auto glassMat = BVHBuilder::createTransparentMaterial({ 0.8f,0.8f,0.8f }, 1.1f, 0);
         auto redGlassMat = BVHBuilder::createTransparentMaterial({ 1,0.5,0.5 }, 1.05f, 0.1f);
 
-        Material suzanneMat = BVHBuilder::createLambertianMaterial({ 0.9f, 0.9f, 0.9f });
+        Material suzanneMat = BVHBuilder::createPbrMaterial({ 1, 0.2f, 0.2f }, 1);
         Material roomMat = BVHBuilder::createLambertianMaterial({ 0.9f, 0.9f, 0.9f });
         Material redMat = BVHBuilder::createLambertianMaterial({ 0.9f, 0.2f, 0.2f });
         Material blueMat = BVHBuilder::createLambertianMaterial({ 0.2f, 0.2f, 0.9f });
@@ -292,7 +292,17 @@ namespace tim
     #ifndef _DEBUG
             loadBlas("./data/suzanne.obj", { -2.5f, 0, 1.3f }, vec3(1), blas, &suzanneMat);
             loadBlas("./data/suzanne.obj", { 3.f, 0, 1.3f }, vec3(1), blas, &suzanneMat);
-            loadBlas("./data/sponza.obj", {}, vec3(0.01f), blas, nullptr, true);
+
+            std::vector<std::unique_ptr<BVHBuilder>> sponzaBlas;
+            loadBlas("./data/sponza.obj", {}, vec3(0.01f), sponzaBlas, nullptr, true);
+
+            if (!sponzaBlas.empty())
+            {
+                for (auto it = sponzaBlas.begin() + 1; it != sponzaBlas.end(); ++it)
+                    sponzaBlas[0]->mergeBlas(std::move(*it));
+                
+                blas.push_back(std::move(sponzaBlas[0]));
+            }
     #else
             loadBlas("./data/suzanne.obj", { 0, 0, 0 }, vec3(1), blas, &suzanneMat);
     #endif

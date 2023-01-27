@@ -13,7 +13,7 @@ namespace tim
     RayTracingPass::RayTracingPass(IRenderer* _renderer, IRenderContext* _context, ResourceAllocator& _allocator, TextureManager& _texManager) 
         : m_frameSize{ 800,600 }, m_renderer{ _renderer }, m_context{ _context }, m_resourceAllocator{ _allocator }, m_textureManager{ _texManager }
     {
-        m_rayBounceRecursionDepth = 1;
+        m_rayBounceRecursionDepth = 2;
 
         BVHBuildParameters blasParams;
         blasParams.minObjPerNode = 8;
@@ -54,7 +54,7 @@ namespace tim
             auto start = std::chrono::system_clock::now();
             m_bvh->buildBlas(_bvhParams);
 
-            const bool multithread = !_useTlasBlas;
+            const bool multithread = true;
             m_bvh->setParameters(_useTlasBlas ? _tlasParams : _bvhParams);
             m_bvh->build(multithread);
             m_bvh->dumpStats();

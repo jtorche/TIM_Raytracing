@@ -276,13 +276,25 @@ namespace tim
 
     void BVHBuilder::addBlas(std::unique_ptr<BVHBuilder> _blas)
     {
-        TIM_ASSERT(_blas->m_triangleMaterials.size() == 1);
         u32 matIdOffset = (u32)m_triangleMaterials.size();
         m_blasMaterialIdOffset.push_back(matIdOffset);
-        m_triangleMaterials.push_back(_blas->m_triangleMaterials[0]);
+
+        m_triangleMaterials.insert(m_triangleMaterials.end(), _blas->m_triangleMaterials.begin(), _blas->m_triangleMaterials.end());
 
         m_blasInstances.push_back({ u32(m_blas.size()), {} });
         m_blas.push_back(std::move(_blas));
+    }
+
+    void BVHBuilder::mergeBlas(const std::unique_ptr<BVHBuilder>& _blas)
+    {
+        u32 matOffset = u32(m_triangleMaterials.size());
+        for (Triangle tri : _blas->m_triangles)
+        {
+            tri.index2_matId += (matOffset << 16);
+            m_triangles.push_back(tri);
+        }
+
+        m_triangleMaterials.insert(m_triangleMaterials.end(), _blas->m_triangleMaterials.begin(), _blas->m_triangleMaterials.end());
     }
 
     void BVHBuilder::dumpStats() const
@@ -361,7 +373,7 @@ namespace tim
             [&_params](auto& blas)
             {
                 blas->setParameters(_params);
-                blas->build(false);
+                blas->build(true);
             });
 
         // std::for_each(std::execution::seq, m_blas.begin(), m_blas.end(), [](auto& blas) { blas->dumpStats(); });
@@ -579,7 +591,7 @@ namespace tim
             auto& blasRight = bestSplitData.blasRight;
 
         #ifndef _DEBUG
-            if (_depth < 3 && _useMultipleThreads)
+            if (_useMultipleThreads && numObjects > 10'000)
             {
                 std::thread th1([&]()
                 {
