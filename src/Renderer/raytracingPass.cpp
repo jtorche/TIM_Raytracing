@@ -15,7 +15,16 @@ namespace tim
     {
         m_rayBounceRecursionDepth = 1;
 
-        rebuildBvh({}, {}, false);
+        BVHBuildParameters blasParams;
+        blasParams.minObjPerNode = 8;
+        blasParams.minObjGain = 8;
+        blasParams.expandNodeVolumeThreshold = 0.25;
+
+        BVHBuildParameters tlasParams;
+        tlasParams.minObjPerNode = 6;
+        tlasParams.minObjGain = 6;
+        tlasParams.expandNodeVolumeThreshold = 1;
+        rebuildBvh(blasParams, tlasParams, true);
 
         system("pause");
     }

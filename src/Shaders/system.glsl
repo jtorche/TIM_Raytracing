@@ -30,10 +30,10 @@ vec4 toLinear(vec4 sRGB)
 #define NO_BVH				0
 #define TILE_FRUSTUM_CULL	0
 #define USE_SHARED_MEM		1
-#define USE_TRAVERSE_TLAS   0
+#define USE_TRAVERSE_TLAS   1
 
 #define NO_LIGHTING         0
-#define DEBUG_GEOMETRY		0
+#define DEBUG_GEOMETRY		1
 #define DEBUG_BVH		    0
 #define DEBUG_BVH_TRAVERSAL 0
 
