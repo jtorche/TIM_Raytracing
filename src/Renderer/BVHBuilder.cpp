@@ -559,6 +559,9 @@ namespace tim
                 return;
             }
 
+            // Fill leaf data only for lights
+            fillLeafData(_curNode, _depth, _objectsEnd, _objectsEnd, _trianglesEnd, _trianglesEnd, _blasEnd, _blasEnd);
+
             SplitData bestSplitData;
             fillSplitData<true>(bestSplitData, _curNode->extent, bestSplit.leftBox, bestSplit.rightBox, _objectsBegin, _objectsEnd, _trianglesBegin, _trianglesEnd, _blasBegin, _blasEnd);
 

@@ -20,7 +20,7 @@ namespace tim
         vec3 getVertexPosition(u32 _vertexOffet, u32 _index) const;
 
 		void flush(IRenderer* _renderer);
-        void generateGeometryBufferBindings(BufferBinding& _positions, BufferBinding& _normals, BufferBinding& _texcoords);
+        void generateGeometryBufferBindings(BufferBinding& _positions, BufferBinding& _normals, BufferBinding& _texcoords) const;
 
 	private:
 		IRenderer* m_renderer;

@@ -6,7 +6,8 @@
 #include "Renderer/SimpleCamera.h"
 #include "Renderer/shaderMacros.h"
 #include "Renderer/TextureManager.h"
-#include "Renderer/BVHBuilder.h"
+#include "Renderer/Scene.h"
+#include "Renderer/BVHData.h"
 
 #include <iostream>
 
@@ -184,6 +185,21 @@ int main(int argc, char* argv[])
         const u32 downScaleFactor = 8;
         TextureManager textureManager(g_renderer, downScaleFactor);
         textureManager.loadTexture("./data/image/ibl_brdf_lut.png");
+
+        Scene scene(g_renderer, textureManager);
+        {
+            BVHBuildParameters blasParams;
+            blasParams.minObjPerNode = 8;
+            blasParams.minObjGain = 8;
+            blasParams.expandNodeVolumeThreshold = 0.25;
+
+            BVHBuildParameters tlasParams;
+            tlasParams.minObjPerNode = 6;
+            tlasParams.minObjGain = 6;
+            tlasParams.expandNodeVolumeThreshold = 1;
+            scene.build(blasParams, tlasParams, true);
+        }
+
         RayTracingPass rtPass(g_renderer, context, resourceAllocator, textureManager);
         PostprocessPass postprocessPass(g_renderer, context);
 
@@ -209,7 +225,6 @@ int main(int argc, char* argv[])
                     bool useTlas = false;
                     std::cout << "Use tlas ? : "; std::cin >> useTlas;
                    
-
                     if (useTlas)
                     {
                         std::cout << "Tlas Params, min blas per node : "; std::cin >> tlasParams.minObjPerNode;
@@ -225,7 +240,7 @@ int main(int argc, char* argv[])
                     std::cin >> recursionDepth;
 
                     rtPass.setBounceRecursionDepth(recursionDepth);
-                    rtPass.rebuildBvh(params, tlasParams, useTlas);
+                    scene.build(params, tlasParams, useTlas);
                 }
 
                 g_renderer->BeginFrame();
@@ -236,11 +251,11 @@ int main(int argc, char* argv[])
 
                 postprocessPass.setFrameBufferSize(frameResolution);
                 rtPass.setFrameBufferSize(frameResolution);
-                rtPass.setSunData(g_sunData);
+                scene.setSunData(g_sunData);
 
                 ImageCreateInfo imgInfo(ImageFormat::RGBA16F, frameResolution.x, frameResolution.y, 1, 1, ImageType::Image2D, MemoryType::Default);
                 ImageHandle outputColorBuffer = resourceAllocator.allocTexture(imgInfo);
-                rtPass.draw(outputColorBuffer, camera);
+                rtPass.draw(outputColorBuffer, scene, camera);
 
                 ImageCreateInfo imgInfo2(ImageFormat::RGBA8, frameResolution.x, frameResolution.y, 1, 1, ImageType::Image2D, MemoryType::Default, ImageUsage::Sampled | ImageUsage::Storage);
                 ImageHandle finalOutput = resourceAllocator.allocTexture(imgInfo2);

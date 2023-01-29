@@ -5,17 +5,9 @@
 
 namespace tim
 {
+    class Scene;
     class SimpleCamera;
-    class BVHBuilder;
-    class BVHGeometry;
     class TextureManager;
-    struct BVHBuildParameters;
-
-    struct SunData
-    {
-        vec3 sunDir = vec3(0.3f, 0.3f, -1);
-        vec3 sunColor = vec3(3,3,3);
-    };
 
     class RayTracingPass
     {
@@ -23,35 +15,22 @@ namespace tim
         RayTracingPass(IRenderer* _renderer, IRenderContext* _context, ResourceAllocator& _allocator, TextureManager& _texManager);
         ~RayTracingPass();
 
-        void rebuildBvh(const BVHBuildParameters& _bvhParams, const BVHBuildParameters& _tlasParams, bool _useTlasBlas);
         void setBounceRecursionDepth(u32 _depth);
         void setFrameBufferSize(uvec2 _res);
-        void draw(ImageHandle _outputBuffer, const SimpleCamera& _camera);
-
-        void setSunData(const SunData& _data);
+        void draw(ImageHandle _outputBuffer, const Scene& _scene, const SimpleCamera& _camera);
 
     private:
-        void drawBounce(u32 _depth, BufferView _passData, BufferHandle _inputRayBuffer, ImageHandle _outputImage);
+        void drawBounce(const Scene& _scene, u32 _depth, BufferView _passData, BufferHandle _inputRayBuffer, ImageHandle _outputImage);
         u32 getRayStorageBufferSize() const;
 
     private:
-        u32 m_rayBounceRecursionDepth;
-        uvec2 m_frameSize;
         IRenderer* m_renderer = nullptr;
         IRenderContext* m_context = nullptr;
         ResourceAllocator& m_resourceAllocator;
         TextureManager& m_textureManager;
 
-        SunData m_sunData;
-        std::unique_ptr<BVHBuilder> m_bvh;
-        std::unique_ptr<BVHGeometry> m_geometryBuffer;
-        BufferHandle m_bvhBuffer;
-        uvec2 m_bvhTriangleOffsetRange;
-        uvec2 m_bvhPrimitiveOffsetRange;
-        uvec2 m_bvhMaterialOffsetRange;
-        uvec2 m_bvhLightOffsetRange;
-        uvec2 m_bvhNodeOffsetRange;
-        uvec2 m_bvhLeafDataOffsetRange;
-        uvec2 m_bvhBlasHeaderDataOffsetRange;
+        u32 m_rayBounceRecursionDepth;
+        uvec2 m_frameSize;
+
     };
 }

@@ -1,5 +1,6 @@
 #include "Scene.h"
 #include "timCore/Common.h"
+#include "BVHData.h"
 #include "BVHBuilder.h"
 #include "BVHGeometry.h"
 #include "TextureManager.h"
@@ -32,10 +33,21 @@ namespace std
 
 namespace tim
 {
-    Scene::Scene(BVHGeometry& _geometryBuffer, TextureManager& _texManager) : m_geometryBuffer{ _geometryBuffer }, m_texManager{ _texManager }
+    Scene::Scene(IRenderer* _renderer, TextureManager& _texManager) : m_renderer{ _renderer }, m_texManager { _texManager }
     {
-
     }
+
+    void Scene::fillGeometryBufferBindings(std::vector<BufferBinding>& _bindings) const
+    {
+        _bindings.reserve(_bindings.size() + 3);
+        m_geometryBuffer->generateGeometryBufferBindings(_bindings.emplace_back(), _bindings.emplace_back(), _bindings.emplace_back());
+    }
+
+    u32 Scene::getPrimitivesCount() const { return m_bvh->getPrimitivesCount(); }
+    u32 Scene::getTrianglesCount() const { return m_bvh->getTrianglesCount(); }
+    u32 Scene::getBlasInstancesCount() const { return m_bvh->getBlasInstancesCount(); }
+    u32 Scene::getLightsCount() const { return m_bvh->getLightsCount(); }
+    u32 Scene::getNodesCount() const { return m_bvh->getNodesCount(); }
 
     namespace
     {
@@ -174,7 +186,7 @@ namespace tim
 
                 if (data.vertexData.size() < (1u << 16))
                 {
-                    u32 vertexOffset = m_geometryBuffer.addTriangleList((u32)data.vertexData.size(), &data.vertexData[0], &data.normalData[0], &data.texcoordData[0]);
+                    u32 vertexOffset = m_geometryBuffer->addTriangleList((u32)data.vertexData.size(), &data.vertexData[0], &data.normalData[0], &data.texcoordData[0]);
                     TIM_ASSERT(data.indexData.size() % 3 == 0);
                     _builder->addTriangleList(vertexOffset, (u32)data.indexData.size() / 3, &data.indexData[0], _mat ? *_mat : materials[data.materialId]);
                 }
@@ -219,9 +231,9 @@ namespace tim
                 if (data.vertexData.size() < (1u << 16))
                 {
                     Material blasMaterial = _mat ? *_mat : (data.materialId >= 0 ? materials[data.materialId] : BVHBuilder::createLambertianMaterial({ 0.9f, 0.9f, 0.9f }));
-                    _blas.emplace_back() = std::make_unique<BVHBuilder>(shapes[objId].name, m_geometryBuffer, false);
+                    _blas.emplace_back() = std::make_unique<BVHBuilder>(shapes[objId].name, *m_geometryBuffer, false);
                    
-                    u32 vertexOffset = m_geometryBuffer.addTriangleList((u32)data.vertexData.size(), &data.vertexData[0], &data.normalData[0], &data.texcoordData[0]);
+                    u32 vertexOffset = m_geometryBuffer->addTriangleList((u32)data.vertexData.size(), &data.vertexData[0], &data.normalData[0], &data.texcoordData[0]);
                     TIM_ASSERT(data.indexData.size() % 3 == 0);
                     _blas.back()->addTriangleList(vertexOffset, (u32)data.indexData.size() / 3, &data.indexData[0], blasMaterial);
                 }
@@ -237,8 +249,13 @@ namespace tim
         }
     }
 
-    void Scene::build(BVHBuilder* _bvh, bool _useTlasBlas)
+    void Scene::build(const BVHBuildParameters& _bvhParams, const BVHBuildParameters& _tlasParams, bool _useTlasBlas)
     {
+        m_renderer->WaitForIdle();
+        m_geometryBuffer = std::make_unique<BVHGeometry>(m_renderer, 1024 * 1024);
+        m_bvh = std::make_unique<BVHBuilder>("BVHData", *m_geometryBuffer, _useTlasBlas);
+        m_bvhData = std::make_unique<BVHData>(m_renderer, *m_geometryBuffer);
+
 #if 1
         const float DIMXY = 3.1f;
         const float DIMZ = 2;
@@ -254,15 +271,15 @@ namespace tim
         Material pbrMatMetal = BVHBuilder::createPbrMaterial({ 0.9f, 0.9f, 0.9f }, 1);
 
     #ifndef _DEBUG
-        _bvh->addSphere({ { 0, 0, 4.1f }, 0.08f }, BVHBuilder::createEmissiveMaterial({ 1, 1, 1 }));
-        _bvh->addSphereLight({ { 0, 0, 4.1f }, 30, { 2, 2, 2 }, 0.1f });
+        m_bvh->addSphere({ { 0, 0, 4.1f }, 0.08f }, BVHBuilder::createEmissiveMaterial({ 1, 1, 1 }));
+        m_bvh->addSphereLight({ { 0, 0, 4.1f }, 30, { 2, 2, 2 }, 0.1f });
 
-        _bvh->addSphere({ { -9.18164f , 3.32356f , 6.98306f }, 0.05f }, BVHBuilder::createEmissiveMaterial({ 1,0.2f,0.2f }));
-        _bvh->addSphereLight({ { -9.18164f , 3.32356f , 6.98306f }, 16, { 3,0.5,0.5 }, 0.1f });
+        m_bvh->addSphere({ { -9.18164f , 3.32356f , 6.98306f }, 0.05f }, BVHBuilder::createEmissiveMaterial({ 1,0.2f,0.2f }));
+        m_bvh->addSphereLight({ { -9.18164f , 3.32356f , 6.98306f }, 16, { 3,0.5,0.5 }, 0.1f });
 
-        _bvh->addSphere({ {  2.0f, 0, 1.3f }, 0.2f }, pbrMatMetal);
-        _bvh->addSphere({ {  0.5f, 0, 1.3f }, 0.2f }, BVHBuilder::createTransparentMaterial({ 1,0.6f,0.6f }, 1.05f, 0.05f));
-        _bvh->addSphere({ { -1.5f, 0, 1.3f }, 0.2f }, BVHBuilder::createPbrMaterial({ 1,0.6f,0.6f }, 0));
+        m_bvh->addSphere({ {  2.0f, 0, 1.3f }, 0.2f }, pbrMatMetal);
+        m_bvh->addSphere({ {  0.5f, 0, 1.3f }, 0.2f }, BVHBuilder::createTransparentMaterial({ 1,0.6f,0.6f }, 1.05f, 0.05f));
+        m_bvh->addSphere({ { -1.5f, 0, 1.3f }, 0.2f }, BVHBuilder::createPbrMaterial({ 1,0.6f,0.6f }, 0));
     #else
         _bvh->addSphereLight({ { 0, 0, 4.1f }, 30, { 2, 2, 2 }, 0.1f });
     #endif
@@ -274,12 +291,12 @@ namespace tim
         {
         #ifndef _DEBUG
             BVHBuilder::setTextureMaterial(suzanneMat, texFlame, 0);
-            addOBJ("./data/suzanne.obj", { -2.5f, 0, 1.3f }, vec3(1), _bvh, suzanneMat);
+            addOBJ("./data/suzanne.obj", { -2.5f, 0, 1.3f }, vec3(1), m_bvh.get(), suzanneMat);
 
             BVHBuilder::setTextureMaterial(suzanneMat, texDot, 0);
-            addOBJ("./data/suzanne.obj", { 3.f, 0, 1.3f }, vec3(1), _bvh, suzanneMat);
+            addOBJ("./data/suzanne.obj", { 3.f, 0, 1.3f }, vec3(1), m_bvh.get(), suzanneMat);
 
-            addOBJWithMtl("./data/sponza.obj", {}, vec3(0.01f), _bvh, true);
+            addOBJWithMtl("./data/sponza.obj", {}, vec3(0.01f), m_bvh.get(), true);
         #else
             BVHBuilder::setTextureMaterial(suzanneMat, texFlame, 0);
             addOBJ("./data/suzanne.obj", { 0, 0, 0 }, vec3(1), _bvh, suzanneMat);
@@ -307,8 +324,10 @@ namespace tim
             loadBlas("./data/suzanne.obj", { 0, 0, 0 }, vec3(1), blas, &suzanneMat);
     #endif
             for (auto& b : blas)
-                _bvh->addBlas(std::move(b));
+                m_bvh->addBlas(std::move(b));
         } 
 #endif
+        m_geometryBuffer->flush(m_renderer);
+        m_bvhData->build(*m_bvh, _bvhParams, _tlasParams, _useTlasBlas);
     }
 }

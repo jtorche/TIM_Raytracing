@@ -77,7 +77,7 @@ namespace tim
         }
 	}
 
-    void BVHGeometry::generateGeometryBufferBindings(BufferBinding& _positions, BufferBinding& _normals, BufferBinding& _texcoords)
+    void BVHGeometry::generateGeometryBufferBindings(BufferBinding& _positions, BufferBinding& _normals, BufferBinding& _texcoords) const
     {
         _positions = { { m_gpuBuffer, 0, m_maxVertexCount * sizeof(vec3) }, { 1, 0 } };
         _normals = { { m_gpuBuffer, m_maxVertexCount * sizeof(vec3), m_maxVertexCount * sizeof(vec3) }, { 1, 1 } };

@@ -1,10 +1,10 @@
 #include "raytracingPass.h"
+#include "TextureManager.h"
 #include "SimpleCamera.h"
-#include "BVHBuilder.h"
+#include "BVHData.h"
 #include "shaderMacros.h"
 #include "Scene.h"
 #include "Shaders/struct_cpp.glsl"
-#include "TextureManager.h"
 
 #include <iostream>
 
@@ -14,61 +14,10 @@ namespace tim
         : m_frameSize{ 800,600 }, m_renderer{ _renderer }, m_context{ _context }, m_resourceAllocator{ _allocator }, m_textureManager{ _texManager }
     {
         m_rayBounceRecursionDepth = 2;
-
-        BVHBuildParameters blasParams;
-        blasParams.minObjPerNode = 8;
-        blasParams.minObjGain = 8;
-        blasParams.expandNodeVolumeThreshold = 0.25;
-
-        BVHBuildParameters tlasParams;
-        tlasParams.minObjPerNode = 6;
-        tlasParams.minObjGain = 6;
-        tlasParams.expandNodeVolumeThreshold = 1;
-        rebuildBvh(blasParams, tlasParams, true);
-
-        system("pause");
     }
 
     RayTracingPass::~RayTracingPass()
     {
-        m_renderer->DestroyBuffer(m_bvhBuffer);
-    }
-
-    void RayTracingPass::rebuildBvh(const BVHBuildParameters& _bvhParams, const BVHBuildParameters& _tlasParams, bool _useTlasBlas)
-    {
-        if (m_bvhBuffer.ptr != 0)
-        {
-            m_renderer->WaitForIdle();
-            m_renderer->DestroyBuffer(m_bvhBuffer);
-        }
-
-        m_geometryBuffer = std::make_unique<BVHGeometry>(m_renderer, 1024 * 1024);
-        m_bvh = std::make_unique<BVHBuilder>("Scene", * m_geometryBuffer, _useTlasBlas);
-
-        Scene scene(*m_geometryBuffer.get(), m_textureManager);
-        scene.build(m_bvh.get(), _useTlasBlas);
-
-        m_geometryBuffer->flush(m_renderer);
-
-        {
-            auto start = std::chrono::system_clock::now();
-            m_bvh->buildBlas(_bvhParams);
-
-            const bool multithread = true;
-            m_bvh->setParameters(_useTlasBlas ? _tlasParams : _bvhParams);
-            m_bvh->build(multithread);
-            m_bvh->dumpStats();
-            auto end = std::chrono::system_clock::now();
-            std::chrono::duration<double> elapsed_seconds = end - start;
-            std::cout << "Build BVH time: " << elapsed_seconds.count() << "s\n";
-        }
-
-        u32 size = m_bvh->getBvhGpuSize();
-        std::cout << "Uploading " << (size >> 10) << " Ko of BVH data\n";
-        m_bvhBuffer = m_renderer->CreateBuffer(size, MemoryType::Default, BufferUsage::Storage | BufferUsage::Transfer);
-        std::unique_ptr<ubyte[]> buffer = std::unique_ptr<ubyte[]>(new ubyte[size]);
-        m_bvh->fillGpuBuffer(buffer.get(), m_bvhTriangleOffsetRange, m_bvhPrimitiveOffsetRange, m_bvhMaterialOffsetRange, m_bvhLightOffsetRange, m_bvhNodeOffsetRange, m_bvhLeafDataOffsetRange, m_bvhBlasHeaderDataOffsetRange);
-        m_renderer->UploadBuffer(m_bvhBuffer, buffer.get(), size);
     }
 
     void RayTracingPass::setFrameBufferSize(uvec2 _res)
@@ -81,17 +30,12 @@ namespace tim
         m_rayBounceRecursionDepth = _depth;
     }
 
-    void RayTracingPass::setSunData(const SunData& _data)
-    {
-        m_sunData = _data;
-    }
-
     u32 RayTracingPass::getRayStorageBufferSize() const
     {
         return m_frameSize.x * m_frameSize.y * sizeof(IndirectLightRay);
     }
 
-    void RayTracingPass::draw(ImageHandle _outputBuffer, const SimpleCamera& _camera)
+    void RayTracingPass::draw(ImageHandle _outputBuffer, const Scene& _scene, const SimpleCamera& _camera)
     {
         const float fov = 70.f * 3.14f / 180;
 
@@ -100,8 +44,8 @@ namespace tim
         passData.invFrameSize = { 1.f / m_frameSize.x, 1.f / m_frameSize.y };
         passData.cameraPos = { _camera.getPos(), 0 };
         passData.cameraDir = { _camera.getDir(), 0 };
-        passData.sunDir = { normalize(m_sunData.sunDir), 0 };
-        passData.sunColor = { m_sunData.sunColor, 0 };
+        passData.sunDir = { normalize(_scene.getSunData().sunDir), 0};
+        passData.sunColor = { _scene.getSunData().sunColor, 0 };
 
         mat4 projMat = linalg::perspective_matrix<float>(fov, float(m_frameSize.x) / m_frameSize.y, 0.1f, TMAX, linalg::neg_z, linalg::zero_to_one);
         mat4 viewProj = linalg::mul(projMat, _camera.getViewMat());
@@ -130,29 +74,21 @@ namespace tim
         };
         m_textureManager.fillImageBindings(imgBinds);
 
-        BufferBinding geometryPos, geometryNormals, geometryTexcoords;
-        m_geometryBuffer->generateGeometryBufferBindings(geometryPos, geometryNormals, geometryTexcoords);
-
-        BufferBinding bufBinds[] = {
+        std::vector<BufferBinding> bindings = {
             { passDataBuffer, { 0, g_PassData_bind } },
-            { { m_bvhBuffer, m_bvhPrimitiveOffsetRange.x, m_bvhPrimitiveOffsetRange.y }, { 0, g_BvhPrimitives_bind } },
-            { { m_bvhBuffer, m_bvhTriangleOffsetRange.x, m_bvhTriangleOffsetRange.y }, { 0, g_BvhTriangles_bind } },
-            { { m_bvhBuffer, m_bvhMaterialOffsetRange.x, m_bvhMaterialOffsetRange.y }, { 0, g_BvhMaterials_bind } },
-            { { m_bvhBuffer, m_bvhLightOffsetRange.x, m_bvhLightOffsetRange.y }, { 0, g_BvhLights_bind } },
-            { { m_bvhBuffer, m_bvhNodeOffsetRange.x, m_bvhNodeOffsetRange.y }, { 0, g_BvhNodes_bind } },
-            { { m_bvhBuffer, m_bvhBlasHeaderDataOffsetRange.x, m_bvhBlasHeaderDataOffsetRange.y }, { 0, g_BlasHeaders_bind } },
-            { { m_bvhBuffer, m_bvhLeafDataOffsetRange.x, m_bvhLeafDataOffsetRange.y }, { 0, g_BvhLeafData_bind } },
             { { reflexionRayBuffer, 0, getRayStorageBufferSize() }, { 0, g_OutReflexionRayBuffer_bind } },
-            { { refractionRayBuffer, 0, getRayStorageBufferSize() }, { 0, g_OutRefractionRayBuffer_bind } },
-            geometryPos, geometryNormals, geometryTexcoords
+            { { refractionRayBuffer, 0, getRayStorageBufferSize() }, { 0, g_OutRefractionRayBuffer_bind } }
         };
 
-        arg.m_imageBindings = &imgBinds[0];
-        arg.m_numImageBindings = (u32)imgBinds.size();
-        arg.m_bufferBindings = bufBinds;
-        arg.m_numBufferBindings = _countof(bufBinds);
+        _scene.fillGeometryBufferBindings(bindings);
+        _scene.getBVH().fillBvhBindings(bindings);
 
-        PushConstants constants = { m_bvh->getTrianglesCount(), m_bvh->getBlasInstancesCount(), m_bvh->getPrimitivesCount(), m_bvh->getLightsCount(), m_bvh->getNodesCount() };
+        arg.m_imageBindings = imgBinds.data();
+        arg.m_numImageBindings = (u32)imgBinds.size();
+        arg.m_bufferBindings = bindings.data();
+        arg.m_numBufferBindings = (u32)bindings.size();
+
+        PushConstants constants = { _scene.getTrianglesCount(), _scene.getBlasInstancesCount(), _scene.getPrimitivesCount(), _scene.getLightsCount(), _scene.getNodesCount() };
         arg.m_constants = &constants;
         arg.m_constantSize = sizeof(constants);
         ShaderFlags flags;
@@ -164,15 +100,15 @@ namespace tim
 
         if (m_rayBounceRecursionDepth > 1)
         {
-            drawBounce(1, passDataBuffer, reflexionRayBuffer, _outputBuffer);
-            drawBounce(1, passDataBuffer, refractionRayBuffer, _outputBuffer);
+            drawBounce(_scene, 1, passDataBuffer, reflexionRayBuffer, _outputBuffer);
+            drawBounce(_scene, 1, passDataBuffer, refractionRayBuffer, _outputBuffer);
         }
 
         m_resourceAllocator.releaseBuffer(reflexionRayBuffer);
         m_resourceAllocator.releaseBuffer(refractionRayBuffer);
     }
 
-    void RayTracingPass::drawBounce(u32 _depth, BufferView _passData, BufferHandle _inputRayBuffer, ImageHandle _curImage)
+    void RayTracingPass::drawBounce(const Scene& _scene, u32 _depth, BufferView _passData, BufferHandle _inputRayBuffer, ImageHandle _curImage)
     {
         ImageHandle mainColorBuffer = _curImage;
 
@@ -183,18 +119,8 @@ namespace tim
         };
         m_textureManager.fillImageBindings(imgBinds);
 
-        BufferBinding geometryPos, geometryNormals, geometryTexcoords;
-        m_geometryBuffer->generateGeometryBufferBindings(geometryPos, geometryNormals, geometryTexcoords);
-
         std::vector<BufferBinding> bufBinds = {
             { _passData, { 0, g_PassData_bind } },
-            { { m_bvhBuffer, m_bvhPrimitiveOffsetRange.x, m_bvhPrimitiveOffsetRange.y }, { 0, g_BvhPrimitives_bind } },
-            { { m_bvhBuffer, m_bvhMaterialOffsetRange.x, m_bvhMaterialOffsetRange.y }, { 0, g_BvhMaterials_bind } },
-            { { m_bvhBuffer, m_bvhLightOffsetRange.x, m_bvhLightOffsetRange.y }, { 0, g_BvhLights_bind } },
-            { { m_bvhBuffer, m_bvhNodeOffsetRange.x, m_bvhNodeOffsetRange.y }, { 0, g_BvhNodes_bind } },
-            { { m_bvhBuffer, m_bvhLeafDataOffsetRange.x, m_bvhLeafDataOffsetRange.y }, { 0, g_BvhLeafData_bind } },
-            { { _inputRayBuffer, 0, getRayStorageBufferSize() }, { 0, g_InRayBuffer_bind } },
-            geometryPos, geometryNormals, geometryTexcoords
         };
 
         BufferHandle outRayBuffer;
@@ -207,12 +133,15 @@ namespace tim
             bufBinds.push_back({ { outRayBuffer, 0, getRayStorageBufferSize() }, { 0, g_OutRayBuffer_bind } });
         }
 
+        _scene.fillGeometryBufferBindings(bufBinds);
+        _scene.getBVH().fillBvhBindings(bufBinds);
+
         arg.m_imageBindings = &imgBinds[0];
         arg.m_numImageBindings = (u32)imgBinds.size();
         arg.m_bufferBindings = &bufBinds[0];
         arg.m_numBufferBindings = (u32)bufBinds.size();
 
-        PushConstants constants = { m_bvh->getTrianglesCount(), m_bvh->getBlasInstancesCount(), m_bvh->getPrimitivesCount(), m_bvh->getLightsCount(), m_bvh->getNodesCount() };
+        PushConstants constants = { _scene.getTrianglesCount(), _scene.getBlasInstancesCount(), _scene.getPrimitivesCount(), _scene.getLightsCount(), _scene.getNodesCount() };
         arg.m_constants = &constants;
         arg.m_constantSize = sizeof(constants);
         arg.m_key = { TIM_HASH32(rayBouncePass.comp), flags };
@@ -222,7 +151,7 @@ namespace tim
 
         if (_depth + 1 < m_rayBounceRecursionDepth)
         {
-            drawBounce(_depth + 1, _passData, outRayBuffer, _curImage);
+            drawBounce(_scene, _depth + 1, _passData, outRayBuffer, _curImage);
             m_resourceAllocator.releaseBuffer(outRayBuffer);
         }
     }
