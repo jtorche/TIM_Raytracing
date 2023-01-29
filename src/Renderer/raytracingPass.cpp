@@ -121,6 +121,7 @@ namespace tim
 
         std::vector<BufferBinding> bufBinds = {
             { _passData, { 0, g_PassData_bind } },
+            { { _inputRayBuffer, 0, getRayStorageBufferSize() }, { 0, g_InRayBuffer_bind } }
         };
 
         BufferHandle outRayBuffer;

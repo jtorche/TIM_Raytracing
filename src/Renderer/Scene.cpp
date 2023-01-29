@@ -39,8 +39,12 @@ namespace tim
 
     void Scene::fillGeometryBufferBindings(std::vector<BufferBinding>& _bindings) const
     {
-        _bindings.reserve(_bindings.size() + 3);
-        m_geometryBuffer->generateGeometryBufferBindings(_bindings.emplace_back(), _bindings.emplace_back(), _bindings.emplace_back());
+        BufferBinding geometryPos, geometryNormals, geometryTexcoords;
+        m_geometryBuffer->generateGeometryBufferBindings(geometryPos, geometryNormals, geometryTexcoords);
+        _bindings.push_back(geometryPos);
+        _bindings.push_back(geometryNormals);
+        _bindings.push_back(geometryTexcoords);
+        
     }
 
     u32 Scene::getPrimitivesCount() const { return m_bvh->getPrimitivesCount(); }
