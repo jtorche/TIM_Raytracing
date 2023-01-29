@@ -1,5 +1,6 @@
 #pragma once
 #include "rtDevice/public/IRenderer.h"
+#include "Shaders/primitive_cpp.glsl"
 #include <filesystem>
 
 struct Material;
@@ -39,6 +40,7 @@ namespace tim
         u32 getBlasInstancesCount() const;
         u32 getLightsCount() const;
         u32 getNodesCount() const;
+        Box getAABB() const;
 
     private:
         IRenderer* m_renderer;

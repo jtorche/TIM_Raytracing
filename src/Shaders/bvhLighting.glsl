@@ -47,14 +47,14 @@ vec3 computeDirectLighting(uint _rootId, in Ray _ray, in PassData _passData, in 
 	uint numLights = unpacked.w;
 
 	vec3 lit = vec3(0,0,0);
-	for(uint i=0 ; i<numLights ; ++i)
-	{
-		uint lightIndex = g_BvhLeafData[1 + leafDataOffset + numTriangles + numBlas + numObjects + i];
-		lit += evalLighting(_rootId, lightIndex, matId, diffuse, _ray, _hit);
-	}
+	//for(uint i=0 ; i<numLights ; ++i)
+	//{
+	//	uint lightIndex = g_BvhLeafData[1 + leafDataOffset + numTriangles + numBlas + numObjects + i];
+	//	lit += evalLighting(_rootId, lightIndex, matId, diffuse, _ray, _hit);
+	//}
 
-	//for(uint i=0 ; i<g_Constants.numLights ; ++i)
-	//	lit += evalLighting(_rootId, i, matId, diffuse, _ray, _hit);
+	for(uint i=0 ; i<g_Constants.numLights ; ++i)
+		lit += evalLighting(_rootId, i, matId, diffuse, _ray, _hit);
 
 	lit += computeSunLighting(_rootId, _passData.sunDir.xyz, _passData.sunColor.xyz, matId, diffuse, _ray, _hit);
 

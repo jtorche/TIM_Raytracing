@@ -2,6 +2,8 @@
 #include <inttypes.h>
 #include "linalg.h"
 
+#define TIM_PI 3.14159265358979323846f
+
 using u16 = uint16_t;
 using u32 = uint32_t;
 using uint = uint32_t;

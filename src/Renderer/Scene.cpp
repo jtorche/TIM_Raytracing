@@ -53,6 +53,11 @@ namespace tim
     u32 Scene::getLightsCount() const { return m_bvh->getLightsCount(); }
     u32 Scene::getNodesCount() const { return m_bvh->getNodesCount(); }
 
+    Box Scene::getAABB() const
+    {
+        return m_bvh->getAABB();
+    }
+
     namespace
     {
         void transformVertex(vec3& _v, const vec3& _pos, vec3& _scale, bool _swapYZ)
@@ -285,7 +290,7 @@ namespace tim
         m_bvh->addSphere({ {  0.5f, 0, 1.3f }, 0.2f }, BVHBuilder::createTransparentMaterial({ 1,0.6f,0.6f }, 1.05f, 0.05f));
         m_bvh->addSphere({ { -1.5f, 0, 1.3f }, 0.2f }, BVHBuilder::createPbrMaterial({ 1,0.6f,0.6f }, 0));
     #else
-        _bvh->addSphereLight({ { 0, 0, 4.1f }, 30, { 2, 2, 2 }, 0.1f });
+        m_bvh.get()->addSphereLight({ { 0, 0, 4.1f }, 30, { 2, 2, 2 }, 0.1f });
     #endif
 
         u32 texFlame = m_texManager.loadTexture("./data/image/flame.png");
@@ -303,7 +308,7 @@ namespace tim
             addOBJWithMtl("./data/sponza.obj", {}, vec3(0.01f), m_bvh.get(), true);
         #else
             BVHBuilder::setTextureMaterial(suzanneMat, texFlame, 0);
-            addOBJ("./data/suzanne.obj", { 0, 0, 0 }, vec3(1), _bvh, suzanneMat);
+            addOBJ("./data/suzanne.obj", { 0, 0, 0 }, vec3(1), m_bvh.get(), suzanneMat);
         #endif  
         }
         else

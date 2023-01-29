@@ -382,7 +382,8 @@ namespace tim
 
     ubyte * VezRenderer::GetDynamicBuffer(u32 _size, BufferView& _buffer)
     {
-        u64 offset = m_scratchBufferCursor.fetch_add(_size);
+        constexpr u32 minAlignement = 0x10;
+        u64 offset = m_scratchBufferCursor.fetch_add(alignUp<u32>(_size, minAlignement));
         TIM_ASSERT(offset + _size <= g_scratchBufferSize);
 
         _buffer.m_buffer = { m_scratchBuffer[m_frameIndex] };

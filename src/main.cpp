@@ -2,6 +2,7 @@
 #define GLFW_EXPOSE_NATIVE_WIN32
 #include <GLFW/glfw3native.h>
 #include "Renderer/raytracingPass.h"
+#include "Renderer/lightProbFieldPass.h"
 #include "Renderer/postprocessPass.h"
 #include "Renderer/SimpleCamera.h"
 #include "Renderer/shaderMacros.h"
@@ -201,6 +202,7 @@ int main(int argc, char* argv[])
         }
 
         RayTracingPass rtPass(g_renderer, context, resourceAllocator, textureManager);
+        LightProbFieldPass lpfPass(g_renderer, context, resourceAllocator, textureManager);
         PostprocessPass postprocessPass(g_renderer, context);
 
         double prevTime = glfwGetTime();
@@ -252,6 +254,8 @@ int main(int argc, char* argv[])
                 postprocessPass.setFrameBufferSize(frameResolution);
                 rtPass.setFrameBufferSize(frameResolution);
                 scene.setSunData(g_sunData);
+
+                lpfPass.generateLPF(scene);
 
                 ImageCreateInfo imgInfo(ImageFormat::RGBA16F, frameResolution.x, frameResolution.y, 1, 1, ImageType::Image2D, MemoryType::Default);
                 ImageHandle outputColorBuffer = resourceAllocator.allocTexture(imgInfo);

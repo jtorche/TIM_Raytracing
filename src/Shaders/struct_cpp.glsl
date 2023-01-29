@@ -2,7 +2,9 @@
 #define H_STRUCT_FXH_
 
 #define g_PassData_bind 0
+#define g_CstBuffer_bind 0
 #define g_outputImage_bind 1
+#define g_outputBuffer_bind 1
 #define g_BvhPrimitives_bind 2
 #define g_BvhTriangles_bind 3
 #define g_BvhNodes_bind 4

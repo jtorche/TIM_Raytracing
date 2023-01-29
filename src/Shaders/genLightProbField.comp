@@ -1,0 +1,35 @@
+#version 450
+#extension GL_EXT_scalar_block_layout : enable
+#extension GL_EXT_nonuniform_qualifier : enable
+
+#include "system.glsl"
+#include "struct_cpp.glsl"
+#include "lightprob.glsl"
+
+layout(push_constant) uniform pushConstantBlock
+{
+	PushConstants g_Constants;
+};
+
+layout(std430, set=0, binding = g_CstBuffer_bind)
+uniform CstBuffer_block
+{
+	GenLightProbFieldConstants g_lpfCst;
+};
+
+layout(std430, binding = g_outputBuffer_bind) writeonly buffer OutputLayout
+{
+    vec3 g_irradiance[];
+};
+
+#include "baseRaytracingPass.glsl"
+
+layout (local_size_x = UPDATE_LPF_NUM_PROBS_PER_GROUP) in;
+void main()
+{
+	uint probBatchId = gl_WorkGroupID.x;
+	uint rayId = gl_WorkGroupID.y;
+    uint probIndex = gl_LocalInvocationID.x + UPDATE_LPF_NUM_PROBS_PER_GROUP * probBatchId;
+
+	g_irradiance[probIndex * NUM_RAYS_PER_PROB + rayId] = g_lpfCst.rays[rayId].xyz;
+}
