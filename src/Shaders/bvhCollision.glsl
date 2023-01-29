@@ -208,6 +208,7 @@ uint tlas_collide(uint _nid, Ray _ray, inout ClosestHit closestHit)
 		}
 	}
 
+	uint prevNid = closestHit.nid;
 	for (uint i = 0; i < numBlas; ++i)
 	{
 		uint blasIndex = g_BvhLeafData[1 + leafDataOffset + numTriangles + i];
@@ -218,8 +219,12 @@ uint tlas_collide(uint _nid, Ray _ray, inout ClosestHit closestHit)
 		{
 			uint prevNid = closestHit.nid;
 			numTraversal += traverseBvh(_ray, g_blasHeader[blasIndex].rootIndex, closestHit);
+				
 		}
 	}
+
+	if(closestHit.nid != prevNid) // find collision with blas
+		closestHit.nid = _nid;
 
 	return numTraversal;
 }
