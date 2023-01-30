@@ -28,6 +28,8 @@ namespace tim
 		lpfConstants.lpfMin = { _scene.getAABB().minExtent, 0 };
 		lpfConstants.lpfMax = { _scene.getAABB().maxExtent, 0 };
 		lpfConstants.lpfResolution = { m_fieldSize, 0 };
+		lpfConstants.sunDir = { _scene.getSunData().sunDir, 0};
+		lpfConstants.sunColor = { _scene.getSunData().sunColor, 0};
 		sampleRays(lpfConstants.rays, NUM_RAYS_PER_PROB);
 
 		std::vector<BufferBinding> bindings = {
@@ -83,9 +85,7 @@ namespace tim
 				float y = sinf(phi) * sinf(theta);
 				float z = cosf(phi);
 
-				rays[i * sqrtCount + j] = { x,y,z,0};
-				rays[i * sqrtCount + j] = { float(test*3),float(test*3+1),float(test*3+2), 0 };
-				test++;
+				rays[i * sqrtCount + j] = { x,y,z,0 };
 				
 			}
 		}

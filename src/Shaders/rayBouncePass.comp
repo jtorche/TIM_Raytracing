@@ -36,10 +36,14 @@ void main()
     {
         if (g_inReflexionRays[rayIndexFromCoord()].pos.w > 0)
         {
+            SunDirColor sun;
+		    sun.sunDir = g_passData.sunDir.xyz;
+		    sun.sunColor = g_passData.sunColor.xyz;
+
             ClosestHit closestHit;
             Ray ray = createRay(g_inReflexionRays[rayIndexFromCoord()].pos.xyz, normalize(g_inReflexionRays[rayIndexFromCoord()].dir.xyz));
             vec3 lightAbsorbdeByPrevBounce = g_inReflexionRays[rayIndexFromCoord()].lit.xyz;
-            vec3 lit = rayTrace(g_passData, ray, closestHit) * lightAbsorbdeByPrevBounce;
+            vec3 lit = rayTrace(sun, ray, closestHit) * lightAbsorbdeByPrevBounce;
 
             vec4 curFrag = imageLoad(g_inputImage, pixelCoord);
             imageStore(g_outputImage, pixelCoord, vec4(lit + curFrag.xyz, 1));

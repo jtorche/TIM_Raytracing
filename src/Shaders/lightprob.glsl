@@ -23,6 +23,9 @@ struct GenLightProbFieldConstants
 	vec4 lpfMin;
 	vec4 lpfMax;
 	uvec4 lpfResolution;
+	vec4 sunDir;
+	vec4 sunColor;
 	vec4 rays[NUM_RAYS_PER_PROB];
 };
+
 #endif

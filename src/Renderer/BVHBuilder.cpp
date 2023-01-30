@@ -431,7 +431,8 @@ namespace tim
         for (u32 i = 0; i < m_blasInstances.size(); ++i)
             blasIds[i] = i;
 
-        addObjectsRec(0, 0xFFFFffff, objectsIds.begin(), objectsIds.end(), triangleIds.begin(), triangleIds.end(), blasIds.begin(), blasIds.end(), m_nodes[0].get(), _useMultipleThreads);
+        const u32 numItems = u32(m_objects.size() + m_triangles.size() + m_blasInstances.size());
+        addObjectsRec(0, numItems, objectsIds.begin(), objectsIds.end(), triangleIds.begin(), triangleIds.end(), blasIds.begin(), blasIds.end(), m_nodes[0].get(), _useMultipleThreads);
 
         TIM_ASSERT(m_nodes.size() < g_MaxNodeCount);
     }
@@ -518,7 +519,7 @@ namespace tim
         u32 numObjects = u32(std::distance(_objectsBegin, _objectsEnd) + std::distance(_trianglesBegin, _trianglesEnd) + std::distance(_blasBegin, _blasEnd));
 
         // Fill leafs
-        if (_depth > 0 && (_numUniqueItems <= m_params.minObjPerNode || _depth >= m_params.maxDepth))
+        if (/*_depth > 0 && */(_numUniqueItems <= m_params.minObjPerNode || _depth >= m_params.maxDepth))
         {
             fillLeafData(_curNode, _depth, _objectsBegin, _objectsEnd, _trianglesBegin, _trianglesEnd, _blasBegin, _blasEnd);
             return;

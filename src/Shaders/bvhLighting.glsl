@@ -27,7 +27,7 @@ vec3 computeSunLighting(uint _rootId, vec3 _sunDir, vec3 _sunColor, uint _matId,
 		                _ray.from + _ray.dir * _hit.t, normal, _ray.from);
 }
 
-vec3 computeDirectLighting(uint _rootId, in Ray _ray, in PassData _passData, in ClosestHit _hit)
+vec3 computeDirectLighting(uint _rootId, in Ray _ray, in SunDirColor _sun, in ClosestHit _hit)
 {
 	vec3 diffuse = vec3(1,1,1);
 
@@ -56,7 +56,7 @@ vec3 computeDirectLighting(uint _rootId, in Ray _ray, in PassData _passData, in 
 	for(uint i=0 ; i<g_Constants.numLights ; ++i)
 		lit += evalLighting(_rootId, i, matId, diffuse, _ray, _hit);
 
-	lit += computeSunLighting(_rootId, _passData.sunDir.xyz, _passData.sunColor.xyz, matId, diffuse, _ray, _hit);
+	lit += computeSunLighting(_rootId, _sun.sunDir, _sun.sunColor, matId, diffuse, _ray, _hit);
 
 	return lit;
 }

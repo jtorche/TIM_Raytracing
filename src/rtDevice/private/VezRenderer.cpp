@@ -36,7 +36,15 @@ namespace tim
         {
             OutputDebugString(pCallbackData->pMessage);
             OutputDebugString("\n");
-            if((messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) > 0)
+
+            const char* ignoreMessages[] =
+            {
+                "VUID-VkShaderModuleCreateInfo-pCode-01091"
+            };
+
+            bool debugBreak = std::none_of(std::begin(ignoreMessages), std::end(ignoreMessages), [pCallbackData](const char* _msg) { return strstr(pCallbackData->pMessage, _msg) != nullptr; });
+
+            if(debugBreak && (messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) > 0)
                 __debugbreak();
         }
 

@@ -5,6 +5,7 @@
 #include "system.glsl"
 #include "struct_cpp.glsl"
 #include "lightprob.glsl"
+#include "lightprobHelpers.glsl"
 
 layout(push_constant) uniform pushConstantBlock
 {
@@ -31,5 +32,20 @@ void main()
 	uint rayId = gl_WorkGroupID.y;
     uint probIndex = gl_LocalInvocationID.x + UPDATE_LPF_NUM_PROBS_PER_GROUP * probBatchId;
 
-	g_irradiance[probIndex * NUM_RAYS_PER_PROB + rayId] = g_lpfCst.rays[rayId].xyz;
+	Box lpfAABB;
+	lpfAABB.minExtent = g_lpfCst.lpfMin.xyz;
+	lpfAABB.maxExtent = g_lpfCst.lpfMax.xyz;
+
+	uvec3 probCoord = getLightProbCoord(probIndex, g_lpfCst.lpfResolution.xyz);
+	vec3 probPosition = getLightProbPosition(probCoord, g_lpfCst.lpfResolution.xyz, lpfAABB);
+
+	ClosestHit closestHit;
+	Ray ray = createRay(probPosition, g_lpfCst.rays[rayId].xyz);
+
+	SunDirColor sun;
+	sun.sunDir = g_lpfCst.sunDir.xyz;
+	sun.sunColor = g_lpfCst.sunColor.xyz;
+    vec3 lit = rayTrace(sun, ray, closestHit);
+
+	g_irradiance[probIndex * NUM_RAYS_PER_PROB + rayId] = lit;
 }

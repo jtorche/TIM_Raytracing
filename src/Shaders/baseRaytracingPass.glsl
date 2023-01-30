@@ -13,7 +13,7 @@
 
 #include "bvhLighting.glsl"
 
-vec3 rayTrace(in PassData _passData, in Ray _ray, out ClosestHit _hitResult)
+vec3 rayTrace(in SunDirColor _sun, in Ray _ray, out ClosestHit _hitResult)
 {
 	ClosestHit closestHit;
 	closestHit.t = TMAX;
@@ -65,7 +65,7 @@ vec3 rayTrace(in PassData _passData, in Ray _ray, out ClosestHit _hitResult)
 	#if NO_LIGHTING
 		lit = getHitColor(closestHit);
 	#else
-		lit += computeDirectLighting(rootId, _ray, _passData, closestHit);
+		lit += computeDirectLighting(rootId, _ray, _sun, closestHit);
 	#endif
 
 #else
