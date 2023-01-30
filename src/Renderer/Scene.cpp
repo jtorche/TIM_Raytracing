@@ -44,7 +44,6 @@ namespace tim
         _bindings.push_back(geometryPos);
         _bindings.push_back(geometryNormals);
         _bindings.push_back(geometryTexcoords);
-        
     }
 
     u32 Scene::getPrimitivesCount() const { return m_bvh->getPrimitivesCount(); }
@@ -289,8 +288,6 @@ namespace tim
         m_bvh->addSphere({ {  2.0f, 0, 1.3f }, 0.2f }, pbrMatMetal);
         m_bvh->addSphere({ {  0.5f, 0, 1.3f }, 0.2f }, BVHBuilder::createTransparentMaterial({ 1,0.6f,0.6f }, 1.05f, 0.05f));
         m_bvh->addSphere({ { -1.5f, 0, 1.3f }, 0.2f }, BVHBuilder::createPbrMaterial({ 1,0.6f,0.6f }, 0));
-    #else
-        m_bvh.get()->addSphereLight({ { 0, 0, 4.1f }, 30, { 2, 2, 2 }, 0.1f });
     #endif
 
         u32 texFlame = m_texManager.loadTexture("./data/image/flame.png");
@@ -307,8 +304,8 @@ namespace tim
 
             addOBJWithMtl("./data/sponza.obj", {}, vec3(0.01f), m_bvh.get(), true);
         #else
-            BVHBuilder::setTextureMaterial(suzanneMat, texFlame, 0);
-            addOBJ("./data/suzanne.obj", { 0, 0, 0 }, vec3(1), m_bvh.get(), suzanneMat);
+            m_bvh.get()->addSphereLight({ { 3.08371f , 0.250811f , 5.16995f }, 25, { 2, 2, 2 }, 0.1f });
+            addOBJWithMtl("./data/cornell.obj", { 0, 0, 0 }, vec3(1), m_bvh.get());
         #endif  
         }
         else
@@ -330,7 +327,13 @@ namespace tim
                 blas.push_back(std::move(sponzaBlas[0]));
             }
     #else
-            loadBlas("./data/suzanne.obj", { 0, 0, 0 }, vec3(1), blas, &suzanneMat);
+            m_bvh.get()->addSphereLight({ { 3.08371f , 0.250811f , 5.16995f }, 25, { 2, 2, 2 }, 0.1f });
+
+            // loadBlas("./data/cornellBox.obj", { 0, 0, 0 }, vec3(1), blas);
+            loadBlas("./data/cornell.obj", { 0, 0, 0 }, vec3(1), blas);
+            for (auto it = blas.begin() + 1; it != blas.end(); ++it)
+                blas[0]->mergeBlas(std::move(*it));
+            blas.resize(1);
     #endif
             for (auto& b : blas)
                 m_bvh->addBlas(std::move(b));
