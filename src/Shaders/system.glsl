@@ -27,15 +27,14 @@ vec4 toLinear(vec4 sRGB)
 #define COMPUTE_SHADOW_ON_THE_FLY	1
 #define NO_RAY_INVDIR				0
 
-#define NO_BVH				0
-#define TILE_FRUSTUM_CULL	0
 #define USE_SHARED_MEM		1
 #define USE_TRAVERSE_TLAS   1
+#define NO_LIGHTING         0
 
-#define NO_LIGHTING         1
 #define DEBUG_GEOMETRY		0
 #define DEBUG_BVH		    0
 #define DEBUG_BVH_TRAVERSAL 0
+#define ANY_DEBUG           (DEBUG_GEOMETRY + DEBUG_BVH + DEBUG_BVH_TRAVERSAL)
 
 #define g_AreaLightShadowUniformSampling	0
 #define g_AreaLightShadowSampleCount	    1

@@ -1,5 +1,6 @@
 #pragma once
 #include "rtDevice/public/IRenderer.h"
+#include "LightProbField.h"
 #include "Shaders/primitive_cpp.glsl"
 #include <filesystem>
 
@@ -26,7 +27,7 @@ namespace tim
     {
     public:
         Scene(IRenderer* _renderer, TextureManager& _texManager);
-        ~Scene() = default;
+        ~Scene();
 
         void build(const BVHBuildParameters& _bvhParams, const BVHBuildParameters& _tlasParams, bool _useTlasBlas);
         void fillGeometryBufferBindings(std::vector<BufferBinding>& _bindings) const;
@@ -34,6 +35,7 @@ namespace tim
         void setSunData(const SunData& _data) { m_sunData = _data; }
         const SunData getSunData() const { return m_sunData; }
         const BVHData& getBVH() const { return *m_bvhData; }
+        const LightProbField& getLPF() const { return m_lightProbField; }
 
         u32 getPrimitivesCount() const;
         u32 getTrianglesCount() const;
@@ -48,7 +50,9 @@ namespace tim
         std::unique_ptr<BVHGeometry> m_geometryBuffer;
         std::unique_ptr<BVHBuilder> m_bvh;
         std::unique_ptr<BVHData> m_bvhData;
+
         SunData m_sunData;
+        LightProbField m_lightProbField;
 
     private:
         void addOBJ(const fs::path& _path, vec3 _pos, vec3 _scale, BVHBuilder* _builder, const Material& _mat, bool _swapYZ = false);

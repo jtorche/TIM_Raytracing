@@ -19,6 +19,7 @@
 #define g_inputImage_bind 13
 #define g_inputBuffer_bind 13
 #define g_dataTextures_bind 14
+#define g_lpfTextures_bind 15
 
 #define LOCAL_SIZE 16
 #define TMAX 100
@@ -40,6 +41,10 @@ struct PassData
 
 	vec4 sunDir;
 	vec4 sunColor;
+
+	vec4 sceneMinExtent;
+	vec4 sceneMaxExtent;
+	uvec4 lpfResolution;
 };
 
 struct PushConstants

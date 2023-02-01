@@ -25,7 +25,6 @@ layout(push_constant) uniform pushConstantBlock
 layout (local_size_x = LOCAL_SIZE, local_size_y = LOCAL_SIZE) in;
 void main()
 {
-#if !TILE_FRUSTUM_CULL
 	ivec2 pixelCoord = ivec2(gl_GlobalInvocationID.x, gl_NumWorkGroups.y * LOCAL_SIZE - gl_GlobalInvocationID.y);
 	if(pixelCoord.x < g_passData.frameSize.x && pixelCoord.y < g_passData.frameSize.y)
 	{	
@@ -33,48 +32,52 @@ void main()
 		vec3 stepH = (g_passData.frustumCorner01.xyz - g_passData.frustumCorner00.xyz) * g_passData.invFrameSize.y;
 
 		vec3 rayTarget = g_passData.frustumCorner00.xyz + stepW * gl_GlobalInvocationID.x + stepH * gl_GlobalInvocationID.y;
-
-		ClosestHit closestHit;
         Ray ray = createRay(g_passData.cameraPos.xyz, normalize(rayTarget - g_passData.cameraPos.xyz));
 
+		ClosestHit closestHit;
+        uint numTraversal = rayTrace(ray, closestHit);
+        
+	#if ANY_DEBUG
+		vec3 lit = applyDebugLighting(ray, closestHit, numTraversal);
+		imageStore(g_outputImage, pixelCoord, vec4(lit, 1));
+	#else
 		SunDirColor sun;
 		sun.sunDir = g_passData.sunDir.xyz;
 		sun.sunColor = g_passData.sunColor.xyz;
-        vec3 lit = rayTrace(sun, ray, closestHit);
-        
-        imageStore(g_outputImage, pixelCoord, vec4(lit, 1));
-        nextBounce(vec3(1,1,1), closestHit, ray);
-	}
-#else
+		vec3 lit = applyDirectLighting(sun, ray, closestHit);
 
-	cullWithFrustumTile(g_passData, g_Constants);
-
-	ivec2 pixelCoord = ivec2(gl_GlobalInvocationID.x, gl_NumWorkGroups.y * LOCAL_SIZE - gl_GlobalInvocationID.y);
-	if(pixelCoord.x < g_passData.frameSize.x && pixelCoord.y < g_passData.frameSize.y)
-	{	
-		vec3 stepW = (g_passData.frustumCorner10.xyz - g_passData.frustumCorner00.xyz) * g_passData.invFrameSize.x;
-		vec3 stepH = (g_passData.frustumCorner01.xyz - g_passData.frustumCorner00.xyz) * g_passData.invFrameSize.y;
-
-		vec3 rayTarget = g_passData.frustumCorner00.xyz + stepW * gl_GlobalInvocationID.x + stepH * gl_GlobalInvocationID.y;
-
-		Ray ray = createRay(g_passData.cameraPos.xyz, normalize(rayTarget - g_passData.cameraPos.xyz));
-
-		ClosestHit closestHit;
-		closestHit.t = TMAX;
-		closestHit.mid_objId = 0xFFFFffff;
-		uint rootId = g_Constants.numNodes == 1 ? NID_LEAF_BIT : 0;
-
-		collideRayAgainstTileData(ray, closestHit);
-		
-		vec3 lit = vec3(0,0,0);
-		if(closestHit.t < TMAX)
-		{
-			for(uint i=0 ; i<g_lightCount ; ++i)
-                lit += evalLighting(rootId, g_lights[i], getMaterialId(closestHit), ray, closestHit);
-		}
-		
 		imageStore(g_outputImage, pixelCoord, vec4(lit, 1));
         nextBounce(vec3(1,1,1), closestHit, ray);
+	#endif
 	}
-#endif
+
+	//cullWithFrustumTile(g_passData, g_Constants);
+	//
+	//ivec2 pixelCoord = ivec2(gl_GlobalInvocationID.x, gl_NumWorkGroups.y * LOCAL_SIZE - gl_GlobalInvocationID.y);
+	//if(pixelCoord.x < g_passData.frameSize.x && pixelCoord.y < g_passData.frameSize.y)
+	//{	
+	//	vec3 stepW = (g_passData.frustumCorner10.xyz - g_passData.frustumCorner00.xyz) * g_passData.invFrameSize.x;
+	//	vec3 stepH = (g_passData.frustumCorner01.xyz - g_passData.frustumCorner00.xyz) * g_passData.invFrameSize.y;
+	//
+	//	vec3 rayTarget = g_passData.frustumCorner00.xyz + stepW * gl_GlobalInvocationID.x + stepH * gl_GlobalInvocationID.y;
+	//
+	//	Ray ray = createRay(g_passData.cameraPos.xyz, normalize(rayTarget - g_passData.cameraPos.xyz));
+	//
+	//	ClosestHit closestHit;
+	//	closestHit.t = TMAX;
+	//	closestHit.mid_objId = 0xFFFFffff;
+	//	uint rootId = g_Constants.numNodes == 1 ? NID_LEAF_BIT : 0;
+	//
+	//	collideRayAgainstTileData(ray, closestHit);
+	//	
+	//	vec3 lit = vec3(0,0,0);
+	//	if(closestHit.t < TMAX)
+	//	{
+	//		for(uint i=0 ; i<g_lightCount ; ++i)
+    //            lit += evalLighting(rootId, g_lights[i], getMaterialId(closestHit), ray, closestHit);
+	//	}
+	//	
+	//	imageStore(g_outputImage, pixelCoord, vec4(lit, 1));
+    //    nextBounce(vec3(1,1,1), closestHit, ray);
+	//}
 }

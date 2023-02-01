@@ -42,10 +42,12 @@ void main()
 	ClosestHit closestHit;
 	Ray ray = createRay(probPosition, g_lpfCst.rays[rayId].xyz);
 
+	rayTrace(ray, closestHit);
+
 	SunDirColor sun;
 	sun.sunDir = g_lpfCst.sunDir.xyz;
 	sun.sunColor = g_lpfCst.sunColor.xyz;
-    vec3 lit = rayTrace(sun, ray, closestHit);
+    vec3 lit = applyDirectLighting(sun, ray, closestHit);
 
 	uint sampleIndex = (probIndex * NUM_RAYS_PER_PROB + rayId) * 3;
 	g_irradiance[sampleIndex + 0] = lit.x;

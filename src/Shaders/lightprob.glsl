@@ -13,6 +13,12 @@ struct SH9Color
 	vec3 w[9];
 };
 
+struct LightProbFieldHeader
+{
+	Box aabb;
+	uvec3 resolution;
+};
+
 #define NUM_RAYS_PER_PROB 64
 #define UPDATE_LPF_NUM_PROBS_PER_GROUP 256
 #define UPDATE_LPF_LOCALSIZE 64

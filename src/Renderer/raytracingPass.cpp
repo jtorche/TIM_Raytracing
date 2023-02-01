@@ -59,6 +59,10 @@ namespace tim
         passData.frustumCorner10 /= passData.frustumCorner10.w;
         passData.frustumCorner01 /= passData.frustumCorner01.w;
 
+        passData.sceneMinExtent = { _scene.getAABB().minExtent, 0 };
+        passData.sceneMaxExtent = { _scene.getAABB().maxExtent, 0 };
+        passData.lpfResolution = { _scene.getLPF().m_fieldSize, 0 };
+
         BufferView passDataBuffer;
         void* passDataPtr = m_renderer->GetDynamicBuffer(sizeof(PassData), passDataBuffer);
         memcpy(passDataPtr, &passData, sizeof(PassData));

@@ -7,43 +7,13 @@
 
 namespace tim
 {
-
-	void GpuLightProbField::allocate(IRenderer* _renderer, uvec3 _fieldSize)
-	{
-		ImageCreateInfo descriptor(ImageFormat::RGBA16F, _fieldSize.x, _fieldSize.y, _fieldSize.z, 1, ImageType::Image3D);
-
-		for (u32 i = 0; i < 2; ++i)
-		{
-			lightProbFieldR[i] = _renderer->CreateImage(descriptor);
-			lightProbFieldG[i] = _renderer->CreateImage(descriptor);
-			lightProbFieldB[i] = _renderer->CreateImage(descriptor);
-		}
-		
-		lightProbFieldY00 = _renderer->CreateImage(descriptor);
-	}
-
-	void GpuLightProbField::free(IRenderer* _renderer)
-	{
-		for (u32 i = 0; i < 2; ++i)
-		{
-			_renderer->DestroyImage(lightProbFieldR[i]);
-			_renderer->DestroyImage(lightProbFieldG[i]);
-			_renderer->DestroyImage(lightProbFieldB[i]);
-		}
-		
-		_renderer->DestroyImage(lightProbFieldY00);
-	}
-
 	LightProbFieldPass::LightProbFieldPass(IRenderer* _renderer, IRenderContext* _context, ResourceAllocator& _allocator, TextureManager& _texManager) 
 		: m_renderer{ _renderer }, m_context{ _context }, m_resourceAllocator{ _allocator }, m_textureManager{ _texManager }
 	{
-		m_fieldSize = { 20, 20, 10 };
-		m_field.allocate(m_renderer, m_fieldSize);
 	}
 
 	LightProbFieldPass::~LightProbFieldPass()
 	{
-		m_field.free(m_renderer);
 	}
 
 	void LightProbFieldPass::updateLightProbField(const Scene& _scene)
@@ -52,7 +22,7 @@ namespace tim
 		GenLightProbFieldConstants& lpfConstants = *((GenLightProbFieldConstants*)m_renderer->GetDynamicBuffer(sizeof(GenLightProbFieldConstants), lpfConstantsBuffer));
 		lpfConstants.lpfMin = { _scene.getAABB().minExtent, 0 };
 		lpfConstants.lpfMax = { _scene.getAABB().maxExtent, 0 };
-		lpfConstants.lpfResolution = { m_fieldSize, 0 };
+		lpfConstants.lpfResolution = { _scene.getLPF().m_fieldSize, 0};
 		lpfConstants.sunDir = { _scene.getSunData().sunDir, 0 };
 		lpfConstants.sunColor = { _scene.getSunData().sunColor, 0 };
 
@@ -73,22 +43,22 @@ namespace tim
 		std::vector<ImageBinding> imgBinds;
 		for (u32 i = 0; i < 2; ++i)
 		{
-			imgBinds.push_back({ m_field.lightProbFieldR[i], ImageViewType::Storage, { 0, 3, i } });
-			imgBinds.push_back({ m_field.lightProbFieldG[i], ImageViewType::Storage, { 0, 4, i } });
-			imgBinds.push_back({ m_field.lightProbFieldB[i], ImageViewType::Storage, { 0, 5, i } });
+			imgBinds.push_back({ _scene.getLPF().lightProbFieldR[i], ImageViewType::Storage, { 0, 3, i } });
+			imgBinds.push_back({ _scene.getLPF().lightProbFieldG[i], ImageViewType::Storage, { 0, 4, i } });
+			imgBinds.push_back({ _scene.getLPF().lightProbFieldB[i], ImageViewType::Storage, { 0, 5, i } });
 		}
-		imgBinds.push_back({ m_field.lightProbFieldY00, ImageViewType::Storage, { 0, 6, 0 } });
+		imgBinds.push_back({ _scene.getLPF().lightProbFieldY00, ImageViewType::Storage, { 0, 6, 0 } });
 
 		arg.m_imageBindings = imgBinds.data();
 		arg.m_numImageBindings = (u32)imgBinds.size();
 		arg.m_bufferBindings = bindings.data();
 		arg.m_numBufferBindings = (u32)bindings.size();
 
-		arg.m_constants = &m_fieldSize;
+		arg.m_constants = &_scene.getLPF().m_fieldSize;
 		arg.m_constantSize = sizeof(uvec3);
 		arg.m_key = { TIM_HASH32(updateLightProbField.comp), {} };
 
-		const u32 numProbs = m_fieldSize.x * m_fieldSize.y * m_fieldSize.z;
+		const u32 numProbs = _scene.getLPF().m_numProbs;
 		u32 numGroup = alignUp<u32>(numProbs, UPDATE_LPF_LOCALSIZE) / UPDATE_LPF_LOCALSIZE;
 		m_context->Dispatch(arg, numGroup, 1);
 
@@ -97,7 +67,7 @@ namespace tim
 
 	BufferView LightProbFieldPass::generateIrradiance(const BufferView& _lpfConstants, const Scene& _scene)
 	{
-		const u32 numProbs = m_fieldSize.x * m_fieldSize.y * m_fieldSize.z;
+		const u32 numProbs = _scene.getLPF().m_numProbs;
 		const u32 irradianceBufferSize = sizeof(vec3) * NUM_RAYS_PER_PROB * numProbs;
 		BufferHandle irradianceBuffer = m_resourceAllocator.allocBuffer(irradianceBufferSize, BufferUsage::Storage | BufferUsage::Transfer, MemoryType::Default);
 		BufferView irradianceFieldView = { irradianceBuffer, 0, irradianceBufferSize };

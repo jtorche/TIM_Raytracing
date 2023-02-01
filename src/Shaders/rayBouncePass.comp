@@ -14,7 +14,7 @@ layout(push_constant) uniform pushConstantBlock
     PushConstants g_Constants;
 };
 
-layout(std430, set = 0, binding = g_PassData_bind)
+layout(std140, set = 0, binding = g_PassData_bind)
 uniform PassData_block
 {
     PassData g_passData;
@@ -36,14 +36,16 @@ void main()
     {
         if (g_inReflexionRays[rayIndexFromCoord()].pos.w > 0)
         {
-            SunDirColor sun;
-		    sun.sunDir = g_passData.sunDir.xyz;
-		    sun.sunColor = g_passData.sunColor.xyz;
-
             ClosestHit closestHit;
             Ray ray = createRay(g_inReflexionRays[rayIndexFromCoord()].pos.xyz, normalize(g_inReflexionRays[rayIndexFromCoord()].dir.xyz));
             vec3 lightAbsorbdeByPrevBounce = g_inReflexionRays[rayIndexFromCoord()].lit.xyz;
-            vec3 lit = rayTrace(sun, ray, closestHit) * lightAbsorbdeByPrevBounce;
+            
+            rayTrace(ray, closestHit) * lightAbsorbdeByPrevBounce;
+
+            SunDirColor sun;
+		    sun.sunDir = g_passData.sunDir.xyz;
+		    sun.sunColor = g_passData.sunColor.xyz;
+            vec3 lit = applyDirectLighting(sun, ray, closestHit)  * lightAbsorbdeByPrevBounce;
 
             vec4 curFrag = imageLoad(g_inputImage, pixelCoord);
             imageStore(g_outputImage, pixelCoord, vec4(lit + curFrag.xyz, 1));

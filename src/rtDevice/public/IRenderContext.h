@@ -53,7 +53,7 @@ namespace tim
         u32 m_numBufferBindings = 0;
         ImageBinding * m_imageBindings = nullptr;
         u32 m_numImageBindings = 0;
-        void * m_constants = nullptr;
+        const void * m_constants = nullptr;
         u32 m_constantSize = 0;
     };
 

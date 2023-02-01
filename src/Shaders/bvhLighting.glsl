@@ -3,6 +3,7 @@
 
 #include "bvhGetter.glsl"
 #include "lighting.glsl"
+#include "lightprob.glsl"
 
 vec3 evalLighting(uint _rootId, uint _lightIndex, uint _matId, vec3 _diffuse, in Ray _ray, in ClosestHit _hit)
 {
@@ -59,6 +60,13 @@ vec3 computeDirectLighting(uint _rootId, in Ray _ray, in SunDirColor _sun, in Cl
 	lit += computeSunLighting(_rootId, _sun.sunDir, _sun.sunColor, matId, diffuse, _ray, _hit);
 
 	return lit;
+}
+
+vec3 computeLightingFromLPF(in Ray _ray, in ClosestHit _hit, in LightProbFieldHeader _lpfHeader, in sampler3D _shTex[7])
+{
+	vec3 pos = _ray.from + _ray.dir * _hit.t;
+
+	return pos;
 }
 
 #endif

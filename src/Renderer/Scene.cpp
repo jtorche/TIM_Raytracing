@@ -35,6 +35,12 @@ namespace tim
 {
     Scene::Scene(IRenderer* _renderer, TextureManager& _texManager) : m_renderer{ _renderer }, m_texManager { _texManager }
     {
+        m_lightProbField.allocate(m_renderer, { 20, 20, 10 });
+    }
+
+    Scene::~Scene()
+    {
+        m_lightProbField.free(m_renderer);
     }
 
     void Scene::fillGeometryBufferBindings(std::vector<BufferBinding>& _bindings) const
