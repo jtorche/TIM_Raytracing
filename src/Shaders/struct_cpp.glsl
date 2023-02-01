@@ -17,6 +17,7 @@
 #define g_OutRayBuffer_bind 11
 #define g_OutRefractionRayBuffer_bind 12
 #define g_inputImage_bind 13
+#define g_inputBuffer_bind 13
 #define g_dataTextures_bind 14
 
 #define LOCAL_SIZE 16

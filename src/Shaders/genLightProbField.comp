@@ -20,7 +20,7 @@ uniform CstBuffer_block
 
 layout(std430, binding = g_outputBuffer_bind) writeonly buffer OutputLayout
 {
-    vec3 g_irradiance[];
+    float g_irradiance[];
 };
 
 #include "baseRaytracingPass.glsl"
@@ -47,5 +47,8 @@ void main()
 	sun.sunColor = g_lpfCst.sunColor.xyz;
     vec3 lit = rayTrace(sun, ray, closestHit);
 
-	g_irradiance[probIndex * NUM_RAYS_PER_PROB + rayId] = lit;
+	uint sampleIndex = (probIndex * NUM_RAYS_PER_PROB + rayId) * 3;
+	g_irradiance[sampleIndex + 0] = lit.x;
+	g_irradiance[sampleIndex + 1] = lit.y;
+	g_irradiance[sampleIndex + 2] = lit.z;
 }

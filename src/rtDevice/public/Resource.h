@@ -61,6 +61,7 @@ namespace tim
         BGRA8,
         RGBA8_SRGB,
         RGBA16F,
+        RG16F
     };
 
     struct ImageCreateInfo

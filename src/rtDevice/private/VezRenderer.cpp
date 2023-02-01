@@ -177,7 +177,7 @@ namespace tim
         {
             for (u32 i = 0; i < TIM_FRAME_LATENCY; ++i)
             {
-                m_scratchBuffer[i] = new Buffer(g_scratchBufferSize, MemoryType::Staging, BufferUsage::ConstantBuffer);
+                m_scratchBuffer[i] = new Buffer(g_scratchBufferSize, MemoryType::Staging, BufferUsage::ConstantBuffer | BufferUsage::Storage);
                 void* ptr; 
                 vezMapBuffer(m_vkDevice, m_scratchBuffer[i]->getVkBuffer(), 0, VK_WHOLE_SIZE, &ptr);
                 TIM_ASSERT(ptr);

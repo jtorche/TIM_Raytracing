@@ -10,13 +10,12 @@ struct SH9
 
 struct SH9Color
 {
-	SH9 r;
-	SH9 g;
-	SH9 b;
+	vec3 w[9];
 };
 
 #define NUM_RAYS_PER_PROB 64
 #define UPDATE_LPF_NUM_PROBS_PER_GROUP 256
+#define UPDATE_LPF_LOCALSIZE 64
 
 struct GenLightProbFieldConstants
 {
@@ -27,5 +26,15 @@ struct GenLightProbFieldConstants
 	vec4 sunColor;
 	vec4 rays[NUM_RAYS_PER_PROB];
 };
+
+#define SH_Y00		0
+#define SH_Y11		1
+#define SH_Y10		2
+#define SH_Y1_1		3
+#define SH_Y21		4
+#define SH_Y2_1		5
+#define SH_Y2_2		6
+#define SH_Y20		7
+#define SH_Y22		8
 
 #endif

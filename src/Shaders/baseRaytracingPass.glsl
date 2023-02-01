@@ -63,7 +63,7 @@ vec3 rayTrace(in SunDirColor _sun, in Ray _ray, out ClosestHit _hitResult)
 	{
 #if !DEBUG_GEOMETRY && !DEBUG_BVH
 	#if NO_LIGHTING
-		lit = getHitColor(closestHit);
+		lit = g_BvhMaterialData[getMaterialId(closestHit)].color.xyz;
 	#else
 		lit += computeDirectLighting(rootId, _ray, _sun, closestHit);
 	#endif
