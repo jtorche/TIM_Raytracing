@@ -56,6 +56,22 @@ vec3 computeLighting(uint rootId, in Material _mat, vec3 _texColor, vec3 _lightC
 	return lit;
 }
 
+vec3 computeIndirectLighting(in Material _mat, vec3 _albedo, vec3 _light)
+{
+	if(_mat.type_ids.x == Material_Emissive || _mat.type_ids.x == Material_Transparent)
+		return vec3(0,0,0);
+
+	if(_mat.type_ids.x == Material_PBR)
+	{
+		float metalness = _mat.params.x;
+		return (1.0 - metalness) * _albedo * _mat.color.xyz * _light / TIM_PI;
+	}
+	else if(_mat.type_ids.x == Material_Lambert)
+		return _light * _albedo * _mat.color.xyz / TIM_PI;
+
+	return vec3(0,0,0);
+}
+
 vec3 evalSphereLight(uint _rootId, in SphereLight _sl, in Material _mat, in vec3 _texColor, vec3 _pos, vec3 _normal, vec3 _eye)
 {
 	float d = length(_sl.pos - _pos);

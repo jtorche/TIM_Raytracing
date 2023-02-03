@@ -5,7 +5,7 @@
 #include "LightProbField.h"
 #include <random>
 
-#include "Shaders/lightprob.glsl"
+#include "Shaders/lightprob/lightprob.glsl"
 
 namespace tim
 {

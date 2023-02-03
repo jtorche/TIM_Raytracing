@@ -76,6 +76,7 @@ namespace tim
         std::vector<ImageBinding> imgBinds = {
             { _outputBuffer, ImageViewType::Storage, 0, g_outputImage_bind }
         };
+        _scene.getLPF().fillBindings(imgBinds, g_lpfTextures_bind);
         m_textureManager.fillImageBindings(imgBinds);
 
         std::vector<BufferBinding> bindings = {
@@ -97,6 +98,7 @@ namespace tim
         arg.m_constantSize = sizeof(constants);
         ShaderFlags flags;
         flags.set(C_FIRST_RECURSION_STEP);
+        flags.set(C_USE_LPF);
         arg.m_key = { TIM_HASH32(cameraPass.comp), flags };
 
         const u32 localSize = LOCAL_SIZE;
@@ -122,6 +124,7 @@ namespace tim
             { mainColorBuffer, ImageViewType::Storage, 0, g_inputImage_bind }
         };
         m_textureManager.fillImageBindings(imgBinds);
+        _scene.getLPF().fillBindings(imgBinds, g_lpfTextures_bind);
 
         std::vector<BufferBinding> bufBinds = {
             { _passData, { 0, g_PassData_bind } },

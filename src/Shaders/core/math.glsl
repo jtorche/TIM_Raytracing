@@ -1,6 +1,8 @@
 #ifndef H_MATH_FXH_
 #define H_MATH_FXH_
 
+#define TIM_PI 3.14159265359 
+
 float rand(float n)
 { 
 	return fract(sin(n * 12.9898) * 43758.5453123) * 0.5 + 0.5; 

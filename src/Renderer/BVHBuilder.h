@@ -3,7 +3,7 @@
 #include <vector>
 #include <unordered_set>
 
-#include "Shaders/primitive_cpp.glsl"
+#include "Shaders/core/primitive_cpp.glsl"
 #include "BVHGeometry.h"
 #include <mutex>
 
@@ -68,7 +68,7 @@ namespace tim
         static Material createTransparentMaterial(vec3 _color, float _refractionIndice, float _reflectivity);
         static void setTextureMaterial(Material& _mat, u32 _texture0, u32 _texture1);
 
-        BVHBuilder(const std::string& _name, const BVHGeometry& _geometry, bool _isTlas) : m_name{ _name }, m_isTlas { _isTlas }, m_geometryBuffer{ _geometry } {}
+        BVHBuilder(const std::string& _name, const BVHGeometry& _geometry, bool _isTlas) : m_name{ _name }, m_isTlas{ _isTlas }, m_geometryBuffer{ _geometry } { m_triangleMaterials.push_back(createLambertianMaterial({ 1,1,1 })); }
 
         void dumpStats() const;
 

@@ -10,7 +10,7 @@ namespace tim
 		m_fieldSize = _fieldSize;
 		m_numProbs = m_fieldSize.x * m_fieldSize.y * m_fieldSize.z;
 
-		ImageCreateInfo descriptor(ImageFormat::RGBA16F, _fieldSize.x, _fieldSize.y, _fieldSize.z, 1, ImageType::Image3D);
+		ImageCreateInfo descriptor(ImageFormat::RGBA16F, _fieldSize.x, _fieldSize.y, _fieldSize.z, 1, ImageType::Image3D, MemoryType::Default, ImageUsage::Transfer | ImageUsage::Storage);
 
 		for (u32 i = 0; i < 2; ++i)
 		{
@@ -37,17 +37,18 @@ namespace tim
 		m_numProbs = 0;
 	}
 
-	void LightProbField::fillBindings(std::vector<ImageBinding>& _bindings)
+	void LightProbField::fillBindings(std::vector<ImageBinding>& _bindings, u16 _bindPoint) const
 	{
-		_bindings.push_back({ lightProbFieldY00, ImageViewType::Sampled, { 0, g_lpfTextures_bind, 0 }, SamplerType::Clamp_Linear_MipNearest });
+		const SamplerType sampler = SamplerType::Count;
+		_bindings.push_back({ lightProbFieldY00, ImageViewType::Storage, { 0, _bindPoint, 0 }, sampler });
 
-		_bindings.push_back({ lightProbFieldR[0], ImageViewType::Sampled, { 0, g_lpfTextures_bind, 1 }, SamplerType::Clamp_Linear_MipNearest });
-		_bindings.push_back({ lightProbFieldR[1], ImageViewType::Sampled, { 0, g_lpfTextures_bind, 2 }, SamplerType::Clamp_Linear_MipNearest });
+		_bindings.push_back({ lightProbFieldR[0], ImageViewType::Storage, { 0, _bindPoint, 1 }, sampler });
+		_bindings.push_back({ lightProbFieldR[1], ImageViewType::Storage, { 0, _bindPoint, 2 }, sampler });
 
-		_bindings.push_back({ lightProbFieldG[0], ImageViewType::Sampled, { 0, g_lpfTextures_bind, 3 }, SamplerType::Clamp_Linear_MipNearest });
-		_bindings.push_back({ lightProbFieldG[1], ImageViewType::Sampled, { 0, g_lpfTextures_bind, 4 }, SamplerType::Clamp_Linear_MipNearest });
+		_bindings.push_back({ lightProbFieldG[0], ImageViewType::Storage, { 0, _bindPoint, 3 }, sampler });
+		_bindings.push_back({ lightProbFieldG[1], ImageViewType::Storage, { 0, _bindPoint, 4 }, sampler });
 
-		_bindings.push_back({ lightProbFieldB[0], ImageViewType::Sampled, { 0, g_lpfTextures_bind, 5 }, SamplerType::Clamp_Linear_MipNearest });
-		_bindings.push_back({ lightProbFieldB[1], ImageViewType::Sampled, { 0, g_lpfTextures_bind, 6 }, SamplerType::Clamp_Linear_MipNearest });
+		_bindings.push_back({ lightProbFieldB[0], ImageViewType::Storage, { 0, _bindPoint, 5 }, sampler });
+		_bindings.push_back({ lightProbFieldB[1], ImageViewType::Storage, { 0, _bindPoint, 6 }, sampler });
 	}
 }

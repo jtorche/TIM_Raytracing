@@ -1,7 +1,7 @@
 #ifndef H_LIGHTPROB_CPP_FXH_
 #define H_LIGHTPROB_CPP_FXH_
 
-#include "primitive_cpp.glsl"
+#include "Shaders/core/primitive_cpp.glsl"
 
 struct SH9
 {

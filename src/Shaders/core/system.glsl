@@ -36,6 +36,9 @@ vec4 toLinear(vec4 sRGB)
 #define DEBUG_BVH_TRAVERSAL 0
 #define ANY_DEBUG           (DEBUG_GEOMETRY + DEBUG_BVH + DEBUG_BVH_TRAVERSAL)
 
+#define SHOW_LPF_DEBUG      1
+#define LPF_DEBUG_SIZE      0.1
+
 #define g_AreaLightShadowUniformSampling	0
 #define g_AreaLightShadowSampleCount	    1
 

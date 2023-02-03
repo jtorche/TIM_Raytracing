@@ -7,7 +7,7 @@ namespace tim
     {
         void allocate(IRenderer* _renderer, uvec3 _fieldSize);
         void free(IRenderer* _renderer);
-        void fillBindings(std::vector<ImageBinding>& _bindings);
+        void fillBindings(std::vector<ImageBinding>& _bindings, u16 _bindPoint) const;
 
         uvec3 m_fieldSize;
         u32 m_numProbs;

@@ -2,10 +2,12 @@
 #extension GL_EXT_scalar_block_layout : enable
 #extension GL_EXT_nonuniform_qualifier : enable
 
-#include "system.glsl"
+//#undef USE_LPF
+//#define IGNORE_BACKFACE
+
+#include "core/system.glsl"
 #include "struct_cpp.glsl"
-#include "lightprob.glsl"
-#include "lightprobHelpers.glsl"
+#include "lightprob/lightprob.glsl"
 
 layout(push_constant) uniform pushConstantBlock
 {
@@ -23,7 +25,11 @@ layout(std430, binding = g_outputBuffer_bind) writeonly buffer OutputLayout
     float g_irradiance[];
 };
 
+layout(set = 0, binding = g_lpfTextures_bind, rgba16f) uniform readonly image3D g_lpfTextures[7];
+#include "lightprob/fetchSH_inline.glsl"
+
 #include "baseRaytracingPass.glsl"
+#include "lightprob/lightprobHelpers.glsl"
 
 layout (local_size_x = UPDATE_LPF_NUM_PROBS_PER_GROUP) in;
 void main()
@@ -47,7 +53,13 @@ void main()
 	SunDirColor sun;
 	sun.sunDir = g_lpfCst.sunDir.xyz;
 	sun.sunColor = g_lpfCst.sunColor.xyz;
-    vec3 lit = applyDirectLighting(sun, ray, closestHit);
+
+	LightProbFieldHeader lpfHeader;
+	lpfHeader.aabb.minExtent = g_lpfCst.lpfMin.xyz;
+	lpfHeader.aabb.maxExtent = g_lpfCst.lpfMax.xyz;
+	lpfHeader.resolution = g_lpfCst.lpfResolution.xyz;
+
+    vec3 lit = computeLighting(sun, lpfHeader, ray, closestHit);
 
 	uint sampleIndex = (probIndex * NUM_RAYS_PER_PROB + rayId) * 3;
 	g_irradiance[sampleIndex + 0] = lit.x;

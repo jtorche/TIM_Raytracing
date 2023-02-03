@@ -2,8 +2,9 @@
 #include "Scene.h"
 #include "TextureManager.h"
 #include "BVHData.h"
+#include "shaderMacros.h"
 #include "Shaders/struct_cpp.glsl"
-#include "Shaders/lightprob.glsl"
+#include "Shaders/lightprob/lightprob.glsl"
 
 namespace tim
 {
@@ -41,13 +42,7 @@ namespace tim
 		};
 
 		std::vector<ImageBinding> imgBinds;
-		for (u32 i = 0; i < 2; ++i)
-		{
-			imgBinds.push_back({ _scene.getLPF().lightProbFieldR[i], ImageViewType::Storage, { 0, 3, i } });
-			imgBinds.push_back({ _scene.getLPF().lightProbFieldG[i], ImageViewType::Storage, { 0, 4, i } });
-			imgBinds.push_back({ _scene.getLPF().lightProbFieldB[i], ImageViewType::Storage, { 0, 5, i } });
-		}
-		imgBinds.push_back({ _scene.getLPF().lightProbFieldY00, ImageViewType::Storage, { 0, 6, 0 } });
+		_scene.getLPF().fillBindings(imgBinds, 3);
 
 		arg.m_imageBindings = imgBinds.data();
 		arg.m_numImageBindings = (u32)imgBinds.size();
@@ -75,6 +70,7 @@ namespace tim
 		DrawArguments arg = {};
 		std::vector<ImageBinding> imgBinds;
 		m_textureManager.fillImageBindings(imgBinds);
+		_scene.getLPF().fillBindings(imgBinds, g_lpfTextures_bind);
 
 		std::vector<BufferBinding> bindings = {
 			{ irradianceFieldView, { 0, g_outputBuffer_bind } },
@@ -92,7 +88,10 @@ namespace tim
 		PushConstants constants = { _scene.getTrianglesCount(), _scene.getBlasInstancesCount(), _scene.getPrimitivesCount(), _scene.getLightsCount(), _scene.getNodesCount() };
 		arg.m_constants = &constants;
 		arg.m_constantSize = sizeof(constants);
-		arg.m_key = { TIM_HASH32(genLightProbField.comp), {} };
+
+		ShaderFlags flags;
+		flags.set(C_USE_LPF);
+		arg.m_key = { TIM_HASH32(genLightProbField.comp), flags };
 
 		u32 numProbBatch = alignUp<u32>(numProbs, UPDATE_LPF_NUM_PROBS_PER_GROUP) / UPDATE_LPF_NUM_PROBS_PER_GROUP;
 		m_context->Dispatch(arg, numProbBatch, NUM_RAYS_PER_PROB);
@@ -118,6 +117,7 @@ namespace tim
 			{
 				vec2 cellStart = { float(i) / sqrtCount, float(j) / sqrtCount };
 				vec2 r = { uniform01(m_rand), uniform01(m_rand) };
+
 				r /= sqrtCount;
 				r += cellStart;
 
@@ -138,9 +138,9 @@ namespace tim
 
 				coef.w[SH_Y00] = 0.282095f;
 
-				coef.w[SH_Y11] = 0.488603f * N.y;
+				coef.w[SH_Y11] = 0.488603f * N.x;
 				coef.w[SH_Y10] = 0.488603f * N.z;
-				coef.w[SH_Y1_1] = 0.488603f * N.x;
+				coef.w[SH_Y1_1] = 0.488603f * N.y;
 
 				coef.w[SH_Y21] = 1.092548f * N.x * N.z;
 				coef.w[SH_Y2_1] = 1.092548f * N.y * N.z;

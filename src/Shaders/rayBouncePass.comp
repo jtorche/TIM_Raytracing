@@ -3,7 +3,7 @@
 #extension GL_EXT_scalar_block_layout : enable
 #extension GL_EXT_nonuniform_qualifier : enable
 
-#include "system.glsl"
+#include "core/system.glsl"
 #include "struct_cpp.glsl"
 
 layout(set = 0, binding = g_outputImage_bind, rgba16f) uniform writeonly image2D g_outputImage;
@@ -25,6 +25,9 @@ layout(std430, binding = g_InRayBuffer_bind) readonly buffer g_InReflexionRayBuf
     IndirectLightRay g_inReflexionRays[];
 };
 
+layout(set = 0, binding = g_lpfTextures_bind, rgba16f) uniform readonly image3D g_lpfTextures[7];
+#include "lightprob/fetchSH_inline.glsl"
+
 #include "baseRaytracingPass.glsl"
 #include "rayStorageHelpers.glsl"
 
@@ -45,7 +48,13 @@ void main()
             SunDirColor sun;
 		    sun.sunDir = g_passData.sunDir.xyz;
 		    sun.sunColor = g_passData.sunColor.xyz;
-            vec3 lit = applyDirectLighting(sun, ray, closestHit)  * lightAbsorbdeByPrevBounce;
+
+		    LightProbFieldHeader lpfHeader;
+		    lpfHeader.aabb.minExtent = g_passData.sceneMinExtent.xyz;
+		    lpfHeader.aabb.maxExtent = g_passData.sceneMaxExtent.xyz;
+		    lpfHeader.resolution = g_passData.lpfResolution.xyz;
+
+		    vec3 lit = computeLighting(sun, lpfHeader, ray, closestHit);
 
             vec4 curFrag = imageLoad(g_inputImage, pixelCoord);
             imageStore(g_outputImage, pixelCoord, vec4(lit + curFrag.xyz, 1));

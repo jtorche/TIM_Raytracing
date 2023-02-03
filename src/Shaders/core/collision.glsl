@@ -62,6 +62,13 @@ float CollideTriangle(Ray r, vec3 p0, vec3 p1, vec3 p2, float tmax)
     const float EPSILON = 0.00001;
     vec3 edge1 = p1 - p0;
     vec3 edge2 = p2 - p0;
+
+    #ifdef IGNORE_BACKFACE
+    vec3 n = cross(edge1, edge2);
+    if(dot(n, r.dir) > 0)
+        return -1;
+    #endif
+
     vec3 h = cross(r.dir, edge2);
     float a = dot(edge1, h);
     if (abs(a) < EPSILON)

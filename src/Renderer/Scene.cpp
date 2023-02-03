@@ -35,7 +35,7 @@ namespace tim
 {
     Scene::Scene(IRenderer* _renderer, TextureManager& _texManager) : m_renderer{ _renderer }, m_texManager { _texManager }
     {
-        m_lightProbField.allocate(m_renderer, { 20, 20, 10 });
+        m_lightProbField.allocate(m_renderer, { 8, 8, 8 });
     }
 
     Scene::~Scene()
@@ -61,6 +61,13 @@ namespace tim
     Box Scene::getAABB() const
     {
         return m_bvh->getAABB();
+    }
+
+    void Scene::setLightProbFieldResolution(uvec3 _res)
+    {
+        m_renderer->WaitForIdle();
+        m_lightProbField.free(m_renderer);
+        m_lightProbField.allocate(m_renderer, _res);
     }
 
     namespace
@@ -333,7 +340,7 @@ namespace tim
                 blas.push_back(std::move(sponzaBlas[0]));
             }
     #else
-            m_bvh.get()->addSphereLight({ { 3.08371f , 0.250811f , 5.16995f }, 25, { 2, 2, 2 }, 0.1f });
+            m_bvh.get()->addSphereLight({ { 3.08371f , 0.250811f , 5.16995f }, 15, { 0.1, 0.1, 0.1 }, 0.1f });
 
             // loadBlas("./data/cornellBox.obj", { 0, 0, 0 }, vec3(1), blas);
             loadBlas("./data/cornell.obj", { 0, 0, 0 }, vec3(1), blas);

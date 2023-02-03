@@ -2,16 +2,15 @@
 #define H_BASERAYTRACINGPASS_FXH_
 
 #include "struct_cpp.glsl"
-#include "collision.glsl"
-#include "lighting.glsl"
+#include "core/collision.glsl"
+#include "core/lighting.glsl"
 
-#include "bvhBindings.glsl"
+#include "bvh/bvhBindings.glsl"
+#include "bvh/bvhTraversal.glsl"
+#include "bvh/bvhGetter.glsl"
+#include "bvh/bvhCollision.glsl"
 
-#include "bvhTraversal.glsl"
-#include "bvhGetter.glsl"
-#include "bvhCollision.glsl"
-
-#include "bvhLighting.glsl"
+#include "bvh/bvhLighting.glsl"
 
 //--------------------------------------------------------------------------------
 uint rayTrace(in Ray _ray, out ClosestHit _hitResult)
@@ -32,7 +31,7 @@ uint rayTrace(in Ray _ray, out ClosestHit _hitResult)
 }
 
 //--------------------------------------------------------------------------------
-vec3 applyDirectLighting(in SunDirColor _sun, in Ray _ray, in ClosestHit _closestHit)
+vec3 computeLighting(in SunDirColor _sun, in LightProbFieldHeader _lpfHeader, in Ray _ray, in ClosestHit _closestHit)
 {
 	if(_closestHit.t < TMAX)
 	{
@@ -40,7 +39,7 @@ vec3 applyDirectLighting(in SunDirColor _sun, in Ray _ray, in ClosestHit _closes
 		return g_BvhMaterialData[getMaterialId(_closestHit)].color.xyz;
 	#else
 		uint rootId = g_Constants.numNodes == 1 ? NID_LEAF_BIT : 0;
-		return computeDirectLighting(rootId, _ray, _sun, _closestHit);
+		return computeLighting(rootId, _ray, _sun, _lpfHeader, _closestHit);
 	#endif
 	}
 	else

@@ -2,7 +2,7 @@
 #define H_CULLFRUSTUM_FXH_
 
 #include "struct_cpp.glsl"
-#include "bvhCollision.glsl"
+#include "bvh/bvhCollision.glsl"
 
 #if TILE_FRUSTUM_CULL
 

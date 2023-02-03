@@ -2,7 +2,9 @@
 #extension GL_EXT_scalar_block_layout : enable
 #extension GL_EXT_nonuniform_qualifier : enable
 
-#include "system.glsl"
+// #define NO_LPF
+
+#include "core/system.glsl"
 #include "struct_cpp.glsl"
 
 layout(std430, set=0, binding = g_PassData_bind)
@@ -18,9 +20,14 @@ layout(push_constant) uniform pushConstantBlock
 	PushConstants g_Constants;
 };
 
+layout(set = 0, binding = g_lpfTextures_bind, rgba16f) uniform readonly image3D g_lpfTextures[7];
+#include "lightprob/fetchSH_inline.glsl"
+
 #include "baseRaytracingPass.glsl"
 #include "rayStorageHelpers.glsl"
 #include "cullFrustum.glsl"
+
+void raytraceLightProbFieldDebug(in Ray _ray, inout ClosestHit _hitResult);
 
 layout (local_size_x = LOCAL_SIZE, local_size_y = LOCAL_SIZE) in;
 void main()
@@ -36,6 +43,10 @@ void main()
 
 		ClosestHit closestHit;
         uint numTraversal = rayTrace(ray, closestHit);
+
+	#if SHOW_LPF_DEBUG
+		raytraceLightProbFieldDebug(ray, closestHit);
+	#endif
         
 	#if ANY_DEBUG
 		vec3 lit = applyDebugLighting(ray, closestHit, numTraversal);
@@ -44,7 +55,13 @@ void main()
 		SunDirColor sun;
 		sun.sunDir = g_passData.sunDir.xyz;
 		sun.sunColor = g_passData.sunColor.xyz;
-		vec3 lit = applyDirectLighting(sun, ray, closestHit);
+
+		LightProbFieldHeader lpfHeader;
+		lpfHeader.aabb.minExtent = g_passData.sceneMinExtent.xyz;
+		lpfHeader.aabb.maxExtent = g_passData.sceneMaxExtent.xyz;
+		lpfHeader.resolution = g_passData.lpfResolution.xyz;
+
+		vec3 lit = computeLighting(sun, lpfHeader, ray, closestHit);
 
 		imageStore(g_outputImage, pixelCoord, vec4(lit, 1));
         nextBounce(vec3(1,1,1), closestHit, ray);
@@ -80,4 +97,34 @@ void main()
 	//	imageStore(g_outputImage, pixelCoord, vec4(lit, 1));
     //    nextBounce(vec3(1,1,1), closestHit, ray);
 	//}
+}
+
+void raytraceLightProbFieldDebug(in Ray _ray, inout ClosestHit _hitResult)
+{
+	LightProbFieldHeader lpfHeader;
+	lpfHeader.aabb.minExtent = g_passData.sceneMinExtent.xyz;
+	lpfHeader.aabb.maxExtent = g_passData.sceneMaxExtent.xyz;
+	lpfHeader.resolution = g_passData.lpfResolution.xyz;
+
+	uint numProb = lpfHeader.resolution.x * lpfHeader.resolution.y * lpfHeader.resolution.z;
+	for(uint i = 0 ; i < numProb ; ++i)
+	{
+		ivec3 coord = getLightProbCoord(i, lpfHeader.resolution);
+		vec3 pos = getLightProbPosition(coord, lpfHeader.resolution, lpfHeader.aabb);
+		Sphere sphere;
+		sphere.center = pos;
+		sphere.radius = LPF_DEBUG_SIZE;
+		sphere.invRadius = 1.0 / LPF_DEBUG_SIZE;
+
+		Hit hit;
+		if(HitSphere(_ray, sphere, 0, _hitResult.t, hit))
+		{
+			_hitResult.t			= hit.t * OFFSET_RAY_COLLISION;
+			_hitResult.mid_objId	= i + ((0 << 16) & 0xFFFF0000);
+			_hitResult.nid			= 0xFFFFffff;
+
+			ClosestHit_setDebugColorId(_hitResult, i);
+			storeHitNormal(_hitResult, hit.normal);
+		}
+	}
 }

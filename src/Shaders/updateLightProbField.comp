@@ -2,10 +2,9 @@
 #extension GL_EXT_scalar_block_layout : enable
 #extension GL_EXT_nonuniform_qualifier : enable
 
-#include "system.glsl"
+#include "core/system.glsl"
+#include "lightprob/lightprob.glsl"
 #include "struct_cpp.glsl"
-#include "lightprob.glsl"
-#include "lightprobHelpers.glsl"
 
 const float M_PI = 3.14159265358979323846264338327950288;
 
@@ -26,18 +25,16 @@ layout(std430, set=0, binding = 2) readonly buffer InputLayout1
 };
 
 // SH field output
-layout(set = 0, binding = 3, rgba16f) uniform writeonly image3D g_lightProbFieldR[2];
-layout(set = 0, binding = 4, rgba16f) uniform writeonly image3D g_lightProbFieldG[2];
-layout(set = 0, binding = 5, rgba16f) uniform writeonly image3D g_lightProbFieldB[2];
-layout(set = 0, binding = 6, rgba16f) uniform writeonly image3D g_lightProbFieldY00;
+layout(set = 0, binding = 3, rgba16f) uniform image3D g_lpfTextures[7];
+#include "lightprob/storeSH_inline.glsl"
+#include "lightprob/fetchSH_inline.glsl"
+#include "lightprob/lightprobHelpers.glsl"
 
 layout (local_size_x = UPDATE_LPF_LOCALSIZE) in;
 void main()
 {
 	uint probBatchId = gl_WorkGroupID.x;
 	uint probIndex = probBatchId * UPDATE_LPF_LOCALSIZE + gl_LocalInvocationID.x;
-
-	vec3 mean = vec3(0,0,0);
 
 	const uint numProb = g_lpfCst.lpfResolution.x * g_lpfCst.lpfResolution.y * g_lpfCst.lpfResolution.z;
 	if(probIndex < numProb)
@@ -47,7 +44,6 @@ void main()
 		{
 			uint sampleIndex = (probIndex * NUM_RAYS_PER_PROB + i) * 3;
 			vec3 L = vec3(g_irradiance[sampleIndex], g_irradiance[sampleIndex+1], g_irradiance[sampleIndex+2]);
-			mean += L;
 			for (uint j = 0; j < 9; ++j)
 			{
 				float w = g_shCoef[i * 9 + j];
@@ -59,18 +55,10 @@ void main()
 		for (uint j = 0; j < 9; ++j)
 			shCoef.w[j] *= (4.0*M_PI / NUM_RAYS_PER_PROB);
 
-		mean /= NUM_RAYS_PER_PROB;
 		ivec3 probCoord = getLightProbCoord(probIndex, g_lpfCst.lpfResolution.xyz);
-
-		imageStore(g_lightProbFieldY00, probCoord, vec4(shCoef.w[0], 0));
-
-		imageStore(g_lightProbFieldR[0], probCoord, vec4(shCoef.w[1].r, shCoef.w[2].r, shCoef.w[3].r, shCoef.w[4].r));
-		imageStore(g_lightProbFieldR[1], probCoord, vec4(shCoef.w[5].r, shCoef.w[6].r, shCoef.w[7].r, shCoef.w[8].r));
+		SH9Color prevSh = fetchSH9(probCoord);
 		
-		imageStore(g_lightProbFieldG[0], probCoord, vec4(shCoef.w[1].g, shCoef.w[2].g, shCoef.w[3].g, shCoef.w[4].g));
-		imageStore(g_lightProbFieldG[1], probCoord, vec4(shCoef.w[5].g, shCoef.w[6].g, shCoef.w[7].g, shCoef.w[8].g));
-		
-		imageStore(g_lightProbFieldB[0], probCoord, vec4(shCoef.w[1].b, shCoef.w[2].b, shCoef.w[3].b, shCoef.w[4].b));
-		imageStore(g_lightProbFieldB[1], probCoord, vec4(shCoef.w[5].b, shCoef.w[6].b, shCoef.w[7].b, shCoef.w[8].b));
+		storeSH9(probCoord, lerp(prevSh, shCoef, 0.05));
+		//storeSH9(probCoord, getZeroInitializedSHCoef());
 	}
 }

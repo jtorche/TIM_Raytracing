@@ -44,7 +44,7 @@ namespace tim
         else
         {
             std::string outputFile = m_folder + "cache/" + buildShaderKeyString(_fx, _flags);
-            std::string cmdArg = std::string((const char *)itFx->second.m_fxName.u8string().c_str()) + " " + buildDefineCommand(_flags) + " -O -o " + outputFile;
+            std::string cmdArg = std::string((const char *)itFx->second.m_fxName.u8string().c_str()) + " " + buildDefineCommand(_flags) + " -Isrc/Shaders/ -Isrc -O -o " + outputFile;
 
             fs::remove(outputFile);
 
@@ -53,7 +53,7 @@ namespace tim
             bool retry = false;
             do
             {
-                std::string compilerPath = "C:\\VulkanSDK\\1.3.216.0\\Bin\\glslc.exe";
+                std::string compilerPath = "C:\\VulkanSDK\\1.3.224.1\\Bin\\glslc.exe";
                 if (!fs::exists(compilerPath))
                     std::cout << compilerPath << " does not exist." << std::endl;
 
@@ -92,7 +92,7 @@ namespace tim
         for (u32 i = 0; i < ShaderFlags::MaxFlags; ++i)
         {
             if (_flags.test(i) && m_macros[i])
-                res += std::string("-D") + m_macros[i];
+                res += std::string(" -D") + m_macros[i];
         }
 
         return res;

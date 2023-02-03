@@ -1,7 +1,7 @@
 #pragma once
 #include "rtDevice/public/IRenderer.h"
 #include "LightProbField.h"
-#include "Shaders/primitive_cpp.glsl"
+#include "Shaders/core/primitive_cpp.glsl"
 #include <filesystem>
 
 struct Material;
@@ -43,6 +43,8 @@ namespace tim
         u32 getLightsCount() const;
         u32 getNodesCount() const;
         Box getAABB() const;
+
+        void setLightProbFieldResolution(uvec3 _res);
 
     private:
         IRenderer* m_renderer;

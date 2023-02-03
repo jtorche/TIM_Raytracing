@@ -1,9 +1,9 @@
 #ifndef H_BVHBINDINGS_FXH_
 #define H_BVHBINDINGS_FXH_
 
-#include "struct_cpp.glsl"
-#include "primitive_cpp.glsl"
-#include "collision.glsl"
+#include "bvhBindings_cpp.glsl"
+#include "core/primitive_cpp.glsl"
+#include "core/collision.glsl"
 
 layout(std430, set = 0, binding = g_BvhPrimitives_bind) buffer BvhPrimitives
 {
@@ -55,7 +55,6 @@ layout(std430, set = 1, binding = 2) buffer GeometryData_TexCoord
 };
 
 layout(set = 0, binding = g_dataTextures_bind) uniform sampler2D g_dataTextures[TEXTURE_ARRAY_SIZE];
-layout(set = 0, binding = g_lpfTextures_bind) uniform sampler3D g_lpfTextures[7];
 
 #if USE_SHARED_MEM
 shared vec3 g_normalHit[LOCAL_SIZE * LOCAL_SIZE];

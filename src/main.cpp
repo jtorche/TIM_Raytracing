@@ -23,6 +23,7 @@ bool g_rebuildBvh = false;
 bool g_windowMinimized = false;
 bool g_editSun = false;
 SunData g_sunData;
+uvec3 g_lpfResolution = { 0,0,0 };
 
 void key_callback(GLFWwindow* window, int key, int scancode, int action, int mods)
 {
@@ -40,6 +41,10 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
         float sunValue = 1;
         std::cout << "Sun intensity : "; std::cin >> sunValue;
         g_sunData.sunColor = { sunValue, sunValue, sunValue };
+        std::cout << "LPF Resolution : ";
+        std::cin >> g_lpfResolution.x;
+        std::cin >> g_lpfResolution.y;
+        std::cin >> g_lpfResolution.z;
     }
     else
     {
@@ -200,14 +205,16 @@ int main(int argc, char* argv[])
             tlasParams.expandNodeVolumeThreshold = 1;
             scene.build(blasParams, tlasParams, true);
         }
+        bool needClearLpf = true;
 
         RayTracingPass rtPass(g_renderer, context, resourceAllocator, textureManager);
         LightProbFieldPass lpfPass(g_renderer, context, resourceAllocator, textureManager);
         PostprocessPass postprocessPass(g_renderer, context);
 
         double prevTime = glfwGetTime();
+        double prevTimeForFps = prevTime;
         double frameTime = 0.01;
-        u32 frameIndex = 0;
+        u32 frameCounter = 0;
         /* Loop until the user closes the window */
         while (!glfwWindowShouldClose(window))
         {
@@ -245,11 +252,28 @@ int main(int argc, char* argv[])
                     scene.build(params, tlasParams, useTlas);
                 }
 
+                if (g_lpfResolution != uvec3())
+                {
+                    scene.setLightProbFieldResolution(g_lpfResolution);
+                    g_lpfResolution = {};
+                }
+
                 g_renderer->BeginFrame();
                 ImageHandle backbuffer = g_renderer->GetBackBuffer();
 
                 context->BeginRender();
                 context->ClearImage(backbuffer, Color{ 0, 0, 0, 0 });
+                if (needClearLpf)
+                {
+                    context->ClearImage(scene.getLPF().lightProbFieldY00, Color{ 0, 0, 0, 0 });
+                    context->ClearImage(scene.getLPF().lightProbFieldR[0], Color{ 0, 0, 0, 0 });
+                    context->ClearImage(scene.getLPF().lightProbFieldR[1], Color{ 0, 0, 0, 0 });
+                    context->ClearImage(scene.getLPF().lightProbFieldG[0], Color{ 0, 0, 0, 0 });
+                    context->ClearImage(scene.getLPF().lightProbFieldG[1], Color{ 0, 0, 0, 0 });
+                    context->ClearImage(scene.getLPF().lightProbFieldB[0], Color{ 0, 0, 0, 0 });
+                    context->ClearImage(scene.getLPF().lightProbFieldB[1], Color{ 0, 0, 0, 0 });
+                    needClearLpf = false;
+                }
 
                 postprocessPass.setFrameBufferSize(frameResolution);
                 rtPass.setFrameBufferSize(frameResolution);
@@ -277,13 +301,17 @@ int main(int argc, char* argv[])
                 g_renderer->EndFrame();
                 g_renderer->Present();
 
-                if (frameIndex % 100 == 0)
-                    std::cout << "FPS : " << u32(0.5f + 1.f / float(frameTime)) << std::endl;
-
+                frameCounter++;
                 double curTime = glfwGetTime();
+                if (curTime - prevTimeForFps > 1)
+                {
+                    std::cout << "FPS : " << u32(0.5f + float(frameCounter) / float(curTime - prevTimeForFps)) << std::endl;
+                    prevTimeForFps = curTime;
+                    frameCounter = 0;
+                }
+
                 frameTime = curTime - prevTime;
                 prevTime = curTime;
-                frameIndex++;
             }
             else
             {

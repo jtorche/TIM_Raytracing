@@ -1,7 +1,7 @@
 #ifndef H_BVHGETTER_FXH_
 #define H_BVHGETTER_FXH_
 
-#include "primitive_cpp.glsl"
+#include "core/primitive_cpp.glsl"
 
 bool bvh_isLeaf(uint _nid)
 {
