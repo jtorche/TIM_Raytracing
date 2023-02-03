@@ -99,6 +99,9 @@ namespace tim
         ShaderFlags flags;
         flags.set(C_FIRST_RECURSION_STEP);
         flags.set(C_USE_LPF);
+        if(_scene.useTlas())
+            flags.set(C_USE_TRAVERSE_TLAS);
+
         arg.m_key = { TIM_HASH32(cameraPass.comp), flags };
 
         const u32 localSize = LOCAL_SIZE;
@@ -140,6 +143,8 @@ namespace tim
             m_context->ClearBuffer(outRayBuffer, 0);
             bufBinds.push_back({ { outRayBuffer, 0, getRayStorageBufferSize() }, { 0, g_OutRayBuffer_bind } });
         }
+        if (_scene.useTlas())
+            flags.set(C_USE_TRAVERSE_TLAS);
 
         _scene.fillGeometryBufferBindings(bufBinds);
         _scene.getBVH().fillBvhBindings(bufBinds);

@@ -28,7 +28,6 @@ vec4 toLinear(vec4 sRGB)
 #define NO_RAY_INVDIR				0
 
 #define USE_SHARED_MEM		1
-#define USE_TRAVERSE_TLAS   1
 #define NO_LIGHTING         0
 
 #define DEBUG_GEOMETRY		0
@@ -36,7 +35,7 @@ vec4 toLinear(vec4 sRGB)
 #define DEBUG_BVH_TRAVERSAL 0
 #define ANY_DEBUG           (DEBUG_GEOMETRY + DEBUG_BVH + DEBUG_BVH_TRAVERSAL)
 
-#define SHOW_LPF_DEBUG      1
+#define SHOW_LPF_DEBUG      0
 #define LPF_DEBUG_SIZE      0.1
 
 #define g_AreaLightShadowUniformSampling	0

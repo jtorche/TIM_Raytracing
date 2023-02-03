@@ -51,4 +51,16 @@ namespace tim
 		_bindings.push_back({ lightProbFieldB[0], ImageViewType::Storage, { 0, _bindPoint, 5 }, sampler });
 		_bindings.push_back({ lightProbFieldB[1], ImageViewType::Storage, { 0, _bindPoint, 6 }, sampler });
 	}
+
+	void LightProbField::clearSH(IRenderContext * _context) const
+	{
+		_context->ClearImage(lightProbFieldY00, Color{ 0, 0, 0, 0 });
+		_context->ClearImage(lightProbFieldR[0], Color{ 0, 0, 0, 0 });
+		_context->ClearImage(lightProbFieldR[1], Color{ 0, 0, 0, 0 });
+		_context->ClearImage(lightProbFieldG[0], Color{ 0, 0, 0, 0 });
+		_context->ClearImage(lightProbFieldG[1], Color{ 0, 0, 0, 0 });
+		_context->ClearImage(lightProbFieldB[0], Color{ 0, 0, 0, 0 });
+		_context->ClearImage(lightProbFieldB[1], Color{ 0, 0, 0, 0 });
+	}
+	
 }

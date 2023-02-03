@@ -265,13 +265,7 @@ int main(int argc, char* argv[])
                 context->ClearImage(backbuffer, Color{ 0, 0, 0, 0 });
                 if (needClearLpf)
                 {
-                    context->ClearImage(scene.getLPF().lightProbFieldY00, Color{ 0, 0, 0, 0 });
-                    context->ClearImage(scene.getLPF().lightProbFieldR[0], Color{ 0, 0, 0, 0 });
-                    context->ClearImage(scene.getLPF().lightProbFieldR[1], Color{ 0, 0, 0, 0 });
-                    context->ClearImage(scene.getLPF().lightProbFieldG[0], Color{ 0, 0, 0, 0 });
-                    context->ClearImage(scene.getLPF().lightProbFieldG[1], Color{ 0, 0, 0, 0 });
-                    context->ClearImage(scene.getLPF().lightProbFieldB[0], Color{ 0, 0, 0, 0 });
-                    context->ClearImage(scene.getLPF().lightProbFieldB[1], Color{ 0, 0, 0, 0 });
+                    scene.getLPF().clearSH(context);
                     needClearLpf = false;
                 }
 

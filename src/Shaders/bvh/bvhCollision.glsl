@@ -238,7 +238,7 @@ void bvh_collide(uint _nid, Ray _ray, inout ClosestHit closestHit)
 	uint numBlas = unpackedLeafDat.y;
 	uint numObjects = unpackedLeafDat.z;
 
-	#if !USE_TRAVERSE_TLAS
+	#ifndef USE_TRAVERSE_TLAS
 	for(uint i=0 ; i<numObjects ; ++i)
 	{
 		uint objIndex = g_BvhLeafData[1 + leafDataOffset + numTriangles + numBlas + i];
@@ -283,7 +283,7 @@ void bvh_collide(uint _nid, Ray _ray, inout ClosestHit closestHit)
 		}
 	}
 
-	#if !USE_TRAVERSE_TLAS
+	#ifndef USE_TRAVERSE_TLAS
 	for (uint i = 0; i < numBlas; ++i)
 	{
 		uint blasIndex = g_BvhLeafData[1 + leafDataOffset + numTriangles + i];
@@ -314,7 +314,7 @@ bool bvh_collide_fast(uint _nid, Ray _ray, float tmax)
 	uint numBlas = unpackedLeafDat.y;
 	uint numObjects = unpackedLeafDat.z;
 
-	#if !USE_TRAVERSE_TLAS
+	#ifndef USE_TRAVERSE_TLAS
 	for(uint i=0 ; i<numObjects ; ++i)
 	{
 		uint objIndex = g_BvhLeafData[1 + leafDataOffset + numTriangles + numBlas + i];
@@ -333,7 +333,7 @@ bool bvh_collide_fast(uint _nid, Ray _ray, float tmax)
 			return true;
 	}
 
-	#if !USE_TRAVERSE_TLAS
+	#ifndef USE_TRAVERSE_TLAS
 	for (uint i = 0; i < numBlas; ++i)
 	{
 		uint blasIndex = g_BvhLeafData[1 + leafDataOffset + numTriangles + i];

@@ -44,7 +44,7 @@ vec3 computeLighting(uint rootId, in Material _mat, vec3 _texColor, vec3 _lightC
 		#if !NO_RAY_INVDIR   
 		shadowRay.invdir = vec3(1,1,1) / L;
 		#endif
-	#if USE_TRAVERSE_TLAS
+	#ifdef USE_TRAVERSE_TLAS
 		float shadow = traverseTlasFast(shadowRay, rootId, shadowRayLength) ? 0 : 1;
 	#else
 		float shadow = traverseBvhFast(shadowRay, rootId, shadowRayLength) ? 0 : 1;

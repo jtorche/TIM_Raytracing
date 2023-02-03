@@ -43,6 +43,7 @@ namespace tim
         u32 getLightsCount() const;
         u32 getNodesCount() const;
         Box getAABB() const;
+        bool useTlas() const;
 
         void setLightProbFieldResolution(uvec3 _res);
 
@@ -52,6 +53,7 @@ namespace tim
         std::unique_ptr<BVHGeometry> m_geometryBuffer;
         std::unique_ptr<BVHBuilder> m_bvh;
         std::unique_ptr<BVHData> m_bvhData;
+        bool m_useTlas = false;
 
         SunData m_sunData;
         LightProbField m_lightProbField;

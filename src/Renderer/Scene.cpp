@@ -57,11 +57,14 @@ namespace tim
     u32 Scene::getBlasInstancesCount() const { return m_bvh->getBlasInstancesCount(); }
     u32 Scene::getLightsCount() const { return m_bvh->getLightsCount(); }
     u32 Scene::getNodesCount() const { return m_bvh->getNodesCount(); }
+    bool Scene::useTlas() const { return m_useTlas; }
 
     Box Scene::getAABB() const
     {
         return m_bvh->getAABB();
     }
+
+    
 
     void Scene::setLightProbFieldResolution(uvec3 _res)
     {
@@ -354,5 +357,6 @@ namespace tim
 #endif
         m_geometryBuffer->flush(m_renderer);
         m_bvhData->build(*m_bvh, _bvhParams, _tlasParams, _useTlasBlas);
+        m_useTlas = _useTlasBlas;
     }
 }

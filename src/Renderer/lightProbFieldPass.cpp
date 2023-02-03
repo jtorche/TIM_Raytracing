@@ -91,6 +91,8 @@ namespace tim
 
 		ShaderFlags flags;
 		flags.set(C_USE_LPF);
+		if (_scene.useTlas())
+			flags.set(C_USE_TRAVERSE_TLAS);
 		arg.m_key = { TIM_HASH32(genLightProbField.comp), flags };
 
 		u32 numProbBatch = alignUp<u32>(numProbs, UPDATE_LPF_NUM_PROBS_PER_GROUP) / UPDATE_LPF_NUM_PROBS_PER_GROUP;

@@ -306,6 +306,7 @@ namespace tim
         stats.meanDepth /= stats.numLeafs;
 
         std::cout << "BVHBuilder stats:\n";
+        std::cout << " - Triangles count: " << m_triangles.size() << "\n";
         std::cout << " - leafs count: " << stats.numLeafs << "\n";
         std::cout << " - mean triangles: " << stats.meanTriangle << "\n";
         std::cout << " - mean depth: " << stats.meanDepth << "\n";
@@ -319,7 +320,6 @@ namespace tim
         {
             std::cout << dupBlas << " : " << m_blas[m_blasInstances[dupBlas].blasId]->getTrianglesCount() << " x " << count << std::endl;
         }
-        system("pause");
     }
 
     void BVHBuilder::computeStatsRec(Stats& _stats, Node* _curNode, u32 _depth) const
@@ -374,6 +374,7 @@ namespace tim
             {
                 blas->setParameters(_params);
                 blas->build(true);
+                blas->dumpStats();
             });
 
         // std::for_each(std::execution::seq, m_blas.begin(), m_blas.end(), [](auto& blas) { blas->dumpStats(); });
@@ -519,29 +520,54 @@ namespace tim
         u32 numObjects = u32(std::distance(_objectsBegin, _objectsEnd) + std::distance(_trianglesBegin, _trianglesEnd) + std::distance(_blasBegin, _blasEnd));
 
         // Fill leafs
-        if (/*_depth > 0 && */(_numUniqueItems <= m_params.minObjPerNode || _depth >= m_params.maxDepth))
+        if (_numUniqueItems <= m_params.minObjPerNode || _depth >= m_params.maxDepth)
         {
             fillLeafData(_curNode, _depth, _objectsBegin, _objectsEnd, _trianglesBegin, _trianglesEnd, _blasBegin, _blasEnd);
             return;
         }
         else
         {
-            SplitData splitData[3];
-            searchBestSplit(_curNode, _objectsBegin, _objectsEnd, _trianglesBegin, _trianglesEnd, _blasBegin, _blasEnd,
-                [](const vec3& step) { return vec3(step.x, 0, 0); }, [](const vec3& _step) { return vec3{ 0, _step.y, _step.z }; }, splitData[0]);
-            searchBestSplit(_curNode, _objectsBegin, _objectsEnd, _trianglesBegin, _trianglesEnd, _blasBegin, _blasEnd,
-                [](const vec3& step) { return vec3(0, step.y, 0); }, [](const vec3& _step) { return vec3{ _step.x, 0, _step.z }; }, splitData[1]);
-            searchBestSplit(_curNode, _objectsBegin, _objectsEnd, _trianglesBegin, _trianglesEnd, _blasBegin, _blasEnd,
-                [](const vec3& step) { return vec3(0, 0, step.z); }, [](const vec3& _step) { return vec3{ _step.x, _step.y, 0 }; }, splitData[2]);
+            constexpr u32 selectBestSplitItemCountThreshold = 1024;
+            SplitData bestSplit;
 
-            // search for best homogeneous split
-            auto getBestSplit = [&](u32 s0, u32 s1) -> u32
+            if (numObjects < selectBestSplitItemCountThreshold)
             {
-                return computeSplitScore(splitData[s0]) > computeSplitScore(splitData[s1]) ? s0 : s1;
-            };
+                SplitData splitData[3];
+                searchBestSplit(_curNode, _objectsBegin, _objectsEnd, _trianglesBegin, _trianglesEnd, _blasBegin, _blasEnd,
+                    [](const vec3& step) { return vec3(step.x, 0, 0); }, [](const vec3& _step) { return vec3{ 0, _step.y, _step.z }; }, splitData[0]);
+                searchBestSplit(_curNode, _objectsBegin, _objectsEnd, _trianglesBegin, _trianglesEnd, _blasBegin, _blasEnd,
+                    [](const vec3& step) { return vec3(0, step.y, 0); }, [](const vec3& _step) { return vec3{ _step.x, 0, _step.z }; }, splitData[1]);
+                searchBestSplit(_curNode, _objectsBegin, _objectsEnd, _trianglesBegin, _trianglesEnd, _blasBegin, _blasEnd,
+                    [](const vec3& step) { return vec3(0, 0, step.z); }, [](const vec3& _step) { return vec3{ _step.x, _step.y, 0 }; }, splitData[2]);
 
-            u32 bestSplitIndex = getBestSplit(getBestSplit(0, 1), 2);
-            const SplitData& bestSplit = splitData[bestSplitIndex];
+                // search for best homogeneous split
+                auto getBestSplit = [&](u32 s0, u32 s1) -> u32
+                {
+                    return computeSplitScore(splitData[s0]) > computeSplitScore(splitData[s1]) ? s0 : s1;
+                };
+
+
+                u32 bestSplitIndex = getBestSplit(getBestSplit(0, 1), 2);
+                bestSplit = std::move(splitData[bestSplitIndex]);
+            }
+            else
+            {
+                switch (_depth % 3)
+                {
+                case 0:
+                    searchBestSplit(_curNode, _objectsBegin, _objectsEnd, _trianglesBegin, _trianglesEnd, _blasBegin, _blasEnd,
+                        [](const vec3& step) { return vec3(step.x, 0, 0); }, [](const vec3& _step) { return vec3{ 0, _step.y, _step.z }; }, bestSplit);
+                    break;
+                case 1:
+                    searchBestSplit(_curNode, _objectsBegin, _objectsEnd, _trianglesBegin, _trianglesEnd, _blasBegin, _blasEnd,
+                        [](const vec3& step) { return vec3(0, step.y, 0); }, [](const vec3& _step) { return vec3{ _step.x, 0, _step.z }; }, bestSplit);
+                    break;
+                case 2:
+                    searchBestSplit(_curNode, _objectsBegin, _objectsEnd, _trianglesBegin, _trianglesEnd, _blasBegin, _blasEnd,
+                        [](const vec3& step) { return vec3(0, 0, step.z); }, [](const vec3& _step) { return vec3{ _step.x, _step.y, 0 }; }, bestSplit);
+                    break;
+                }
+            }
 
             //if (bestSplit.numItemsRight == 224 && bestSplit.numItemsLeft == 1)
             //{

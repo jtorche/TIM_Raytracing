@@ -23,7 +23,7 @@ uint rayTrace(in Ray _ray, out ClosestHit _hitResult)
 
 	uint rootId = g_Constants.numNodes == 1 ? NID_LEAF_BIT : 0;
 
-#if USE_TRAVERSE_TLAS
+#ifdef USE_TRAVERSE_TLAS
 	return traverseTlas(_ray, rootId, _hitResult);
 #else
 	return traverseBvh(_ray, rootId, _hitResult);

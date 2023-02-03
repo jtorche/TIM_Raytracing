@@ -2,7 +2,7 @@
 #extension GL_EXT_scalar_block_layout : enable
 #extension GL_EXT_nonuniform_qualifier : enable
 
-// #define NO_LPF
+//#define NO_LPF
 
 #include "core/system.glsl"
 #include "struct_cpp.glsl"
