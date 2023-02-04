@@ -195,15 +195,15 @@ int main(int argc, char* argv[])
         Scene scene(g_renderer, textureManager);
         {
             BVHBuildParameters blasParams;
-            blasParams.minObjPerNode = 8;
-            blasParams.minObjGain = 8;
+            blasParams.minObjPerNode = 4;
+            blasParams.minObjGain = 4;
             blasParams.expandNodeVolumeThreshold = 0.25;
 
             BVHBuildParameters tlasParams;
             tlasParams.minObjPerNode = 6;
             tlasParams.minObjGain = 6;
             tlasParams.expandNodeVolumeThreshold = 1;
-            scene.build(blasParams, tlasParams, true);
+            scene.build(blasParams, tlasParams, false);
         }
         bool needClearLpf = true;
 
@@ -244,6 +244,7 @@ int main(int argc, char* argv[])
                     std::cout << "Bvh Params, min obj per node : "; std::cin >> params.minObjPerNode;
                     std::cout << "Bvh Params, min obj gain : "; std::cin >> params.minObjGain;
                     std::cout << "Bvh Params, volume heuristic : "; std::cin >> params.expandNodeVolumeThreshold;
+                    std::cout << "Bvh Params, dimension heuristic : "; std::cin >> params.expandNodeDimensionFactor;
 
                     std::cout << "Rendering recursion depth : ";
                     std::cin >> recursionDepth;

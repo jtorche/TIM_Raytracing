@@ -396,6 +396,8 @@ namespace tim
         m_nodes.reserve((m_triangles.size() + m_objects.size() + m_blasInstances.size()) * 2);
         m_nodes.push_back(std::make_unique<Node>(0));
 
+        m_meanTriangleSize = 0;
+
         // Compute true AABB of the scene
         Box tightBox = { {  std::numeric_limits<float>::max(),  std::numeric_limits<float>::max(),  std::numeric_limits<float>::max() },
                          { -std::numeric_limits<float>::max(), -std::numeric_limits<float>::max(), -std::numeric_limits<float>::max() } };
@@ -410,6 +412,7 @@ namespace tim
             Box box = getAABB(m_triangles[i]);
             tightBox.minExtent = linalg::min_(tightBox.minExtent, box.minExtent);
             tightBox.maxExtent = linalg::max_(tightBox.maxExtent, box.maxExtent);
+            m_meanTriangleSize += linalg::sum(box.maxExtent - box.minExtent) / 3;
         }
         for (u32 i = 0; i < m_blasInstances.size(); ++i)
         {
@@ -419,6 +422,9 @@ namespace tim
         }
         m_aabb = adjustAABB(tightBox);
         m_nodes.back()->extent = m_aabb;
+
+        m_meanTriangleSize /= m_triangles.size();
+        m_meanTriangleSize *= m_params.expandNodeDimensionFactor;
 
         std::vector<u32> objectsIds(m_objects.size());
         for (u32 i = 0; i < m_objects.size(); ++i)
@@ -685,6 +691,14 @@ namespace tim
         }
     }
 
+    static float computeMaxDistanceBetweenBoxDimensions(const Box& _box1, const Box& _box2)
+    {
+        vec3 dim1 = _box1.maxExtent - _box1.minExtent;
+        vec3 dim2 = _box2.maxExtent - _box2.minExtent;
+
+        return linalg::maxelem(linalg::abs(dim1 - dim2));
+    }
+
     template<bool FillItems>
     void BVHBuilder::fillSplitData(SplitData& _splitData, const Box& parentBox, const Box& leftBox, const Box& rightBox,
                                    ObjectIt _objectsBegin, ObjectIt _objectsEnd, ObjectIt _trianglesBegin, ObjectIt _trianglesEnd, ObjectIt _blasBegin, ObjectIt _blasEnd) const
@@ -736,8 +750,10 @@ namespace tim
                 else // the item is in both left and right AABBs
                 {
                     float smallestVolume = std::min(leftVolume, rightVolume);
-                    float diffLeft = getBoxVolume(intersectionBox(mergeBox(leftBox, aabb), parentBox)) - leftVolume;
-                    float diffRight = getBoxVolume(intersectionBox(mergeBox(rightBox, aabb), parentBox)) - rightVolume;    
+                    Box newLeftBox = intersectionBox(mergeBox(leftBox, aabb), parentBox);
+                    Box newRightBox = intersectionBox(mergeBox(rightBox, aabb), parentBox);
+                    float diffLeft = getBoxVolume(newLeftBox) - leftVolume;
+                    float diffRight = getBoxVolume(newRightBox) - rightVolume;
 
                     auto addInBothNodes = [&]()
                     {
@@ -760,7 +776,9 @@ namespace tim
 
                     if (diffLeft < diffRight) // better to add in left
                     {
-                        if ((diffLeft / smallestVolume) >= m_params.expandNodeVolumeThreshold)
+                        float distAugmentation = computeMaxDistanceBetweenBoxDimensions(newLeftBox, leftBox);
+
+                        if ((diffLeft / smallestVolume) >= m_params.expandNodeVolumeThreshold || distAugmentation > m_meanTriangleSize)
                         {
                             // big items added in both side to avoid increasing the size of the AABB to much
                             addInBothNodes();
@@ -781,7 +799,9 @@ namespace tim
                     }
                     else // better to add in right
                     {
-                        if ((diffRight / smallestVolume) >= m_params.expandNodeVolumeThreshold)
+                        float distAugmentation = computeMaxDistanceBetweenBoxDimensions(newRightBox, rightBox);
+
+                        if ((diffRight / smallestVolume) >= m_params.expandNodeVolumeThreshold || distAugmentation > m_meanTriangleSize)
                         {
                             // big items added in both side to avoid increasing the size of the AABB to much
                             addInBothNodes();

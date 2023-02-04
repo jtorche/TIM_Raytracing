@@ -52,10 +52,12 @@ namespace tim
 
     struct BVHBuildParameters
     {
-        u32 maxDepth = 20;
-        u32 minObjPerNode = 8;
+        // Best parameters for sponza
+        u32 maxDepth = 25;
+        u32 minObjPerNode = 4;
         u32 minObjGain = 4;
-        float expandNodeVolumeThreshold = 0.25;
+        float expandNodeVolumeThreshold = 0.2;
+        float expandNodeDimensionFactor = 0.225;
     };
 
     class BVHBuilder
@@ -199,6 +201,7 @@ namespace tim
         };
 
         Box m_aabb;
+        float m_meanTriangleSize = 0;
         std::vector<std::unique_ptr<Node>> m_nodes;
         std::vector<Triangle> m_triangles;
         std::vector<Material> m_triangleMaterials;
