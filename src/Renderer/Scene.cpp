@@ -275,12 +275,13 @@ namespace tim
 
     void Scene::build(const BVHBuildParameters& _bvhParams, const BVHBuildParameters& _tlasParams, bool _useTlasBlas)
     {
+        constexpr bool useSponza = false;
+
         m_renderer->WaitForIdle();
         m_geometryBuffer = std::make_unique<BVHGeometry>(m_renderer, 1024 * 1024);
         m_bvh = std::make_unique<BVHBuilder>("BVHData", *m_geometryBuffer, _useTlasBlas);
         m_bvhData = std::make_unique<BVHData>(m_renderer, *m_geometryBuffer);
 
-#if 1
         const float DIMXY = 3.1f;
         const float DIMZ = 2;
 
@@ -294,67 +295,78 @@ namespace tim
         Material pbrMat = BVHBuilder::createPbrMaterial({ 0.9f, 0.9f, 0.9f }, 0);
         Material pbrMatMetal = BVHBuilder::createPbrMaterial({ 0.9f, 0.9f, 0.9f }, 1);
 
-    #ifndef _DEBUG
-        m_bvh->addSphere({ { 0, 0, 4.1f }, 0.08f }, BVHBuilder::createEmissiveMaterial({ 1, 1, 1 }));
-        m_bvh->addSphereLight({ { 0, 0, 4.1f }, 30, { 2, 2, 2 }, 0.1f });
+        if (useSponza)
+        {
+            m_bvh->addSphere({ { 0, 0, 4.1f }, 0.08f }, BVHBuilder::createEmissiveMaterial({ 1, 1, 1 }));
+            m_bvh->addSphereLight({ { 0, 0, 4.1f }, 30, { 2, 2, 2 }, 0.1f });
 
-        m_bvh->addSphere({ { -9.18164f , 3.32356f , 6.98306f }, 0.05f }, BVHBuilder::createEmissiveMaterial({ 1,0.2f,0.2f }));
-        m_bvh->addSphereLight({ { -9.18164f , 3.32356f , 6.98306f }, 16, { 3,0.5,0.5 }, 0.1f });
+            m_bvh->addSphere({ { -9.18164f , 3.32356f , 6.98306f }, 0.05f }, BVHBuilder::createEmissiveMaterial({ 1,0.2f,0.2f }));
+            m_bvh->addSphereLight({ { -9.18164f , 3.32356f , 6.98306f }, 16, { 3,0.5,0.5 }, 0.1f });
 
-        m_bvh->addSphere({ {  2.0f, 0, 1.3f }, 0.2f }, pbrMatMetal);
-        m_bvh->addSphere({ {  0.5f, 0, 1.3f }, 0.2f }, BVHBuilder::createTransparentMaterial({ 1,0.6f,0.6f }, 1.05f, 0.05f));
-        m_bvh->addSphere({ { -1.5f, 0, 1.3f }, 0.2f }, BVHBuilder::createPbrMaterial({ 1,0.6f,0.6f }, 0));
-    #endif
+            m_bvh->addSphere({ {  2.0f, 0, 1.3f }, 0.2f }, pbrMatMetal);
+            m_bvh->addSphere({ {  0.5f, 0, 1.3f }, 0.2f }, BVHBuilder::createTransparentMaterial({ 1,0.6f,0.6f }, 1.05f, 0.05f));
+            m_bvh->addSphere({ { -1.5f, 0, 1.3f }, 0.2f }, BVHBuilder::createPbrMaterial({ 1,0.6f,0.6f }, 0));
+        }
 
         u32 texFlame = m_texManager.loadTexture("./data/image/flame.png");
         u32 texDot = m_texManager.loadTexture("./data/image/tex.png");
 
         if (!_useTlasBlas)
         {
-        #ifndef _DEBUG
-            BVHBuilder::setTextureMaterial(suzanneMat, texFlame, 0);
-            addOBJ("./data/suzanne.obj", { -2.5f, 0, 1.3f }, vec3(1), m_bvh.get(), suzanneMat);
+            if (useSponza)
+            {
+                BVHBuilder::setTextureMaterial(suzanneMat, texFlame, 0);
+                addOBJ("./data/suzanne.obj", { -2.5f, 0, 1.3f }, vec3(1), m_bvh.get(), suzanneMat);
+                
+                BVHBuilder::setTextureMaterial(suzanneMat, texDot, 0);
+                addOBJ("./data/suzanne.obj", { 3.f, 0, 1.3f }, vec3(1), m_bvh.get(), suzanneMat);
+                 
+                addOBJ("./data/object1.obj", { 0, 0, 4.1f }, vec3(1), m_bvh.get(), roomMat);
 
-            BVHBuilder::setTextureMaterial(suzanneMat, texDot, 0);
-            addOBJ("./data/suzanne.obj", { 3.f, 0, 1.3f }, vec3(1), m_bvh.get(), suzanneMat);
-
-            addOBJWithMtl("./data/sponza.obj", {}, vec3(0.01f), m_bvh.get(), true);
-        #else
-            m_bvh.get()->addSphereLight({ { 3.08371f , 0.250811f , 5.16995f }, 25, { 2, 2, 2 }, 0.1f });
-            addOBJWithMtl("./data/cornell.obj", { 0, 0, 0 }, vec3(1), m_bvh.get());
-        #endif  
+                addOBJWithMtl("./data/sponza.obj", {}, vec3(0.01f), m_bvh.get(), true);
+                // addOBJWithMtl("./data/room/room.obj", {}, vec3(2), m_bvh.get());
+            }
+            else
+            {
+                m_bvh.get()->addSphereLight({ { 3.08371f , 0.250811f , 5.16995f }, 25, { 2, 2, 2 }, 0.1f });
+                //addOBJWithMtl("./data/cornell.obj", { 0, 0, 0 }, vec3(1), m_bvh.get());
+                addOBJ("./data/object1.obj", { 2.10406f , -0.641558f , 1.7f }, vec3(5), m_bvh.get(), roomMat);
+            }
         }
         else
         {
             std::vector<std::unique_ptr<BVHBuilder>> blas;
             
-    #ifndef _DEBUG
-            loadBlas("./data/suzanne.obj", { -2.5f, 0, 1.3f }, vec3(1), blas, &suzanneMat);
-            loadBlas("./data/suzanne.obj", { 3.f, 0, 1.3f }, vec3(1), blas, &suzanneMat);
-
-            std::vector<std::unique_ptr<BVHBuilder>> sponzaBlas;
-            loadBlas("./data/sponza.obj", {}, vec3(0.01f), sponzaBlas, nullptr, true);
-
-            if (!sponzaBlas.empty())
+            if (useSponza)
             {
-                for (auto it = sponzaBlas.begin() + 1; it != sponzaBlas.end(); ++it)
-                    sponzaBlas[0]->mergeBlas(std::move(*it));
-                
-                blas.push_back(std::move(sponzaBlas[0]));
-            }
-    #else
-            m_bvh.get()->addSphereLight({ { 3.08371f , 0.250811f , 5.16995f }, 15, { 0.1, 0.1, 0.1 }, 0.1f });
+                loadBlas("./data/suzanne.obj", { -2.5f, 0, 1.3f }, vec3(1), blas, &suzanneMat);
+                loadBlas("./data/suzanne.obj", { 3.f, 0, 1.3f }, vec3(1), blas, &suzanneMat);
 
-            // loadBlas("./data/cornellBox.obj", { 0, 0, 0 }, vec3(1), blas);
-            loadBlas("./data/cornell.obj", { 0, 0, 0 }, vec3(1), blas);
-            for (auto it = blas.begin() + 1; it != blas.end(); ++it)
-                blas[0]->mergeBlas(std::move(*it));
-            blas.resize(1);
-    #endif
+                std::vector<std::unique_ptr<BVHBuilder>> sponzaBlas;
+                loadBlas("./data/sponza.obj", {}, vec3(0.01f), sponzaBlas, nullptr, true);
+
+                if (!sponzaBlas.empty())
+                {
+                    for (auto it = sponzaBlas.begin() + 1; it != sponzaBlas.end(); ++it)
+                        sponzaBlas[0]->mergeBlas(std::move(*it));
+
+                    blas.push_back(std::move(sponzaBlas[0]));
+                }
+            }
+            else
+            {
+                m_bvh.get()->addSphereLight({ { 3.08371f , 0.250811f , 5.16995f }, 15, { 0.1, 0.1, 0.1 }, 0.1f });
+
+                loadBlas("./data/cornell.obj", { 0, 0, 0 }, vec3(1), blas);
+                for (auto it = blas.begin() + 1; it != blas.end(); ++it)
+                    blas[0]->mergeBlas(std::move(*it));
+                blas.resize(1);
+
+                loadBlas("./data/object1.obj", { 2.10406f , -0.641558f , 1.7f }, vec3(1), blas);
+            }
             for (auto& b : blas)
                 m_bvh->addBlas(std::move(b));
         } 
-#endif
         m_geometryBuffer->flush(m_renderer);
         m_bvhData->build(*m_bvh, _bvhParams, _tlasParams, _useTlasBlas);
         m_useTlas = _useTlasBlas;
