@@ -36,12 +36,12 @@ vec4 toLinear(vec4 sRGB)
 #define ANY_DEBUG           (DEBUG_GEOMETRY + DEBUG_BVH + DEBUG_BVH_TRAVERSAL)
 
 #define SHOW_LPF_DEBUG      0
-#define LPF_DEBUG_SIZE      0.1
+#define LPF_DEBUG_SIZE      0.05
 
 #define g_AreaLightShadowUniformSampling	0
 #define g_AreaLightShadowSampleCount	    1
 
-#define OFFSET_RAY_COLLISION 0.9999
+#define OFFSET_RAY_COLLISION (10e-6)
 
 #define Fdielectric vec3(0.04,0.04,0.04)
 #define RoughnessPBR 0.02

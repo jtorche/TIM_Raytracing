@@ -276,6 +276,7 @@ namespace tim
     void Scene::build(const BVHBuildParameters& _bvhParams, const BVHBuildParameters& _tlasParams, bool _useTlasBlas)
     {
         constexpr bool useSponza = false;
+        constexpr bool useRoom = true;
 
         m_renderer->WaitForIdle();
         m_geometryBuffer = std::make_unique<BVHGeometry>(m_renderer, 1024 * 1024);
@@ -320,17 +321,23 @@ namespace tim
                 
                 BVHBuilder::setTextureMaterial(suzanneMat, texDot, 0);
                 addOBJ("./data/suzanne.obj", { 3.f, 0, 1.3f }, vec3(1), m_bvh.get(), suzanneMat);
-                 
-                addOBJ("./data/object1.obj", { 0, 0, 4.1f }, vec3(1), m_bvh.get(), roomMat);
+
 
                 addOBJWithMtl("./data/sponza.obj", {}, vec3(0.01f), m_bvh.get(), true);
-                // addOBJWithMtl("./data/room/room.obj", {}, vec3(2), m_bvh.get());
+            }
+            else if (useRoom)
+            {
+                m_bvh->addSphere({ { 0.340643f, 0.879322f, 3.09497f }, 0.08f }, BVHBuilder::createEmissiveMaterial({ 1, 1, 1 }));
+                m_bvh->addSphereLight({ { 0.340643f, 0.879322f, 3.09497f }, 20, { 3, 3, 3 }, 0.1f });
+
+                addOBJWithMtl("./data/room/room.obj", {}, vec3(2), m_bvh.get());
             }
             else
             {
                 m_bvh.get()->addSphereLight({ { 3.08371f , 0.250811f , 5.16995f }, 25, { 2, 2, 2 }, 0.1f });
-                //addOBJWithMtl("./data/cornell.obj", { 0, 0, 0 }, vec3(1), m_bvh.get());
-                addOBJ("./data/object1.obj", { 2.10406f , -0.641558f , 1.7f }, vec3(5), m_bvh.get(), roomMat);
+                addOBJWithMtl("./data/cornell.obj", { 0, 0, 0 }, vec3(1), m_bvh.get());
+                addOBJ("./data/object1.obj", { 2.10406f , -0.641558f , 1.7f }, vec3(1), m_bvh.get(), roomMat);
+                
             }
         }
         else

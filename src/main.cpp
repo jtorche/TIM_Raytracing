@@ -197,7 +197,8 @@ int main(int argc, char* argv[])
             BVHBuildParameters blasParams;
             blasParams.minObjPerNode = 4;
             blasParams.minObjGain = 4;
-            blasParams.expandNodeVolumeThreshold = 0.25;
+            blasParams.expandNodeVolumeThreshold = 0.2f;
+            blasParams.expandNodeVolumeThreshold = 0.225f;
 
             BVHBuildParameters tlasParams;
             tlasParams.minObjPerNode = 6;

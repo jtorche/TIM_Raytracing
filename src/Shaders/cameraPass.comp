@@ -119,7 +119,7 @@ void raytraceLightProbFieldDebug(in Ray _ray, inout ClosestHit _hitResult)
 		Hit hit;
 		if(HitSphere(_ray, sphere, 0, _hitResult.t, hit))
 		{
-			_hitResult.t			= hit.t * OFFSET_RAY_COLLISION;
+			_hitResult.t			= hit.t - OFFSET_RAY_COLLISION;
 			_hitResult.mid_objId	= i + ((0 << 16) & 0xFFFF0000);
 			_hitResult.nid			= 0xFFFFffff;
 

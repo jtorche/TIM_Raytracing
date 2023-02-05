@@ -7,6 +7,8 @@
 #include <execution>
 #include "shaders/struct_cpp.glsl"
 
+//#define INLINE_TRIANGLES
+
 namespace tim
 {
     namespace
@@ -382,8 +384,8 @@ namespace tim
 
     static Box adjustAABB(Box _box)
     {
-        _box.maxExtent += vec3(float(1e-5));
-        _box.minExtent -= vec3(float(1e-5));
+        _box.maxExtent += vec3(float(1e-6));
+        _box.minExtent -= vec3(float(1e-6));
         return _box;
     }
 
@@ -535,7 +537,7 @@ namespace tim
         {
             constexpr u32 selectBestSplitItemCountThreshold = 1024;
             SplitData bestSplit;
-
+            
             if (numObjects < selectBestSplitItemCountThreshold)
             {
                 SplitData splitData[3];
@@ -586,10 +588,14 @@ namespace tim
             //    __debugbreak();
             //}
 
-            if (_depth > 0 && (numObjects - bestSplit.numItemsLeft < m_params.minObjGain && numObjects - bestSplit.numItemsRight < m_params.minObjGain))
+            if (_depth > 0)
             {
-                fillLeafData(_curNode, _depth, _objectsBegin, _objectsEnd, _trianglesBegin, _trianglesEnd, _blasBegin, _blasEnd);
-                return;
+                if (numObjects - bestSplit.numItemsLeft < m_params.minObjGain && numObjects - bestSplit.numItemsRight < m_params.minObjGain ||
+                    bestSplit.numUniqueItemsLeft == 0 || bestSplit.numUniqueItemsRight == 0)
+                {
+                    fillLeafData(_curNode, _depth, _objectsBegin, _objectsEnd, _trianglesBegin, _trianglesEnd, _blasBegin, _blasEnd);
+                    return;
+                }
             }
 
             // Fill leaf data only for lights
@@ -721,6 +727,7 @@ namespace tim
             {
                 bool collideLeft = _collideObj(it, leftBox) != CollisionType::Disjoint;
                 bool collideRight = _collideObj(it, rightBox) != CollisionType::Disjoint;
+
                 Box aabb = _getAABB(it);
 
                 if (!collideLeft && collideRight)
@@ -747,14 +754,13 @@ namespace tim
                         isLeftBoxInitialized = true;
                     }
                 }
+                else if(!collideLeft && !collideRight)
+                {
+                    // error case, usually due to floating point precision
+                    // __debugbreak();  
+                }
                 else // the item is in both left and right AABBs
                 {
-                    float smallestVolume = std::min(leftVolume, rightVolume);
-                    Box newLeftBox = intersectionBox(mergeBox(leftBox, aabb), parentBox);
-                    Box newRightBox = intersectionBox(mergeBox(rightBox, aabb), parentBox);
-                    float diffLeft = getBoxVolume(newLeftBox) - leftVolume;
-                    float diffRight = getBoxVolume(newRightBox) - rightVolume;
-
                     auto addInBothNodes = [&]()
                     {
                         _splitData.numItemsInBoth++;
@@ -768,11 +774,17 @@ namespace tim
 
                             _splitData.leftBox = intersectionBox(isLeftBoxInitialized ? mergeBox(aabb, _splitData.leftBox) : aabb, curLeftBox);
                             isLeftBoxInitialized = true;
-                            
+
                             _splitData.rightBox = intersectionBox(isRightBoxInitialized ? mergeBox(aabb, _splitData.rightBox) : aabb, curRightBox);
                             isRightBoxInitialized = true;
                         }
                     };
+
+                    float smallestVolume = std::min(leftVolume, rightVolume);
+                    Box newLeftBox = intersectionBox(mergeBox(leftBox, aabb), parentBox);
+                    Box newRightBox = intersectionBox(mergeBox(rightBox, aabb), parentBox);
+                    float diffLeft = getBoxVolume(newLeftBox) - leftVolume;
+                    float diffRight = getBoxVolume(newRightBox) - rightVolume;
 
                     if (diffLeft < diffRight) // better to add in left
                     {
@@ -873,7 +885,7 @@ namespace tim
         else
         {
             vec3 fixedStep = _fixedAxis(boxDim);
-            float score = 0;
+            float score = -1;
             auto processStep = [&](vec3 step)
             {
                 Box leftBox = { _curNode->extent.minExtent, _curNode->extent.minExtent + fixedStep + step };
@@ -944,7 +956,14 @@ namespace tim
             u32 size = 0;
             size += alignUp<u32>((u32)_nodes.size() * sizeof(PackedBVHNode), m_bufferAlignment);
             for (const auto& n : _nodes)
-                size += (u32)(1 + n->triangleList.size() + n->primitiveList.size() + n->lightList.size() + n->blasList.size()) * sizeof(u32);
+            {
+                size += (u32)(1 + n->primitiveList.size() + n->lightList.size() + n->blasList.size()) * sizeof(u32);
+            #ifdef INLINE_TRIANGLES
+                size += n->triangleList.size() * sizeof(Triangle);
+            #else   
+                size += u32(n->triangleList.size()) * sizeof(u32);
+            #endif      
+            }
 
             return size;
         };
@@ -1216,8 +1235,18 @@ namespace tim
 
             *objectListCurPtr = packedCount;
             ++objectListCurPtr;
+        #ifdef INLINE_TRIANGLES
+            TIM_ASSERT(!m_isTlas);
+            for (u32 tri : n->triangleList)
+            {
+                memcpy(objectListCurPtr, &m_triangles[tri], sizeof(Triangle));
+                objectListCurPtr += (sizeof(Triangle) / sizeof(u32));
+            }
+        #else
             memcpy(objectListCurPtr, n->triangleList.data(), sizeof(u32) * n->triangleList.size());
             objectListCurPtr += n->triangleList.size();
+        #endif
+
             memcpy(objectListCurPtr, n->blasList.data(), sizeof(u32) * n->blasList.size());
             objectListCurPtr += n->blasList.size();
             memcpy(objectListCurPtr, n->primitiveList.data(), sizeof(u32) * n->primitiveList.size());

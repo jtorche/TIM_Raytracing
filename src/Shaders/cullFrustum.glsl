@@ -163,7 +163,7 @@ void collideRayAgainstTileData(in Ray _ray, inout ClosestHit _closestHit)
 		Hit hit;
 		bool hasHit = hitPrimitive(primIndex, _ray, _closestHit.t, hit);
 
-		_closestHit.t =			hasHit ? hit.t * OFFSET_RAY_COLLISION	: _closestHit.t;
+		_closestHit.t =			hasHit ? hit.t - OFFSET_RAY_COLLISION	: _closestHit.t;
 
 		if(hasHit) storeHitNormal(_closestHit, hit.normal);
 
@@ -177,7 +177,7 @@ void collideRayAgainstTileData(in Ray _ray, inout ClosestHit _closestHit)
 		Hit hit;
 		bool hasHit = HitTriangle(_ray, g_BvhTriangleData[triIndex], 0, _closestHit.t, hit);
 
-		_closestHit.t =			hasHit ? hit.t * OFFSET_RAY_COLLISION : _closestHit.t;
+		_closestHit.t =			hasHit ? hit.t - OFFSET_RAY_COLLISION : _closestHit.t;
 
 		if(hasHit) storeHitNormal(_closestHit, hit.normal);
 		if(hasHit) storeHitUv(_closestHit, hit.uv);

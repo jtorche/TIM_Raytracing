@@ -56,8 +56,8 @@ namespace tim
         u32 maxDepth = 25;
         u32 minObjPerNode = 4;
         u32 minObjGain = 4;
-        float expandNodeVolumeThreshold = 0.2;
-        float expandNodeDimensionFactor = 0.225;
+        float expandNodeVolumeThreshold = 0.2f;
+        float expandNodeDimensionFactor = 0.225f;
     };
 
     class BVHBuilder
@@ -174,6 +174,7 @@ namespace tim
             Node* sibling = nullptr;
             Node* left = nullptr;
             Node* right = nullptr;
+
             std::vector<u32> primitiveList; // only if leaf
             std::vector<u32> triangleList; // only if leaf
             std::vector<u32> lightList; // only if leaf

@@ -59,7 +59,7 @@ float CollideTriangle(Ray r, vec3 p0, vec3 p1, vec3 p2, float tmax)
 {
 	// https://fr.wikipedia.org/wiki/Algorithme_d%27intersection_de_M%C3%B6ller%E2%80%93Trumbore
 
-    const float EPSILON = 0.00001;
+    const float EPSILON = 10e-8;
     vec3 edge1 = p1 - p0;
     vec3 edge2 = p2 - p0;
 

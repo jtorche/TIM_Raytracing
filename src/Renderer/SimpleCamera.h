@@ -13,6 +13,10 @@ namespace tim
             m_left = _left; m_right = _right; m_forward = _forward; m_backward = _backward;
             m_boost = _boost;
         }
+        void setPosition(vec3 _pos)
+        {
+            pos = _pos;
+        }
         void setMouseDelta(float _dx, float _dy)
         {
             m_mouseDx = -_dx; m_mouseDy = _dy;
