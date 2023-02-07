@@ -43,7 +43,7 @@ void main()
             Ray ray = createRay(g_inReflexionRays[rayIndexFromCoord()].pos.xyz, normalize(g_inReflexionRays[rayIndexFromCoord()].dir.xyz));
             vec3 lightAbsorbdeByPrevBounce = g_inReflexionRays[rayIndexFromCoord()].lit.xyz;
             
-            rayTrace(ray, closestHit) * lightAbsorbdeByPrevBounce;
+            rayTrace(ray, closestHit);
 
             SunDirColor sun;
 		    sun.sunDir = g_passData.sunDir.xyz;
@@ -54,7 +54,7 @@ void main()
 		    lpfHeader.aabb.maxExtent = g_passData.sceneMaxExtent.xyz;
 		    lpfHeader.resolution = g_passData.lpfResolution.xyz;
 
-		    vec3 lit = computeLighting(sun, lpfHeader, ray, closestHit);
+		    vec3 lit = computeLighting(sun, lpfHeader, ray, closestHit) * lightAbsorbdeByPrevBounce;
 
             vec4 curFrag = imageLoad(g_inputImage, pixelCoord);
             imageStore(g_outputImage, pixelCoord, vec4(lit + curFrag.xyz, 1));

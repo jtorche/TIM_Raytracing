@@ -1,13 +1,26 @@
 #include "BVHBuilder.h"
 #include "timCore/Common.h"
+#include "timCore/flat_hash_map.h"
 
 #include "TriBoxCollision.hpp"
 #include <thread>
+#include <set>
+#include <map>
 #include <algorithm>
 #include <execution>
 #include "shaders/struct_cpp.glsl"
 
-//#define INLINE_TRIANGLES
+#define INLINE_TRIANGLES 1
+#define INLINE_STRIPS    0
+
+template<>
+struct ::std::hash<tim::Edge>
+{
+    std::size_t operator()(tim::Edge e) const noexcept
+    {
+        return std::hash<u32>{}(u32(e.v1) + (u32(e.v2) << 16));
+    }
+};
 
 namespace tim
 {
@@ -22,7 +35,7 @@ namespace tim
             vec3 closestPointInAabb = linalg::min_(linalg::max_(_sphere.center, _box.minExtent), _box.maxExtent);
             float distanceSquared = linalg::length2(closestPointInAabb - _sphere.center);
 
-            return distanceSquared < (_sphere.radius * _sphere.radius) ? CollisionType::Intersect : CollisionType::Disjoint;
+            return distanceSquared < (_sphere.radius* _sphere.radius) ? CollisionType::Intersect : CollisionType::Disjoint;
         }
 
         CollisionType boxBoxCollision(const Box& _box1, const Box& _box2)
@@ -46,12 +59,12 @@ namespace tim
         {
             return _p.x < _box.minExtent.x || _p.y < _box.minExtent.y || _p.z < _box.minExtent.z ||
                    _p.x > _box.maxExtent.x || _p.y > _box.maxExtent.y || _p.z > _box.maxExtent.z
-                ? false : true;
+                   ? false : true;
         }
 
         CollisionType triangleVerticesBoxCollision(vec3 p0, vec3 p1, vec3 p2, const Box& _box)
         {
-            if(pointBoxCollision(p0, _box) || pointBoxCollision(p1, _box), pointBoxCollision(p2, _box))
+            if (pointBoxCollision(p0, _box) || pointBoxCollision(p1, _box), pointBoxCollision(p2, _box))
                 return CollisionType::Intersect;
             else
             {
@@ -249,7 +262,7 @@ namespace tim
         addTriangle(_triangle, matId);
     }
 
-    void BVHBuilder::addTriangleList(u32 _vertexOffset, u32 _numTriangle, const u32 * _indexData, const Material& _mat)
+    void BVHBuilder::addTriangleList(u32 _vertexOffset, u32 _numTriangle, const u32* _indexData, const Material& _mat)
     {
         u32 matId = (u32)m_triangleMaterials.size();
         m_triangleMaterials.push_back(_mat);
@@ -305,12 +318,14 @@ namespace tim
         computeStatsRec(stats, m_nodes[0].get(), 0);
 
         stats.meanTriangle /= stats.numLeafs;
+        stats.meanTriangleStrip /= stats.numLeafs;
         stats.meanDepth /= stats.numLeafs;
 
         std::cout << "BVHBuilder stats:\n";
         std::cout << " - Triangles count: " << m_triangles.size() << "\n";
         std::cout << " - leafs count: " << stats.numLeafs << "\n";
         std::cout << " - mean triangles: " << stats.meanTriangle << "\n";
+        std::cout << " - mean strips: " << stats.meanTriangleStrip << "\n";
         std::cout << " - mean depth: " << stats.meanDepth << "\n";
         std::cout << " - max triangles: " << stats.maxTriangle << "\n";
         std::cout << " - max blas: " << stats.maxBlas << "\n";
@@ -318,7 +333,7 @@ namespace tim
         std::cout << " - duplicated triangles: " << stats.numDuplicatedTriangle << "\n";
         std::cout << " - duplicated blas: " << stats.numDuplicatedBlas << "\n";
 
-        for (auto[dupBlas, count] : stats.m_duplicatedBlas)
+        for (auto [dupBlas, count] : stats.m_duplicatedBlas)
         {
             std::cout << dupBlas << " : " << m_blas[m_blasInstances[dupBlas].blasId]->getTrianglesCount() << " x " << count << std::endl;
         }
@@ -328,7 +343,7 @@ namespace tim
     {
         for (u32 blas : _curNode->blasList)
         {
-            auto[_, inserted] = _stats.m_allBlas.insert(blas);
+            auto [_, inserted] = _stats.m_allBlas.insert(blas);
             if (!inserted)
             {
                 _stats.numDuplicatedBlas++;
@@ -345,8 +360,8 @@ namespace tim
 
         if (_curNode->left && _curNode->right)
         {
-            computeStatsRec(_stats, _curNode->left, _depth+1);
-            computeStatsRec(_stats, _curNode->right, _depth+1);
+            computeStatsRec(_stats, _curNode->left, _depth + 1);
+            computeStatsRec(_stats, _curNode->right, _depth + 1);
         }
         else
         {
@@ -355,6 +370,7 @@ namespace tim
             _stats.maxBlas = std::max(_stats.maxBlas, u32(_curNode->blasList.size()));
             _stats.maxDepth = std::max(_stats.maxDepth, _depth);
             _stats.meanTriangle += u32(_curNode->triangleList.size());
+            _stats.meanTriangleStrip += u32(_curNode->strips.size());
             _stats.meanDepth += _depth;
         }
     }
@@ -370,7 +386,7 @@ namespace tim
         std::for_each(std::execution::seq, m_blas.begin(), m_blas.end(),
 #else
         std::for_each(std::execution::par, m_blas.begin(), m_blas.end(),
-        // std::for_each(std::execution::seq, m_blas.begin(), m_blas.end(),
+            // std::for_each(std::execution::seq, m_blas.begin(), m_blas.end(),
 #endif
             [&_params](auto& blas)
             {
@@ -389,7 +405,6 @@ namespace tim
         return _box;
     }
 
- //#pragma optimize("", off)
     void BVHBuilder::build(bool _useMultipleThreads)
     {
         m_stats = {};
@@ -492,6 +507,218 @@ namespace tim
         return float(total - std::max(_data.numUniqueItemsLeft, _data.numUniqueItemsRight));
     }
 
+    namespace TriangleStripHelpers
+    {
+        u16 getVertex(const Triangle& _tri, u32 _index)
+        {
+            u16 v[] = { _tri.index01 & 0x0000FFFF, (_tri.index01 & 0xFFFF0000) >> 16, _tri.index2_matId & 0x0000FFFF };
+            return v[_index];
+        }
+
+        u16 getMaterial(const Triangle& _tri)
+        {
+            return (_tri.index2_matId & 0xFFFF0000) >> 16;
+        }
+
+        bool hasCommonEdge(const Triangle& _tri1, Edge _edge)
+        {
+            Edge e0 = Edge(getVertex(_tri1, 0), getVertex(_tri1, 1));
+            Edge e1 = Edge(getVertex(_tri1, 1), getVertex(_tri1, 2));
+            Edge e2 = Edge(getVertex(_tri1, 2), getVertex(_tri1, 0));
+
+            return _edge == e0 || _edge == e1 || _edge == e2;
+        }
+
+        bool belongTo(u16 _vertex, const Triangle& _triangle)
+        {
+            return _vertex == getVertex(_triangle, 0) || _vertex == getVertex(_triangle, 1) || _vertex == getVertex(_triangle, 2);
+        }
+
+        u64 triangleVerticesUniqueID(const Triangle& _tri)
+        {
+            u16 ids[] = { getVertex(_tri, 0), getVertex(_tri, 1), getVertex(_tri, 2) };
+            std::sort(std::begin(ids), std::end(ids));
+            return u64(ids[0]) + (u64(ids[1]) << 16) + (u64(ids[2]) << 32);
+        }
+
+        void removeDuplicates(std::vector<u32>& _triangleIds, const std::vector<Triangle>& _triangles)
+        {
+            // std::sort(_triangleIds.begin(), _triangleIds.end());
+            // _triangleIds.erase(std::unique(_triangleIds.begin(), _triangleIds.end()), _triangleIds.end());
+
+            std::sort(_triangleIds.begin(), _triangleIds.end(), [&](u32 tri1, u32 tri2)
+                {
+                    if (_triangles[tri1].vertexOffset != _triangles[tri2].vertexOffset)
+                        return _triangles[tri1].vertexOffset < _triangles[tri2].vertexOffset;
+                    else if (getMaterial(_triangles[tri1]) != getMaterial(_triangles[tri2]))
+                        return getMaterial(_triangles[tri1]) < getMaterial(_triangles[tri2]);
+                    else return triangleVerticesUniqueID(_triangles[tri1]) < triangleVerticesUniqueID(_triangles[tri2]);
+                });
+
+            auto last = std::unique(_triangleIds.begin(), _triangleIds.end(), [&](u32 tri1, u32 tri2)
+                {
+                    return _triangles[tri1].vertexOffset == _triangles[tri2].vertexOffset &&
+                           getMaterial(_triangles[tri1]) == getMaterial(_triangles[tri2]) &&
+                           triangleVerticesUniqueID(_triangles[tri1]) == triangleVerticesUniqueID(_triangles[tri2]);
+                });
+
+            _triangleIds.erase(last, _triangleIds.end());
+        }
+
+        TriangleStrip packStrip(const std::vector<u16>& _vertices, u16 _matId)
+        {
+            TIM_ASSERT(_vertices.size() >= 3);
+            TIM_ASSERT(_vertices.size() <= 5);
+
+            TriangleStrip strip;
+            strip.index01 = _vertices[0] | _vertices[1] << 16;
+            strip.index2_matId = _vertices[2] | _matId << 16;
+
+            switch (_vertices.size())
+            {
+            case 3:
+                strip.index34 = 0xFFFFffff;
+                break;
+            case 4:
+                strip.index34 = _vertices[3] + 0xFFFF0000;
+                break;
+            case 5:
+                strip.index34 = _vertices[3] | _vertices[4] << 16;
+                break;
+            };
+            
+            return strip;
+        }
+
+        void fillTriangleStrips(const std::vector<u32>& _triangleIds, const std::vector<Triangle>& _triangles, std::vector<TriangleStrip>& _strips)
+        {
+            constexpr u32 MaxTrianglesInStrip = 3;
+
+            ska::flat_hash_set<u32> remainingTriangles(_triangleIds.begin(), _triangleIds.end());
+            std::vector<u32> trianglesInStrip;
+            std::vector<size_t> uniqueTrianglesInStrip;
+            std::vector<u32> remainingTrianglesToRemove;
+            std::map<u16, u16> vertexRefCounter;
+            std::vector<u16> verticesInStrip;
+
+            while (remainingTriangles.empty() == false)
+            {
+                trianglesInStrip.clear();
+                vertexRefCounter.clear();
+
+                Triangle curTriangle = _triangles[*remainingTriangles.begin()];
+                trianglesInStrip.push_back(*remainingTriangles.begin());
+                remainingTriangles.erase(remainingTriangles.begin());
+
+                ska::flat_hash_set<Edge> edges;
+                edges.insert(Edge(getVertex(curTriangle, 0), getVertex(curTriangle, 1)));
+                edges.insert(Edge(getVertex(curTriangle, 1), getVertex(curTriangle, 2)));
+                edges.insert(Edge(getVertex(curTriangle, 2), getVertex(curTriangle, 0)));
+
+                for (u32 i : { 0, 1, 2 })
+                    vertexRefCounter[getVertex(curTriangle, i)]++;
+
+                bool hasFoundNextStrip;
+                u32 stripSize = 0;
+                do
+                {
+                    hasFoundNextStrip = false;
+                    remainingTrianglesToRemove.clear();
+                    for (u32 tri : remainingTriangles)
+                    {
+                        if (_triangles[tri].vertexOffset != curTriangle.vertexOffset || getMaterial(_triangles[tri]) != getMaterial(curTriangle))
+                            continue;
+
+                        Edge commonEdge;
+                        size_t numCommonEdges = std::count_if(std::begin(edges), std::end(edges), [&](Edge _edge)  
+                            {
+                                bool isCommon = hasCommonEdge(_triangles[tri], _edge);
+                                if (isCommon)
+                                    commonEdge = _edge;
+
+                                return isCommon;
+                            });
+                        if (numCommonEdges == 1 && (vertexRefCounter[commonEdge.v1] + vertexRefCounter[commonEdge.v2]) <= 3)
+                        {
+                            hasFoundNextStrip = true;
+
+                            remainingTrianglesToRemove.push_back(tri);
+                            trianglesInStrip.push_back(tri);
+                            stripSize++;
+
+                            edges.insert(Edge(getVertex(_triangles[tri], 0), getVertex(_triangles[tri], 1)));
+                            edges.insert(Edge(getVertex(_triangles[tri], 1), getVertex(_triangles[tri], 2)));
+                            edges.insert(Edge(getVertex(_triangles[tri], 2), getVertex(_triangles[tri], 0)));
+                            edges.erase(commonEdge);
+
+                            for (u32 i : { 0, 1, 2 })
+                                vertexRefCounter[getVertex(_triangles[tri], i)]++;
+
+                            if (trianglesInStrip.size() == MaxTrianglesInStrip) // we support strip of 5 vertices at most
+                                break;
+                        }
+                    }
+
+                    for (u32 tri : remainingTrianglesToRemove)
+                        remainingTriangles.erase(tri);
+
+                } while (hasFoundNextStrip && trianglesInStrip.size() < MaxTrianglesInStrip);
+
+                u16 lastVertex = std::find_if(vertexRefCounter.begin(), vertexRefCounter.end(), [](auto v_count) { return v_count.second == 1; })->first;
+                u32 lastTriangle = *std::find_if(trianglesInStrip.begin(), trianglesInStrip.end(), [&](u32 _tri) { return belongTo(lastVertex, _triangles[_tri]); });
+                u32 lastTriangleCounter[] = { 
+                    vertexRefCounter[getVertex(_triangles[lastTriangle], 0)], 
+                    vertexRefCounter[getVertex(_triangles[lastTriangle], 1)], 
+                    vertexRefCounter[getVertex(_triangles[lastTriangle], 2)] 
+                };
+
+                verticesInStrip.clear();
+                while (trianglesInStrip.size() > 1)
+                {
+                    u16 vertex = std::find_if(vertexRefCounter.begin(), vertexRefCounter.end(), [&](auto v_count) { return v_count.first != lastVertex && v_count.second == 1; })->first;
+                    verticesInStrip.push_back(vertex);
+
+                    auto tri = std::find_if(trianglesInStrip.begin(), trianglesInStrip.end(), [&](u32 _tri) { return belongTo(vertex, _triangles[_tri]); });
+                    vertexRefCounter[getVertex(_triangles[*tri], 0)]--;
+                    vertexRefCounter[getVertex(_triangles[*tri], 1)]--;
+                    vertexRefCounter[getVertex(_triangles[*tri], 2)]--;
+                    trianglesInStrip.erase(tri);
+                }
+                
+                // Process last triangle
+                // 2 special cases, else lastTriangleCounter will always be equivalent to set<u32>{ 1,2,3 }
+                if (stripSize == 1)
+                {
+                    for (u32 i : { 0, 1, 2 })
+                        verticesInStrip.push_back(getVertex(_triangles[lastTriangle], i));
+                }
+                else if (stripSize == 2)
+                {
+                    for (u32 i : { 0, 1, 2 })
+                    {
+                        if (lastVertex != getVertex(_triangles[lastTriangle], i))
+                            verticesInStrip.push_back(getVertex(_triangles[lastTriangle], i));
+                    }
+                    verticesInStrip.push_back(lastVertex);
+                }
+                else // general case
+                {
+                    verticesInStrip.push_back(lastTriangleCounter[0] == 3 ? getVertex(_triangles[lastTriangle], 0) : (lastTriangleCounter[1] == 3 ? getVertex(_triangles[lastTriangle], 1) : getVertex(_triangles[lastTriangle], 2)));
+                    verticesInStrip.push_back(lastTriangleCounter[0] == 2 ? getVertex(_triangles[lastTriangle], 0) : (lastTriangleCounter[1] == 2 ? getVertex(_triangles[lastTriangle], 1) : getVertex(_triangles[lastTriangle], 2)));
+                    verticesInStrip.push_back(lastTriangleCounter[0] == 1 ? getVertex(_triangles[lastTriangle], 0) : (lastTriangleCounter[1] == 1 ? getVertex(_triangles[lastTriangle], 1) : getVertex(_triangles[lastTriangle], 2)));
+                }
+
+                _strips.push_back(packStrip(verticesInStrip, getMaterial(curTriangle)));
+            }
+        }
+    }
+
+    void BVHBuilder::fillTriangleStrips(Node * _leaf)
+    {
+        TriangleStripHelpers::removeDuplicates(_leaf->triangleList, m_triangles);
+        TriangleStripHelpers::fillTriangleStrips(_leaf->triangleList, m_triangles, _leaf->strips);
+    }
+
     void BVHBuilder::fillLeafData(Node* _curNode, u32 _depth, ObjectIt _objectsBegin, ObjectIt _objectsEnd, ObjectIt _trianglesBegin, ObjectIt _trianglesEnd, ObjectIt _blasBegin, ObjectIt _blasEnd)
     {
         const u32 numBlasAndObj = u32(std::distance(_blasBegin, _blasEnd) + std::distance(_objectsBegin, _objectsEnd));
@@ -513,6 +740,9 @@ namespace tim
             if (sphereBoxCollision(sphere, _curNode->extent) != CollisionType::Disjoint)
                 _curNode->lightList.push_back(u32(i));
         }
+
+        if(_curNode->triangleList.empty() == false)
+            fillTriangleStrips(_curNode);
     }
 
     void BVHBuilder::addObjectsRec(u32 _depth, u32 _numUniqueItems,
@@ -958,9 +1188,11 @@ namespace tim
             for (const auto& n : _nodes)
             {
                 size += (u32)(1 + n->primitiveList.size() + n->lightList.size() + n->blasList.size()) * sizeof(u32);
-            #ifdef INLINE_TRIANGLES
-                size += n->triangleList.size() * sizeof(Triangle);
-            #else   
+            #if INLINE_TRIANGLES
+                size += u32(n->triangleList.size()) * sizeof(Triangle);
+            #elif INLINE_STRIPS
+                size += u32(n->strips.size()) * sizeof(TriangleStrip);
+            #else  
                 size += u32(n->triangleList.size()) * sizeof(u32);
             #endif      
             }
@@ -1235,13 +1467,20 @@ namespace tim
 
             *objectListCurPtr = packedCount;
             ++objectListCurPtr;
-        #ifdef INLINE_TRIANGLES
+        #if INLINE_TRIANGLES
             TIM_ASSERT(!m_isTlas);
             for (u32 tri : n->triangleList)
             {
                 memcpy(objectListCurPtr, &m_triangles[tri], sizeof(Triangle));
                 objectListCurPtr += (sizeof(Triangle) / sizeof(u32));
             }
+        #elif INLINE_STRIPS
+            TIM_ASSERT(!m_isTlas);
+            for (const TriangleStrip& strip : n->strips)
+            {
+                memcpy(objectListCurPtr, &strip, sizeof(TriangleStrip));
+                objectListCurPtr += (sizeof(TriangleStrip) / sizeof(u32));
+        }
         #else
             memcpy(objectListCurPtr, n->triangleList.data(), sizeof(u32) * n->triangleList.size());
             objectListCurPtr += n->triangleList.size();

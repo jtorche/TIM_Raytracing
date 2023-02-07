@@ -18,7 +18,7 @@ IRenderer * g_renderer = nullptr;
 SimpleCamera camera;
 uvec2 targetFrameResolution = { 400, 300 };
 uvec2 frameResolution = { 400, 300 };
-uvec2 backbufferResolution = { 800, 600 };
+uvec2 backbufferResolution = { 1280, 720 };
 bool g_rebuildBvh = false;
 bool g_windowMinimized = false;
 bool g_editSun = false;
@@ -49,11 +49,11 @@ void key_callback(GLFWwindow* window, int key, int scancode, int action, int mod
     else
     {
         if (key == GLFW_KEY_1)
-            frameResolution = { 160, 90 };
-        else if (key == GLFW_KEY_2)
             frameResolution = { 320, 180 };
-        else if (key == GLFW_KEY_3)
+        else if (key == GLFW_KEY_2)
             frameResolution = { 640, 360 };
+        else if (key == GLFW_KEY_3)
+            frameResolution = { 1280, 720 };
         else if (key == GLFW_KEY_4)
             frameResolution = backbufferResolution;
     }
@@ -197,8 +197,8 @@ int main(int argc, char* argv[])
             BVHBuildParameters blasParams;
             blasParams.minObjPerNode = 4;
             blasParams.minObjGain = 4;
-            blasParams.expandNodeVolumeThreshold = 0.2f;
-            blasParams.expandNodeVolumeThreshold = 0.225f;
+            blasParams.expandNodeVolumeThreshold = 0.25f;
+            blasParams.expandNodeDimensionFactor = 0.5f;
 
             BVHBuildParameters tlasParams;
             tlasParams.minObjPerNode = 6;

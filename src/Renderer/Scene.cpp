@@ -35,7 +35,7 @@ namespace tim
 {
     Scene::Scene(IRenderer* _renderer, TextureManager& _texManager) : m_renderer{ _renderer }, m_texManager { _texManager }
     {
-        m_lightProbField.allocate(m_renderer, { 8, 8, 8 });
+        m_lightProbField.allocate(m_renderer, { 12, 12, 12 });
     }
 
     Scene::~Scene()
@@ -275,8 +275,8 @@ namespace tim
 
     void Scene::build(const BVHBuildParameters& _bvhParams, const BVHBuildParameters& _tlasParams, bool _useTlasBlas)
     {
-        constexpr bool useSponza = false;
-        constexpr bool useRoom = true;
+        constexpr bool useSponza = true;
+        constexpr bool useRoom = false;
 
         m_renderer->WaitForIdle();
         m_geometryBuffer = std::make_unique<BVHGeometry>(m_renderer, 1024 * 1024);
@@ -286,15 +286,15 @@ namespace tim
         const float DIMXY = 3.1f;
         const float DIMZ = 2;
 
-        auto glassMat = BVHBuilder::createTransparentMaterial({ 0.8f,0.8f,0.8f }, 1.1f, 0);
+        auto glassMat = BVHBuilder::createTransparentMaterial({ 0.8f,0.8f,0.8f }, 1.1f, 0.2f);
         auto redGlassMat = BVHBuilder::createTransparentMaterial({ 1,0.5,0.5 }, 1.05f, 0.1f);
 
         Material suzanneMat = BVHBuilder::createPbrMaterial({ 1, 0.2f, 0.2f }, 1);
         Material roomMat = BVHBuilder::createLambertianMaterial({ 0.9f, 0.9f, 0.9f });
         Material redMat = BVHBuilder::createLambertianMaterial({ 0.9f, 0.2f, 0.2f });
         Material blueMat = BVHBuilder::createLambertianMaterial({ 0.2f, 0.2f, 0.9f });
-        Material pbrMat = BVHBuilder::createPbrMaterial({ 0.9f, 0.9f, 0.9f }, 0);
-        Material pbrMatMetal = BVHBuilder::createPbrMaterial({ 0.9f, 0.9f, 0.9f }, 1);
+        Material pbrMat = BVHBuilder::createPbrMaterial({ 0.3f, 0.3f, 0.3f }, 0);
+        Material pbrMatMetal = BVHBuilder::createPbrMaterial({ 0.3f, 0.3f, 0.3f }, 1);
 
         if (useSponza)
         {
@@ -305,8 +305,8 @@ namespace tim
             m_bvh->addSphereLight({ { -9.18164f , 3.32356f , 6.98306f }, 16, { 3,0.5,0.5 }, 0.1f });
 
             m_bvh->addSphere({ {  2.0f, 0, 1.3f }, 0.2f }, pbrMatMetal);
-            m_bvh->addSphere({ {  0.5f, 0, 1.3f }, 0.2f }, BVHBuilder::createTransparentMaterial({ 1,0.6f,0.6f }, 1.05f, 0.05f));
-            m_bvh->addSphere({ { -1.5f, 0, 1.3f }, 0.2f }, BVHBuilder::createPbrMaterial({ 1,0.6f,0.6f }, 0));
+            m_bvh->addSphere({ {  0.5f, 0, 1.3f }, 0.2f }, glassMat);
+            m_bvh->addSphere({ { -1.5f, 0, 1.3f }, 0.2f }, redGlassMat);
         }
 
         u32 texFlame = m_texManager.loadTexture("./data/image/flame.png");
@@ -317,10 +317,10 @@ namespace tim
             if (useSponza)
             {
                 BVHBuilder::setTextureMaterial(suzanneMat, texFlame, 0);
-                addOBJ("./data/suzanne.obj", { -2.5f, 0, 1.3f }, vec3(1), m_bvh.get(), suzanneMat);
+                addOBJ("./data/suzanne.obj", { -2.5f, 0, 1.3f }, vec3(1), m_bvh.get(), pbrMat);
                 
                 BVHBuilder::setTextureMaterial(suzanneMat, texDot, 0);
-                addOBJ("./data/suzanne.obj", { 3.f, 0, 1.3f }, vec3(1), m_bvh.get(), suzanneMat);
+                addOBJ("./data/suzanne.obj", { 3.f, 0, 1.3f }, vec3(1), m_bvh.get(), pbrMatMetal);
 
 
                 addOBJWithMtl("./data/sponza.obj", {}, vec3(0.01f), m_bvh.get(), true);

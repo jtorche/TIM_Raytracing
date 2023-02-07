@@ -49,6 +49,14 @@ struct Triangle
 	uint index2_matId;
 };
 
+struct TriangleStrip
+{
+	uint vertexOffset;
+	uint index01;
+	uint index2_matId;
+	uint index34;
+};
+
 // Material_Mirror:			x:mirrorness
 // Material_Transparent:	x:reflectivity, y:refraction_index	
 struct Material

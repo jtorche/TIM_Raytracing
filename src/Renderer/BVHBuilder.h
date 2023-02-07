@@ -125,6 +125,7 @@ namespace tim
                            ObjectIt _objectsBegin, ObjectIt _objectsEnd, ObjectIt _trianglesBegin, ObjectIt _trianglesEnd, ObjectIt _blasBegin, ObjectIt _blasEnd) const;
 
         void fillLeafData(Node* _curNode, u32 _depth, ObjectIt _objectsBegin, ObjectIt _objectsEnd, ObjectIt _trianglesBegin, ObjectIt _trianglesEnd, ObjectIt _blasBegin, ObjectIt _blasEnd);
+        void fillTriangleStrips(Node* _leaf);
         static float computeAvgObjGain(const SplitData& _data);
         static float computeSplitScore(const SplitData& _data);
 
@@ -144,8 +145,10 @@ namespace tim
             u32 maxDepth = 0;
             float meanTriangle = 0;
             float meanDepth = 0;
+            float meanTriangleStrip = 0;
             u32 numDuplicatedTriangle = 0;
             u32 numDuplicatedBlas = 0;
+            
 
             std::unordered_set<u32> m_triangles;
             std::unordered_set<u32> m_allBlas;
@@ -175,10 +178,11 @@ namespace tim
             Node* left = nullptr;
             Node* right = nullptr;
 
-            std::vector<u32> primitiveList; // only if leaf
-            std::vector<u32> triangleList; // only if leaf
-            std::vector<u32> lightList; // only if leaf
-            std::vector<u32> blasList; // only if leaf
+            std::vector<u32> primitiveList;
+            std::vector<u32> triangleList;
+            std::vector<u32> lightList;
+            std::vector<u32> blasList;
+            std::vector<TriangleStrip> strips;
         };
 
         struct SplitData
@@ -211,5 +215,15 @@ namespace tim
         std::vector<std::unique_ptr<BVHBuilder>> m_blas;
         std::vector<u32> m_blasMaterialIdOffset;
         std::vector<BlasInstance> m_blasInstances;
+    };
+
+    struct Edge
+    {
+        u16 v1, v2;
+
+        Edge() : v1(0xFFFF), v2(0xFFFF) {}
+        Edge(u16 _v1, u16 _v2) : v1(_v1 < _v2 ? _v1 : _v2), v2(_v1 < _v2 ? _v2 : _v1) {}
+        bool operator<(Edge e) const { return (e.v1 != v1) ? (v1 < e.v1) : (v2 < e.v2); }
+        bool operator==(Edge e) const { return v1 == e.v1 && v2 == e.v2; }
     };
 }

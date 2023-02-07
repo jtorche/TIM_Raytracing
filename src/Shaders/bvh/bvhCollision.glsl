@@ -3,7 +3,7 @@
 
 #include "core/collision.glsl"
 
-#define INLINE_TRIANGLE 0
+#define INLINE_TRIANGLE 1
 #if INLINE_TRIANGLE
 	#define NodeTriangleStride 3
 	
