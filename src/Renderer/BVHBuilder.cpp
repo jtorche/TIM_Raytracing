@@ -10,8 +10,8 @@
 #include <execution>
 #include "shaders/struct_cpp.glsl"
 
-#define INLINE_TRIANGLES 1
-#define INLINE_STRIPS    0
+#define INLINE_TRIANGLES 0
+#define INLINE_STRIPS    1
 
 template<>
 struct ::std::hash<tim::Edge>
@@ -410,7 +410,6 @@ namespace tim
         m_stats = {};
 
         m_nodes.clear();
-        m_nodes.reserve((m_triangles.size() + m_objects.size() + m_blasInstances.size()) * 2);
         m_nodes.push_back(std::make_unique<Node>(0));
 
         m_meanTriangleSize = 0;
@@ -565,12 +564,13 @@ namespace tim
             _triangleIds.erase(last, _triangleIds.end());
         }
 
-        TriangleStrip packStrip(const std::vector<u16>& _vertices, u16 _matId)
+        TriangleStrip packStrip(const std::vector<u16>& _vertices, u32 _voffset, u16 _matId)
         {
             TIM_ASSERT(_vertices.size() >= 3);
             TIM_ASSERT(_vertices.size() <= 5);
 
             TriangleStrip strip;
+            strip.vertexOffset = _voffset;
             strip.index01 = _vertices[0] | _vertices[1] << 16;
             strip.index2_matId = _vertices[2] | _matId << 16;
 
@@ -708,7 +708,7 @@ namespace tim
                     verticesInStrip.push_back(lastTriangleCounter[0] == 1 ? getVertex(_triangles[lastTriangle], 0) : (lastTriangleCounter[1] == 1 ? getVertex(_triangles[lastTriangle], 1) : getVertex(_triangles[lastTriangle], 2)));
                 }
 
-                _strips.push_back(packStrip(verticesInStrip, getMaterial(curTriangle)));
+                _strips.push_back(packStrip(verticesInStrip, curTriangle.vertexOffset, getMaterial(curTriangle)));
             }
         }
     }
@@ -1453,14 +1453,20 @@ namespace tim
         {
             u32 leafDataIndex = u32(objectListCurPtr - objectListBegin);
 
+        #if INLINE_STRIPS
+            u32 triangleCount = u32(n->strips.size());
+        #else
+            u32 triangleCount = u32(n->triangleList.size());
+        #endif  
+
             // First write node data (objects, triangles and lights)
             static_assert(TriangleBitCount + PrimitiveBitCount + LightBitCount + BlasBitCount == 32);
-            TIM_ASSERT(u32(n->triangleList.size()) < (1 << TriangleBitCount));
+            TIM_ASSERT(triangleCount < (1 << TriangleBitCount));
             TIM_ASSERT(u32(n->blasList.size()) < (1 << BlasBitCount));
             TIM_ASSERT(u32(n->primitiveList.size()) < (1 << PrimitiveBitCount));
             TIM_ASSERT(u32(n->lightList.size()) < (1 << LightBitCount));
 
-            u32 packedCount = u32(n->triangleList.size()) +
+            u32 packedCount = triangleCount +
                 (u32(n->blasList.size()) << TriangleBitCount) +
                 (u32(n->primitiveList.size()) << (TriangleBitCount + BlasBitCount)) +
                 (u32(n->lightList.size()) << (TriangleBitCount + BlasBitCount + PrimitiveBitCount));
@@ -1476,11 +1482,8 @@ namespace tim
             }
         #elif INLINE_STRIPS
             TIM_ASSERT(!m_isTlas);
-            for (const TriangleStrip& strip : n->strips)
-            {
-                memcpy(objectListCurPtr, &strip, sizeof(TriangleStrip));
-                objectListCurPtr += (sizeof(TriangleStrip) / sizeof(u32));
-        }
+            memcpy(objectListCurPtr, n->strips.data(), n->strips.size() * sizeof(TriangleStrip));
+            objectListCurPtr += n->strips.size() * (sizeof(TriangleStrip) / sizeof(u32));
         #else
             memcpy(objectListCurPtr, n->triangleList.data(), sizeof(u32) * n->triangleList.size());
             objectListCurPtr += n->triangleList.size();

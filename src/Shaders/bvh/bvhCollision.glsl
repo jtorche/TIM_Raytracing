@@ -3,8 +3,21 @@
 
 #include "core/collision.glsl"
 
-#define INLINE_TRIANGLE 1
-#if INLINE_TRIANGLE
+#define INLINE_TRIANGLE 0
+#define INLINE_STRIP 1
+
+#if INLINE_STRIP
+	#define NodeTriangleStride 4
+	
+	Triangle loadTriangleFromNode(uint _offset)
+	{
+		Triangle tri;
+		tri.vertexOffset = g_BvhLeafData[_offset];
+		tri.index01 = g_BvhLeafData[_offset+1];
+		tri.index2_matId = g_BvhLeafData[_offset+2];
+		return tri;
+	}
+#elif INLINE_TRIANGLE
 	#define NodeTriangleStride 3
 	
 	Triangle loadTriangleFromNode(uint _offset)
