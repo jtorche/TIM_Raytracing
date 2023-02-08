@@ -3,18 +3,19 @@
 
 #include "core/collision.glsl"
 
-#define INLINE_TRIANGLE 0
-#define INLINE_STRIP 1
+#define INLINE_TRIANGLE 1
+#define INLINE_STRIP 0
 
 #if INLINE_STRIP
 	#define NodeTriangleStride 4
 	
-	Triangle loadTriangleFromNode(uint _offset)
+	TriangleStrip loadTriangleStripFromNode(uint _offset)
 	{
-		Triangle tri;
+		TriangleStrip tri;
 		tri.vertexOffset = g_BvhLeafData[_offset];
 		tri.index01 = g_BvhLeafData[_offset+1];
 		tri.index2_matId = g_BvhLeafData[_offset+2];
+		tri.index34 = g_BvhLeafData[_offset+3];
 		return tri;
 	}
 #elif INLINE_TRIANGLE
@@ -86,74 +87,113 @@ AreaLight loadAreaLight(uint lightIndex)
 	return l;
 }
 
-void loadTriangleVertices(out vec3 p0, out vec3 p1, out vec3 p2, Triangle triangle)
+void loadTriangleVertices(out vec3 p0, out vec3 p1, out vec3 p2, uint index0, uint index1, uint index2)
 {
-	uint v0Offset = triangle.vertexOffset + (triangle.index01 & 0x0000FFFF);
-	p0 = vec3(g_positionData[v0Offset * 3], g_positionData[v0Offset * 3 + 1], g_positionData[v0Offset * 3 + 2]);
-
-	uint v1Offset = triangle.vertexOffset + ((triangle.index01 & 0xFFFF0000) >> 16);
-	p1 = vec3(g_positionData[v1Offset * 3], g_positionData[v1Offset * 3 + 1], g_positionData[v1Offset * 3 + 2]);
-
-	uint v2Offset = triangle.vertexOffset + (triangle.index2_matId & 0x0000FFFF);
-	p2 = vec3(g_positionData[v2Offset * 3], g_positionData[v2Offset * 3 + 1], g_positionData[v2Offset * 3 + 2]);
+	p0 = vec3(g_positionData[index0 * 3], g_positionData[index0 * 3 + 1], g_positionData[index0 * 3 + 2]);
+	p1 = vec3(g_positionData[index1 * 3], g_positionData[index1 * 3 + 1], g_positionData[index1 * 3 + 2]);
+	p2 = vec3(g_positionData[index2 * 3], g_positionData[index2 * 3 + 1], g_positionData[index2 * 3 + 2]);
 }
 
-void loadNormalVertices(out vec3 n0, out vec3 n1, out vec3 n2, Triangle triangle)
+void loadNormalVertices(out vec3 n0, out vec3 n1, out vec3 n2, uint index0, uint index1, uint index2)
 {
-	uint v0Offset = triangle.vertexOffset + (triangle.index01 & 0x0000FFFF);
-	n0 = vec3(g_normalData[v0Offset * 3], g_normalData[v0Offset * 3 + 1], g_normalData[v0Offset * 3 + 2]);
-
-	uint v1Offset = triangle.vertexOffset + ((triangle.index01 & 0xFFFF0000) >> 16);
-	n1 = vec3(g_normalData[v1Offset * 3], g_normalData[v1Offset * 3 + 1], g_normalData[v1Offset * 3 + 2]);
-
-	uint v2Offset = triangle.vertexOffset + (triangle.index2_matId & 0x0000FFFF);
-	n2 = vec3(g_normalData[v2Offset * 3], g_normalData[v2Offset * 3 + 1], g_normalData[v2Offset * 3 + 2]);
+	n0 = vec3(g_normalData[index0 * 3], g_normalData[index0 * 3 + 1], g_normalData[index0 * 3 + 2]);
+	n1 = vec3(g_normalData[index1 * 3], g_normalData[index1 * 3 + 1], g_normalData[index1 * 3 + 2]);
+	n2 = vec3(g_normalData[index2 * 3], g_normalData[index2 * 3 + 1], g_normalData[index2 * 3 + 2]);
 }
 
-void loadUvVertices(out vec2 uv0, out vec2 uv1, out vec2 uv2, Triangle triangle)
+void loadUvVertices(out vec2 uv0, out vec2 uv1, out vec2 uv2, uint index0, uint index1, uint index2)
 {
-	uint v0Offset = triangle.vertexOffset + (triangle.index01 & 0x0000FFFF);
-	uv0 = vec2(g_texCoordData[v0Offset * 2], g_texCoordData[v0Offset * 2 + 1]);
+	uv0 = vec2(g_texCoordData[index0 * 2], g_texCoordData[index0 * 2 + 1]);
+	uv1 = vec2(g_texCoordData[index1 * 2], g_texCoordData[index1 * 2 + 1]);
+	uv2 = vec2(g_texCoordData[index2 * 2], g_texCoordData[index2 * 2 + 1]);
+}
 
-	uint v1Offset = triangle.vertexOffset + ((triangle.index01 & 0xFFFF0000) >> 16);
-	uv1 = vec2(g_texCoordData[v1Offset * 2], g_texCoordData[v1Offset * 2 + 1]);
+void fillUvNormal(Ray r, float t, vec3 p0, vec3 p1, vec3 p2, uint index0, uint index1, uint index2, out Hit outHit)
+{
+	vec3 colP = r.from + r.dir * t;
+	vec3 v0 = p1 - p0, v1 = p2 - p0, v2 = colP - p0;
+	float d00 = dot(v0, v0);
+	float d01 = dot(v0, v1);
+	float d11 = dot(v1, v1);
+	float d20 = dot(v2, v0);
+	float d21 = dot(v2, v1);
+	float denom = d00 * d11 - d01 * d01;
+	float v = (d11 * d20 - d01 * d21) / denom;
+	float w = (d00 * d21 - d01 * d20) / denom;
+	float u = 1 - v - w;
 
-	uint v2Offset = triangle.vertexOffset + (triangle.index2_matId & 0x0000FFFF);
-	uv2 = vec2(g_texCoordData[v2Offset * 2], g_texCoordData[v2Offset * 2 + 1]);
+	vec3 n0,n1,n2; 
+	loadNormalVertices(n0, n1, n2, index0, index1, index2);
+	outHit.normal = n0 * u + n1 * v + n2 * w;
+
+	vec2 uv0,uv1,uv2; 
+	loadUvVertices(uv0, uv1, uv2, index0, index1, index2);
+	outHit.uv = uv0 * u + uv1 * v + uv2 * w;
+	outHit.t = t;
 }
 
 bool HitTriangle(Ray r, Triangle triangle, float tMin, float tmax, out Hit outHit)
 {
 	vec3 p0,p1,p2; 
-	loadTriangleVertices(p0, p1, p2, triangle);
+	loadTriangleVertices(p0, p1, p2, getIndex0(triangle), getIndex1(triangle), getIndex2(triangle));
 
 	float t = CollideTriangle(r, p0, p1, p2, tmax);
 	if(t > 0)
 	{
-		outHit.t = t;
-
-		vec3 colP = r.from + r.dir * t;
-		vec3 v0 = p1 - p0, v1 = p2 - p0, v2 = colP - p0;
-		float d00 = dot(v0, v0);
-		float d01 = dot(v0, v1);
-		float d11 = dot(v1, v1);
-		float d20 = dot(v2, v0);
-		float d21 = dot(v2, v1);
-		float denom = d00 * d11 - d01 * d01;
-		float v = (d11 * d20 - d01 * d21) / denom;
-		float w = (d00 * d21 - d01 * d20) / denom;
-		float u = 1 - v - w;
-
-		vec3 n0,n1,n2; 
-		loadNormalVertices(n0, n1, n2, triangle);
-		outHit.normal = n0 * u + n1 * v + n2 * w;
-
-		vec2 uv0,uv1,uv2; 
-		loadUvVertices(uv0, uv1, uv2, triangle);
-		outHit.uv = uv0 * u + uv1 * v + uv2 * w;
+		fillUvNormal(r, t, p0,p1,p2, getIndex0(triangle), getIndex1(triangle), getIndex2(triangle), outHit);
 		return true;
 	}
 	return false;
+}
+
+bool HitTriangleStrip(Ray r, TriangleStrip strip, float tMin, float tmax, out Hit outHit)
+{
+	uint offset = strip.vertexOffset + (strip.index01 & 0x0000FFFF);
+	vec3 p0 = vec3(g_positionData[offset * 3], g_positionData[offset * 3 + 1], g_positionData[offset * 3 + 2]);
+	
+	offset = strip.vertexOffset + ((strip.index01 & 0xFFFF0000) >> 16);
+	vec3 p1 = vec3(g_positionData[offset * 3], g_positionData[offset * 3 + 1], g_positionData[offset * 3 + 2]);
+	
+	offset = strip.vertexOffset + (strip.index2_matId & 0x0000FFFF);
+	vec3 p2 = vec3(g_positionData[offset * 3], g_positionData[offset * 3 + 1], g_positionData[offset * 3 + 2]);
+	
+	float t0 = CollideTriangle(r, p0, p1, p2, tmax);
+	float t = tmax;
+	if(t0 > 0)
+	{
+		t = t0;
+		fillUvNormal(r, t, p0,p1,p2, getIndex0(strip), getIndex1(strip), getIndex2(strip), outHit);
+	}
+
+	offset = strip.index34 & 0x0000FFFF;
+	if(offset != 0xFFFF)
+	{
+		offset += strip.vertexOffset;
+		vec3 p3 = vec3(g_positionData[offset * 3], g_positionData[offset * 3 + 1], g_positionData[offset * 3 + 2]);
+
+		float t1 = CollideTriangle(r, p1, p2, p3, tmax);
+		if(t1 > 0 && t1 < t)
+		{
+			t = t1;
+			fillUvNormal(r, t, p1,p2,p3, getIndex1(strip), getIndex2(strip), getIndex3(strip), outHit);
+		}
+
+		offset = (strip.index34 & 0xFFFF0000) >> 16;
+		if(offset != 0xFFFF)
+		{
+			offset += strip.vertexOffset;
+			vec3 p4 = vec3(g_positionData[offset * 3], g_positionData[offset * 3 + 1], g_positionData[offset * 3 + 2]);
+		
+			float t2 = CollideTriangle(r, p2, p3, p4, tmax);
+			if(t2 > 0 && t2 < t)
+			{
+				t = t2;
+				fillUvNormal(r, t, p2,p3,p4, getIndex2(strip), getIndex3(strip), getIndex4(strip), outHit);
+			}
+		}
+	}
+
+	return t < tmax;
 }
 
 bool hitPrimitive(uint objIndex, Ray r, float tmax, out Hit hit)
@@ -183,6 +223,43 @@ bool hitPrimitiveThrough(uint objIndex, Ray r, float tmax, out Hit hit)
 
 		case Primitive_AABB: 
 		return HitBoxThrough(r, loadBox(objIndex), 0, tmax, hit);
+	}
+
+	return false;
+}
+
+bool hitTriangleStripFast(Ray r, in TriangleStrip strip, float tmax)
+{
+	uint offset = strip.vertexOffset + (strip.index01 & 0x0000FFFF);
+	vec3 p0 = vec3(g_positionData[offset * 3], g_positionData[offset * 3 + 1], g_positionData[offset * 3 + 2]);
+
+	offset = strip.vertexOffset + ((strip.index01 & 0xFFFF0000) >> 16);
+	vec3 p1 = vec3(g_positionData[offset * 3], g_positionData[offset * 3 + 1], g_positionData[offset * 3 + 2]);
+
+	offset = strip.vertexOffset + (strip.index2_matId & 0x0000FFFF);
+	vec3 p2 = vec3(g_positionData[offset * 3], g_positionData[offset * 3 + 1], g_positionData[offset * 3 + 2]);
+
+	if(CollideTriangle(r, p0, p1, p2, tmax) > 0)
+		return true;
+
+	offset = strip.index34 & 0x0000FFFF;
+	if(offset != 0xFFFF)
+	{
+		offset += strip.vertexOffset;
+		vec3 p3 = vec3(g_positionData[offset * 3], g_positionData[offset * 3 + 1], g_positionData[offset * 3 + 2]);
+	
+		if(CollideTriangle(r, p1, p2, p3, tmax) > 0)
+			return true;
+	
+		offset = (strip.index34 & 0xFFFF0000) >> 16;
+		if(offset != 0xFFFF)
+		{
+			offset += strip.vertexOffset;
+			vec3 p4 = vec3(g_positionData[offset * 3], g_positionData[offset * 3 + 1], g_positionData[offset * 3 + 2]);
+		
+			if(CollideTriangle(r, p2, p3, p4, tmax) > 0)
+				return true;
+		}
 	}
 
 	return false;
@@ -294,31 +371,43 @@ void bvh_collide(uint _nid, Ray _ray, inout ClosestHit closestHit)
 	}
 	#endif
 
+	#if INLINE_STRIP
 	for(uint i=0 ; i<numTriangles ; ++i)
 	{
-		// uint triIndex = g_BvhLeafData[1 + leafDataOffset + i];
+		TriangleStrip strip = loadTriangleStripFromNode(1 + leafDataOffset + i * NodeTriangleStride);
+		Hit hit;
+		bool hasHit = HitTriangleStrip(_ray, strip, 0, closestHit.t, hit);
+		
+		if(hasHit)
+		{
+			closestHit.t = hit.t - OFFSET_RAY_COLLISION;
+			closestHit.mid_objId = 0x0000FFFF + (strip.index2_matId & 0xFFFF0000);
+			closestHit.nid = _nid;
+			ClosestHit_setDebugColorId(closestHit, strip.index01+strip.index2_matId+strip.index34/*triIndex*/);
+
+			storeHitNormal(closestHit, hit.normal);
+			storeHitUv(closestHit, hit.uv);
+		}
+	}
+	#else
+	for(uint i=0 ; i<numTriangles ; ++i)
+	{
 		Triangle triangle = loadTriangleFromNode(1 + leafDataOffset + i * NodeTriangleStride);
 		Hit hit;
 		bool hasHit = HitTriangle(_ray, triangle, 0, closestHit.t, hit);
 
 		if(hasHit)
 		{
-			vec4 color = vec4(1,1,1,1);
-			uint matId = (triangle.index2_matId & 0xFFFF0000) >> 16;
-			
-			hasHit = color.a > 0.5;
-			if (hasHit)
-			{
-				closestHit.t = hit.t - OFFSET_RAY_COLLISION;
-				closestHit.mid_objId = 0x0000FFFF + (triangle.index2_matId & 0xFFFF0000);
-				closestHit.nid = _nid;
-				ClosestHit_setDebugColorId(closestHit, triangle.index01/*triIndex*/);
+			closestHit.t = hit.t - OFFSET_RAY_COLLISION;
+			closestHit.mid_objId = 0x0000FFFF + (triangle.index2_matId & 0xFFFF0000);
+			closestHit.nid = _nid;
+			ClosestHit_setDebugColorId(closestHit, triangle.index01+triangle.index2_matId/*triIndex*/);
 
-				storeHitNormal(closestHit, hit.normal);
-				storeHitUv(closestHit, hit.uv);
-			}
+			storeHitNormal(closestHit, hit.normal);
+			storeHitUv(closestHit, hit.uv);
 		}
 	}
+	#endif
 
 	#ifndef USE_TRAVERSE_TLAS
 	for (uint i = 0; i < numBlas; ++i)
@@ -361,14 +450,23 @@ bool bvh_collide_fast(uint _nid, Ray _ray, float tmax)
 	}
 	#endif
 
+	#if INLINE_STRIP
 	for(uint i=0 ; i<numTriangles ; ++i)
 	{
+		if(hitTriangleStripFast(_ray, loadTriangleStripFromNode(1 + leafDataOffset + i * NodeTriangleStride), tmax))
+			return true;
+	}
+	#else
+	for(uint i=0 ; i<numTriangles ; ++i)
+	{
+		Triangle triangle = loadTriangleFromNode(1 + leafDataOffset + i * NodeTriangleStride);
 		vec3 p0,p1,p2; 
-		loadTriangleVertices(p0, p1, p2, loadTriangleFromNode(1 + leafDataOffset + i * NodeTriangleStride));
+		loadTriangleVertices(p0, p1, p2, getIndex0(triangle), getIndex1(triangle), getIndex2(triangle));
 
 		if(CollideTriangle(_ray, p0, p1, p2, tmax) > 0)
 			return true;
 	}
+	#endif
 
 	#ifndef USE_TRAVERSE_TLAS
 	for (uint i = 0; i < numBlas; ++i)

@@ -111,4 +111,58 @@ struct PackedLight
 	float fparam[13];
 };
 
+#ifndef __cplusplus
+//---------------------------------------------------------------------------
+uint getIndex0(in Triangle triangle)
+{
+	return triangle.vertexOffset + (triangle.index01 & 0x0000FFFF);
+}
+
+uint getIndex1(in Triangle triangle)
+{
+	return triangle.vertexOffset + ((triangle.index01 & 0xFFFF0000) >> 16);
+}
+
+uint getIndex2(in Triangle triangle)
+{
+	return triangle.vertexOffset + (triangle.index2_matId & 0x0000FFFF);
+}
+
+uint getTriangleMaterial(in Triangle triangle)
+{
+	return triangle.vertexOffset + ((triangle.index2_matId & 0xFFFF0000) >> 16);
+}
+
+//---------------------------------------------------------------------------
+uint getIndex0(in TriangleStrip strip)
+{
+	return strip.vertexOffset + (strip.index01 & 0x0000FFFF);
+}
+
+uint getIndex1(in TriangleStrip strip)
+{
+	return strip.vertexOffset + ((strip.index01 & 0xFFFF0000) >> 16);
+}
+
+uint getIndex2(in TriangleStrip strip)
+{
+	return strip.vertexOffset + (strip.index2_matId & 0x0000FFFF);
+}
+
+uint getIndex3(in TriangleStrip strip)
+{
+	return strip.vertexOffset + (strip.index34 & 0x0000FFFF);
+}
+
+uint getIndex4(in TriangleStrip strip)
+{
+	return strip.vertexOffset + ((strip.index34 & 0xFFFF0000) >> 16);
+}
+
+uint getTriangleMaterial(in TriangleStrip strip)
+{
+	return strip.vertexOffset + ((strip.index2_matId & 0xFFFF0000) >> 16);
+}
+
+#endif
 #endif

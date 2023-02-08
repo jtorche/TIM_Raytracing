@@ -10,8 +10,8 @@
 #include <execution>
 #include "shaders/struct_cpp.glsl"
 
-#define INLINE_TRIANGLES 0
-#define INLINE_STRIPS    1
+#define INLINE_TRIANGLES 1
+#define INLINE_STRIPS    0
 
 template<>
 struct ::std::hash<tim::Edge>
@@ -542,9 +542,6 @@ namespace tim
 
         void removeDuplicates(std::vector<u32>& _triangleIds, const std::vector<Triangle>& _triangles)
         {
-            // std::sort(_triangleIds.begin(), _triangleIds.end());
-            // _triangleIds.erase(std::unique(_triangleIds.begin(), _triangleIds.end()), _triangleIds.end());
-
             std::sort(_triangleIds.begin(), _triangleIds.end(), [&](u32 tri1, u32 tri2)
                 {
                     if (_triangles[tri1].vertexOffset != _triangles[tri2].vertexOffset)
@@ -571,8 +568,8 @@ namespace tim
 
             TriangleStrip strip;
             strip.vertexOffset = _voffset;
-            strip.index01 = _vertices[0] | _vertices[1] << 16;
-            strip.index2_matId = _vertices[2] | _matId << 16;
+            strip.index01 = _vertices[0] | (_vertices[1]) << 16;
+            strip.index2_matId = _vertices[2] | (_matId << 16);
 
             switch (_vertices.size())
             {
@@ -583,7 +580,7 @@ namespace tim
                 strip.index34 = _vertices[3] + 0xFFFF0000;
                 break;
             case 5:
-                strip.index34 = _vertices[3] | _vertices[4] << 16;
+                strip.index34 = _vertices[3] | (_vertices[4] << 16);
                 break;
             };
             
@@ -592,7 +589,7 @@ namespace tim
 
         void fillTriangleStrips(const std::vector<u32>& _triangleIds, const std::vector<Triangle>& _triangles, std::vector<TriangleStrip>& _strips)
         {
-            constexpr u32 MaxTrianglesInStrip = 3;
+            constexpr u32 MaxTrianglesInStrip = 2;
 
             ska::flat_hash_set<u32> remainingTriangles(_triangleIds.begin(), _triangleIds.end());
             std::vector<u32> trianglesInStrip;
@@ -619,7 +616,7 @@ namespace tim
                     vertexRefCounter[getVertex(curTriangle, i)]++;
 
                 bool hasFoundNextStrip;
-                u32 stripSize = 0;
+                u32 stripSize = 1;
                 do
                 {
                     hasFoundNextStrip = false;
@@ -703,6 +700,7 @@ namespace tim
                 }
                 else // general case
                 {
+                    TIM_ASSERT(lastTriangleCounter[0] + lastTriangleCounter[1] + lastTriangleCounter[2] == 6);
                     verticesInStrip.push_back(lastTriangleCounter[0] == 3 ? getVertex(_triangles[lastTriangle], 0) : (lastTriangleCounter[1] == 3 ? getVertex(_triangles[lastTriangle], 1) : getVertex(_triangles[lastTriangle], 2)));
                     verticesInStrip.push_back(lastTriangleCounter[0] == 2 ? getVertex(_triangles[lastTriangle], 0) : (lastTriangleCounter[1] == 2 ? getVertex(_triangles[lastTriangle], 1) : getVertex(_triangles[lastTriangle], 2)));
                     verticesInStrip.push_back(lastTriangleCounter[0] == 1 ? getVertex(_triangles[lastTriangle], 0) : (lastTriangleCounter[1] == 1 ? getVertex(_triangles[lastTriangle], 1) : getVertex(_triangles[lastTriangle], 2)));
@@ -715,8 +713,22 @@ namespace tim
 
     void BVHBuilder::fillTriangleStrips(Node * _leaf)
     {
-        TriangleStripHelpers::removeDuplicates(_leaf->triangleList, m_triangles);
+    #if INLINE_STRIPS
         TriangleStripHelpers::fillTriangleStrips(_leaf->triangleList, m_triangles, _leaf->strips);
+        //u32 bestStripsCount = 0xFFFFffff;
+        //
+        //for (u32 i = 0; i < 64; ++i)
+        //{
+        //    std::vector<TriangleStrip> strips;
+        //    std::next_permutation(_leaf->triangleList.begin(), _leaf->triangleList.end());
+        //    TriangleStripHelpers::fillTriangleStrips(_leaf->triangleList, m_triangles, strips);
+        //    if (strips.size() < bestStripsCount)
+        //    {
+        //        bestStripsCount = strips.size();
+        //        _leaf->strips = std::move(strips);
+        //    }
+        //}
+    #endif
     }
 
     void BVHBuilder::fillLeafData(Node* _curNode, u32 _depth, ObjectIt _objectsBegin, ObjectIt _objectsEnd, ObjectIt _trianglesBegin, ObjectIt _trianglesEnd, ObjectIt _blasBegin, ObjectIt _blasEnd)
@@ -728,6 +740,8 @@ namespace tim
 
         for (auto it = _trianglesBegin; it != _trianglesEnd && _curNode->triangleList.size() < (1u << TriangleBitCount); ++it)
             _curNode->triangleList.push_back(*it);
+
+        TriangleStripHelpers::removeDuplicates(_curNode->triangleList, m_triangles);
 
         for (auto it = _blasBegin; it != _blasEnd && _curNode->blasList.size() < (1u << BlasBitCount); ++it)
             _curNode->blasList.push_back(*it);
