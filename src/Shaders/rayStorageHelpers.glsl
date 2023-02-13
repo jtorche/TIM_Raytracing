@@ -45,12 +45,11 @@ void writeRefractionRay(in IndirectLightRay _ray)
 #endif
 }
 
-void computeReflexionRay(uint _objectId, vec3 _lit, vec3 _normal, in Ray _ray, float _t);
+void computeReflexionRay(vec3 _lit, vec3 _normal, in Ray _ray, float _t);
 vec3 computeSpecularBrdf(vec3 albedo, float metalness, vec3 v, vec3 n);
 
 void nextBounce(vec3 _lightAbsorbdeByPreBounce, in ClosestHit _closestHit, in Ray _ray)
 {
-	uint objId = getObjectId(_closestHit);
 	uint matId = getMaterialId(_closestHit);
 	float t = _closestHit.t;
 	vec3 normal = getHitNormal(_closestHit);
@@ -63,48 +62,48 @@ void nextBounce(vec3 _lightAbsorbdeByPreBounce, in ClosestHit _closestHit, in Ra
 	{
 		const float metalness = g_BvhMaterialData[matId].params.x;
 		vec3 Lr = computeSpecularBrdf(albedo, metalness, -_ray.dir, normal);
-		computeReflexionRay(objId, Lr * _lightAbsorbdeByPreBounce, normal, _ray, t);
+		computeReflexionRay(Lr * _lightAbsorbdeByPreBounce, normal, _ray, t);
 	}
-	else if(g_BvhMaterialData[matId].type_ids.x == Material_Transparent)
-	{
-		const float refractionIndice = g_BvhMaterialData[matId].params.y;
-		float fresnelReflexion = computeFresnelReflexion(_ray.dir, normal, refractionIndice);
-
-		float objectReflectivity = g_BvhMaterialData[matId].params.x;
-		fresnelReflexion = (objectReflectivity + (1.0 - objectReflectivity) * fresnelReflexion);
-
-		#if defined(FIRST_RECURSION_STEP)
-		computeReflexionRay(objId, _lightAbsorbdeByPreBounce * albedo * fresnelReflexion, normal, _ray, t);
-		#endif
-
-		vec3 p = _ray.from + _ray.dir * t;
-		vec3 inRefractionRay = refract(_ray.dir, normalize(normal), refractionIndice);
-		// inRefractionRay = normalize(inRefractionRay == vec3(0,0,0) ? _ray.dir : inRefractionRay);
-		if(inRefractionRay != vec3(0,0,0))
-		{
-			if(objId < 0xFFFF)
-			{
-				Ray inRay = createRay(p, inRefractionRay);
-				Hit hit;
-				if(hitPrimitiveThrough(objId, inRay, 100, hit))
-				{
-					vec3 outRefractionRay = refract(inRay.dir, -hit.normal, 1.0 / g_BvhMaterialData[matId].params.y);
-					outRefractionRay = normalize(outRefractionRay == vec3(0,0,0) ? inRay.dir : outRefractionRay);
-					p = inRay.from + inRay.dir * hit.t;
-					IndirectLightRay outRay;
-					outRay.pos = vec4(p + hit.normal * 0.001, 1);
-					outRay.lit = vec4(_lightAbsorbdeByPreBounce * albedo * (1-fresnelReflexion), 0);
-					outRay.dir = vec4(outRefractionRay, 0);
-					writeRefractionRay(outRay);
-				}
-			}
-		}
-	}
+	//else if(g_BvhMaterialData[matId].type_ids.x == Material_Transparent)
+	//{
+	//	const float refractionIndice = g_BvhMaterialData[matId].params.y;
+	//	float fresnelReflexion = computeFresnelReflexion(_ray.dir, normal, refractionIndice);
+	//
+	//	float objectReflectivity = g_BvhMaterialData[matId].params.x;
+	//	fresnelReflexion = (objectReflectivity + (1.0 - objectReflectivity) * fresnelReflexion);
+	//
+	//	#if defined(FIRST_RECURSION_STEP)
+	//	computeReflexionRay(_lightAbsorbdeByPreBounce * albedo * fresnelReflexion, normal, _ray, t);
+	//	#endif
+	//
+	//	vec3 p = _ray.from + _ray.dir * t;
+	//	vec3 inRefractionRay = refract(_ray.dir, normalize(normal), refractionIndice);
+	//	// inRefractionRay = normalize(inRefractionRay == vec3(0,0,0) ? _ray.dir : inRefractionRay);
+	//	if(inRefractionRay != vec3(0,0,0))
+	//	{
+	//		if(objId < 0xFFFF)
+	//		{
+	//			Ray inRay = createRay(p, inRefractionRay);
+	//			Hit hit;
+	//			if(hitPrimitiveThrough(objId, inRay, 100, hit))
+	//			{
+	//				vec3 outRefractionRay = refract(inRay.dir, -hit.normal, 1.0 / g_BvhMaterialData[matId].params.y);
+	//				outRefractionRay = normalize(outRefractionRay == vec3(0,0,0) ? inRay.dir : outRefractionRay);
+	//				p = inRay.from + inRay.dir * hit.t;
+	//				IndirectLightRay outRay;
+	//				outRay.pos = vec4(p + hit.normal * 0.001, 1);
+	//				outRay.lit = vec4(_lightAbsorbdeByPreBounce * albedo * (1-fresnelReflexion), 0);
+	//				outRay.dir = vec4(outRefractionRay, 0);
+	//				writeRefractionRay(outRay);
+	//			}
+	//		}
+	//	}
+	//}
 #endif
 
 }
 
-void computeReflexionRay(uint _objectId, vec3 _lit, vec3 _normal, in Ray _ray, float _t)
+void computeReflexionRay(vec3 _lit, vec3 _normal, in Ray _ray, float _t)
 {
 	vec3 p = _ray.from + _ray.dir * _t;
 	vec3 n = reflect(_ray.dir, _normal);

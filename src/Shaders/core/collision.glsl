@@ -114,11 +114,6 @@ void ClosestHit_setDebugColorId(inout ClosestHit hit, uint id) { hit.dbgColorId 
 void ClosestHit_setDebugColorId(inout ClosestHit hit, uint id) { }
 #endif
 
-uint getObjectId(in ClosestHit _hit)
-{
-	return (_hit.mid_objId & 0x0000FFFF);
-}
-
 uint getMaterialId(in ClosestHit _hit)
 {
 	return (_hit.mid_objId & 0xFFFF0000) >> 16;

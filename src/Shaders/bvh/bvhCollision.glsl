@@ -40,23 +40,6 @@
 	}
 #endif
 
-Sphere loadSphere(uint objIndex)
-{
-	Sphere sphere;
-	sphere.center = vec3(g_BvhPrimitiveData[objIndex].fparam[0], g_BvhPrimitiveData[objIndex].fparam[1], g_BvhPrimitiveData[objIndex].fparam[2]);
-	sphere.radius = g_BvhPrimitiveData[objIndex].fparam[3];
-	sphere.invRadius = g_BvhPrimitiveData[objIndex].fparam[4];
-	return sphere;
-}
-
-Box loadBox(uint objIndex)
-{
-	Box box;
-	box.minExtent = vec3(g_BvhPrimitiveData[objIndex].fparam[0], g_BvhPrimitiveData[objIndex].fparam[1], g_BvhPrimitiveData[objIndex].fparam[2]);
-	box.maxExtent = vec3(g_BvhPrimitiveData[objIndex].fparam[3], g_BvhPrimitiveData[objIndex].fparam[4], g_BvhPrimitiveData[objIndex].fparam[5]);
-	return box;
-}
-
 SphereLight loadSphereLight(uint lightIndex)
 {
 	SphereLight l;
@@ -196,38 +179,6 @@ bool HitTriangleStrip(Ray r, TriangleStrip strip, float tMin, float tmax, out Hi
 	return t < tmax;
 }
 
-bool hitPrimitive(uint objIndex, Ray r, float tmax, out Hit hit)
-{
-	uint type =  g_BvhPrimitiveData[objIndex].iparam & 0xFFFF;
-
-	switch(type)
-	{
-		case Primitive_Sphere: 
-		return HitSphere(r, loadSphere(objIndex), 0, tmax, hit);
-
-		case Primitive_AABB: 
-		return HitBox(r, loadBox(objIndex), 0, tmax, hit);
-	}
-
-	return false;
-}
-
-bool hitPrimitiveThrough(uint objIndex, Ray r, float tmax, out Hit hit)
-{
-	uint type =  g_BvhPrimitiveData[objIndex].iparam & 0xFFFF;
-
-	switch(type)
-	{
-		case Primitive_Sphere: 
-		return HitSphereThrough(r, loadSphere(objIndex), 0, tmax, hit);
-
-		case Primitive_AABB: 
-		return HitBoxThrough(r, loadBox(objIndex), 0, tmax, hit);
-	}
-
-	return false;
-}
-
 bool hitTriangleStripFast(Ray r, in TriangleStrip strip, float tmax)
 {
 	uint offset = strip.vertexOffset + (strip.index01 & 0x0000FFFF);
@@ -265,22 +216,6 @@ bool hitTriangleStripFast(Ray r, in TriangleStrip strip, float tmax)
 	return false;
 }
 
-bool hitPrimitiveFast(uint objIndex, Ray r, float tmax)
-{
-	uint type =  g_BvhPrimitiveData[objIndex].iparam & 0xFFFF;
-	Hit hit;
-	switch(type)
-	{
-		case Primitive_Sphere: 
-		return CollideSphere(r, loadSphere(objIndex), 0, tmax);
-
-		case Primitive_AABB: 
-		return CollideBox(r, loadBox(objIndex), 0, tmax, true) >= 0;
-	}
-
-	return false;
-}
-
 uvec4 unpackObjectCount(uint _packed)
 {
 	uvec4 v;
@@ -301,25 +236,8 @@ uint tlas_collide(uint _nid, Ray _ray, inout ClosestHit closestHit)
 	uvec4 unpackedLeafDat = unpackObjectCount(g_BvhLeafData[leafDataOffset]);
 	uint triangleOffset = unpackedLeafDat.x * NodeTriangleStride;
 	uint numBlas = unpackedLeafDat.y;
-	uint numObjects = unpackedLeafDat.z;
 
 	uint numTraversal = 0;
-	for (uint i = 0; i < numObjects; ++i)
-	{
-		uint objIndex = g_BvhLeafData[1 + leafDataOffset + triangleOffset + numBlas + i];
-		Hit hit;
-		bool hasHit = hitPrimitive(objIndex, _ray, closestHit.t, hit);
-
-		if (hasHit)
-		{
-			closestHit.t = hit.t - OFFSET_RAY_COLLISION;
-			closestHit.mid_objId = objIndex + (g_BvhPrimitiveData[objIndex].iparam & 0xFFFF0000);
-			closestHit.nid = _nid;
-			ClosestHit_setDebugColorId(closestHit, objIndex);
-
-			storeHitNormal(closestHit, hit.normal);
-		}
-	}
 
 	uint prevNid = closestHit.nid;
 	for (uint i = 0; i < numBlas; ++i)
@@ -350,26 +268,6 @@ void bvh_collide(uint _nid, Ray _ray, inout ClosestHit closestHit)
 	uint numTriangles = unpackedLeafDat.x;
 	uint triangleOffset = numTriangles * NodeTriangleStride;
 	uint numBlas = unpackedLeafDat.y;
-	uint numObjects = unpackedLeafDat.z;
-
-	#ifndef USE_TRAVERSE_TLAS
-	for(uint i=0 ; i<numObjects ; ++i)
-	{
-		uint objIndex = g_BvhLeafData[1 + leafDataOffset + triangleOffset + numBlas + i];
-		Hit hit;
-		bool hasHit = hitPrimitive(objIndex, _ray, closestHit.t, hit);
-
-		if(hasHit)
-		{
-			closestHit.t			= hit.t - OFFSET_RAY_COLLISION;
-			closestHit.mid_objId	= objIndex + (g_BvhPrimitiveData[objIndex].iparam & 0xFFFF0000);
-			closestHit.nid			= _nid;
-			ClosestHit_setDebugColorId(closestHit, objIndex);
-
-			storeHitNormal(closestHit, hit.normal);
-		}
-	}
-	#endif
 
 	#if INLINE_STRIP
 	for(uint i=0 ; i<numTriangles ; ++i)
@@ -439,16 +337,6 @@ bool bvh_collide_fast(uint _nid, Ray _ray, float tmax)
 	uint numTriangles = unpackedLeafDat.x;
 	uint triangleOffset = numTriangles * NodeTriangleStride;
 	uint numBlas = unpackedLeafDat.y;
-	uint numObjects = unpackedLeafDat.z;
-
-	#ifndef USE_TRAVERSE_TLAS
-	for(uint i=0 ; i<numObjects ; ++i)
-	{
-		uint objIndex = g_BvhLeafData[1 + leafDataOffset + triangleOffset + numBlas + i];
-		if(hitPrimitiveFast(objIndex, _ray, tmax))
-			return true;
-	}
-	#endif
 
 	#if INLINE_STRIP
 	for(uint i=0 ; i<numTriangles ; ++i)
@@ -499,14 +387,6 @@ bool tlas_collide_fast(uint _nid, Ray _ray, float tmax)
 	uint numTriangles = unpackedLeafDat.x;
 	uint triangleOffset = numTriangles * NodeTriangleStride;
 	uint numBlas = unpackedLeafDat.y;
-	uint numObjects = unpackedLeafDat.z;
-
-	for(uint i=0 ; i<numObjects ; ++i)
-	{
-		uint objIndex = g_BvhLeafData[1 + leafDataOffset + triangleOffset + numBlas + i];
-		if(hitPrimitiveFast(objIndex, _ray, tmax))
-			return true;
-	}
 
 	for (uint i = 0; i < numBlas; ++i)
 	{
