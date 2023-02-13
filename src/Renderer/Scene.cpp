@@ -275,7 +275,7 @@ namespace tim
 
     void Scene::build(const BVHBuildParameters& _bvhParams, const BVHBuildParameters& _tlasParams, bool _useTlasBlas)
     {
-        constexpr bool useSponza = true;
+        constexpr bool useSponza = false;
         constexpr bool useRoom = false;
 
         m_renderer->WaitForIdle();
@@ -362,7 +362,7 @@ namespace tim
             }
             else
             {
-                m_bvh.get()->addSphereLight({ { 3.08371f , 0.250811f , 5.16995f }, 15, { 0.1, 0.1, 0.1 }, 0.1f });
+                m_bvh.get()->addSphereLight({ { 3.08371f , 0.250811f , 5.16995f }, 15, { 0.1f, 0.1f, 0.1f }, 0.1f });
 
                 loadBlas("./data/cornell.obj", { 0, 0, 0 }, vec3(1), blas);
                 for (auto it = blas.begin() + 1; it != blas.end(); ++it)
