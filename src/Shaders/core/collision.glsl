@@ -20,7 +20,7 @@ bool isPointInBox(in Box _box, vec3 _point)
            _point.x < _box.maxExtent.x && _point.y < _box.maxExtent.y && _point.z < _box.maxExtent.z;
 }
 
-float CollideBox(Ray _ray, Box _box, float tmin, float tmax, bool returnTmin)
+float CollideBox(Ray _ray, Box _box, float tmax, bool returnTmin)
 {
 #if !NO_RAY_INVDIR
     vec3 t0s = (_box.minExtent - _ray.from) * _ray.invdir;
@@ -33,13 +33,13 @@ float CollideBox(Ray _ray, Box _box, float tmin, float tmax, bool returnTmin)
     vec3 tsmaller = min(t0s, t1s);
     vec3 tbigger = max(t0s, t1s);
 
-    tmin = max(tmin, max(tsmaller[0], max(tsmaller[1], tsmaller[2])));
+    float tmin = max(0, max(tsmaller[0], max(tsmaller[1], tsmaller[2])));
     tmax = min(tmax, min(tbigger[0], min(tbigger[1], tbigger[2])));
 
     return (tmin < tmax) ? (returnTmin ? tmin : tmax) : -1;
 }
 
-bool CollideSphere(Ray r, Sphere s, float tmin, float tmax)
+bool CollideSphere(Ray r, Sphere s, float tmax)
 {
 	vec3 oc = r.from - s.center;
     float b = dot(oc, r.dir);
@@ -50,7 +50,7 @@ bool CollideSphere(Ray r, Sphere s, float tmin, float tmax)
         float discrSq = sqrt(discr);
         float t0 = (-b - discrSq);
 		float t1 = (-b + discrSq);
-		return (tmin < t0 && t0 < tmax) || (tmin < t1 && t1 < tmax);  
+		return (0 < t0 && t0 < tmax) || (0 < t1 && t1 < tmax);  
     }
     return false;
 }
@@ -127,7 +127,7 @@ struct Hit
 	vec2 uv;
 };
 
-bool HitSphere(Ray r, Sphere s, float tMin, float tmax, out Hit outHit)
+bool HitSphere(Ray r, Sphere s, float tmax, out Hit outHit)
 {
     vec3 oc = r.from - s.center;
     float b = dot(oc, r.dir);
@@ -138,7 +138,7 @@ bool HitSphere(Ray r, Sphere s, float tMin, float tmax, out Hit outHit)
         float discrSq = sqrt(discr);
 
         float t = (-b - discrSq);
-        if (t > tMin && t < tmax)
+        if (t > 0 && t < tmax)
         {
 			vec3 pos = r.from + t * r.dir;
             outHit.normal = (pos - s.center) * s.invRadius;
@@ -146,7 +146,7 @@ bool HitSphere(Ray r, Sphere s, float tMin, float tmax, out Hit outHit)
             return true;
         }
         t = (-b + discrSq);
-        if (t > tMin && t < tmax)
+        if (t > 0 && t < tmax)
         {
 			vec3 pos = r.from + t * r.dir;
             outHit.normal = (pos - s.center) * s.invRadius;
@@ -157,7 +157,7 @@ bool HitSphere(Ray r, Sphere s, float tMin, float tmax, out Hit outHit)
     return false;
 }
 
-bool HitSphereThrough(Ray r, Sphere s, float tMin, float tmax, out Hit outHit)
+bool HitSphereThrough(Ray r, Sphere s, float tmax, out Hit outHit)
 {
     vec3 oc = r.from - s.center;
     float b = dot(oc, r.dir);
@@ -168,7 +168,7 @@ bool HitSphereThrough(Ray r, Sphere s, float tMin, float tmax, out Hit outHit)
         float discrSq = sqrt(discr);
 
 		float t = (-b + discrSq);
-        if (t > tMin && t < tmax)
+        if (t > 0 && t < tmax)
         {
 			vec3 pos = r.from + t * r.dir;
             outHit.normal = (pos - s.center) * s.invRadius;
@@ -176,7 +176,7 @@ bool HitSphereThrough(Ray r, Sphere s, float tMin, float tmax, out Hit outHit)
             return true;
         }
         t = (-b - discrSq);
-        if (t > tMin && t < tmax)
+        if (t > 0 && t < tmax)
         {
 			vec3 pos = r.from + t * r.dir;
             outHit.normal = (pos - s.center) * s.invRadius;
@@ -187,10 +187,10 @@ bool HitSphereThrough(Ray r, Sphere s, float tMin, float tmax, out Hit outHit)
     return false;
 }
 
-bool HitBox(Ray r, Box box, float tMin, float tmax, out Hit outHit)
+bool HitBox(Ray r, Box box, float tmax, out Hit outHit)
 {
-	float t = CollideBox(r, box, tMin, tmax, true).x;
-	if(t >= tMin)
+	float t = CollideBox(r, box, tmax, true).x;
+	if(t >= 0)
 	{
 		vec3 pos = r.from + r.dir * t;
 		vec3 center = (box.maxExtent + box.minExtent) * 0.5;
@@ -209,10 +209,10 @@ bool HitBox(Ray r, Box box, float tMin, float tmax, out Hit outHit)
 	return false;
 }
 
-bool HitBoxThrough(Ray r, Box box, float tMin, float tmax, out Hit outHit)
+bool HitBoxThrough(Ray r, Box box, float tmax, out Hit outHit)
 {
-	float t = CollideBox(r, box, tMin, tmax, false).x;
-	if(t >= tMin)
+	float t = CollideBox(r, box, tmax, false).x;
+	if(t >= 0)
 	{
 		vec3 pos = r.from + r.dir * t;
 		vec3 center = (box.maxExtent + box.minExtent) * 0.5;

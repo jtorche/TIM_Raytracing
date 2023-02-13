@@ -117,7 +117,7 @@ void raytraceLightProbFieldDebug(in Ray _ray, inout ClosestHit _hitResult)
 		sphere.invRadius = 1.0 / LPF_DEBUG_SIZE;
 
 		Hit hit;
-		if(HitSphere(_ray, sphere, 0, _hitResult.t, hit))
+		if(HitSphere(_ray, sphere, _hitResult.t, hit))
 		{
 			_hitResult.t			= hit.t - OFFSET_RAY_COLLISION;
 			_hitResult.mid_objId	= i + ((0 << 16) & 0xFFFF0000);

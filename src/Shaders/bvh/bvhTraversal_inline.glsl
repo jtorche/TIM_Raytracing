@@ -29,8 +29,8 @@ uint traverseBvh(Ray r, uint rootId, inout ClosestHit closestHit)
 			bvh_getNodeBoxes(nodeId, box0, box1);
 
 			// Box intersection
-			float d0 = CollideBox(r, box0, 0, closestHit.t, true);
-			float d1 = CollideBox(r, box1, 0, closestHit.t, true);
+			float d0 = CollideBox(r, box0, closestHit.t, true);
+			float d1 = CollideBox(r, box1, closestHit.t, true);
 		
 			if(d0 < 0 && d1 < 0)
 				break;
@@ -100,8 +100,8 @@ bool traverseBvhFast(Ray r, uint rootId, float tmax)
 			bvh_getNodeBoxes(nodeId, box0, box1);
 
 			// Box intersection
-			float d0 = CollideBox(r, box0, 0, tmax, true);
-			float d1 = CollideBox(r, box1, 0, tmax, true);
+			float d0 = CollideBox(r, box0, tmax, true);
+			float d1 = CollideBox(r, box1, tmax, true);
 		
 			if(d0 < 0 && d1 < 0)
 				break;

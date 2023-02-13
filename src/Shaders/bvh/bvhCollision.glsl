@@ -246,7 +246,7 @@ uint tlas_collide(uint _nid, Ray _ray, inout ClosestHit closestHit)
 	
 		Hit hit;
 		Box box = { g_blasHeader[blasIndex].minExtent, g_blasHeader[blasIndex].maxExtent };
-		if (HitBox(_ray, box, 0, closestHit.t, hit))
+		if (HitBox(_ray, box, closestHit.t, hit))
 		{
 			uint prevNid = closestHit.nid;
 			numTraversal += traverseBvh(_ray, g_blasHeader[blasIndex].rootIndex, closestHit);
@@ -314,7 +314,7 @@ void bvh_collide(uint _nid, Ray _ray, inout ClosestHit closestHit)
 
 		Hit hit;
 		Box box = { g_blasHeader[blasIndex].minExtent, g_blasHeader[blasIndex].maxExtent };
-		bool hasHit = !isPointInBox(box, _ray.from) && HitBox(_ray, box, 0, closestHit.t, hit);
+		bool hasHit = !isPointInBox(box, _ray.from) && HitBox(_ray, box, closestHit.t, hit);
 
 		if (hasHit)
 		{
@@ -365,7 +365,7 @@ bool bvh_collide_fast(uint _nid, Ray _ray, float tmax)
 
 		if (!isPointInBox(box, _ray.from))
 		{
-			if (CollideBox(_ray, box, 0, tmax, true) >= 0)
+			if (CollideBox(_ray, box, tmax, true) >= 0)
 				return true;
 		}
 	}
@@ -393,7 +393,7 @@ bool tlas_collide_fast(uint _nid, Ray _ray, float tmax)
 		uint blasIndex = g_BvhLeafData[1 + leafDataOffset + triangleOffset + i];
 	
 		Box box = { g_blasHeader[blasIndex].minExtent, g_blasHeader[blasIndex].maxExtent };	
-		if (CollideBox(_ray, box, 0, tmax, true) >= 0)
+		if (CollideBox(_ray, box, tmax, true) >= 0)
 		{
 			if(traverseBvhFast(_ray, g_blasHeader[blasIndex].rootIndex, tmax))
 				return true;
