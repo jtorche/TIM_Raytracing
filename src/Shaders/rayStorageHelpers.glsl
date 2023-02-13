@@ -50,20 +50,20 @@ vec3 computeSpecularBrdf(vec3 albedo, float metalness, vec3 v, vec3 n);
 
 void nextBounce(vec3 _lightAbsorbdeByPreBounce, in ClosestHit _closestHit, in Ray _ray)
 {
-	uint matId = getMaterialId(_closestHit);
-	float t = _closestHit.t;
-	vec3 normal = getHitNormal(_closestHit);
-	vec2 uv = getHitUv(_closestHit);
-	vec3 P = _ray.from  + _ray.dir * t;
-	vec3 albedo = g_BvhMaterialData[matId].color.xyz;
-	
-#if defined(FIRST_RECURSION_STEP) || defined(CONTINUE_RECURSION)
-    if (g_BvhMaterialData[matId].type_ids.x == Material_PBR)
-	{
-		const float metalness = g_BvhMaterialData[matId].params.x;
-		vec3 Lr = computeSpecularBrdf(albedo, metalness, -_ray.dir, normal);
-		computeReflexionRay(Lr * _lightAbsorbdeByPreBounce, normal, _ray, t);
-	}
+//	uint matId = getMaterialId(_closestHit);
+//	float t = _closestHit.t;
+//	vec3 normal = getHitNormal(_closestHit);
+//	vec2 uv = getHitUv(_closestHit);
+//	vec3 P = _ray.from  + _ray.dir * t;
+//	vec3 albedo = g_BvhMaterialData[matId].color.xyz;
+//	
+//#if defined(FIRST_RECURSION_STEP) || defined(CONTINUE_RECURSION)
+//    if (g_BvhMaterialData[matId].type_ids.x == Material_PBR)
+//	{
+//		const float metalness = g_BvhMaterialData[matId].params.x;
+//		vec3 Lr = computeSpecularBrdf(albedo, metalness, -_ray.dir, normal);
+//		computeReflexionRay(Lr * _lightAbsorbdeByPreBounce, normal, _ray, t);
+//	}
 	//else if(g_BvhMaterialData[matId].type_ids.x == Material_Transparent)
 	//{
 	//	const float refractionIndice = g_BvhMaterialData[matId].params.y;
@@ -99,7 +99,7 @@ void nextBounce(vec3 _lightAbsorbdeByPreBounce, in ClosestHit _closestHit, in Ra
 	//		}
 	//	}
 	//}
-#endif
+//#endif
 
 }
 

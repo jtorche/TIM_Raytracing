@@ -275,7 +275,7 @@ int main(int argc, char* argv[])
                 rtPass.setFrameBufferSize(frameResolution);
                 scene.setSunData(g_sunData);
 
-                lpfPass.updateLightProbField(scene);
+                // lpfPass.updateLightProbField(scene);
 
                 ImageCreateInfo imgInfo(ImageFormat::RGBA16F, frameResolution.x, frameResolution.y, 1, 1, ImageType::Image2D, MemoryType::Default);
                 ImageHandle outputColorBuffer = resourceAllocator.allocTexture(imgInfo);

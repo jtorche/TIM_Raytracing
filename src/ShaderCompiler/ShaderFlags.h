@@ -11,6 +11,7 @@ namespace tim
         static const u32 MaxFlags = 64;
 
         void set(u32 _flag) { m_flags = m_flags | (u64(1) << _flag); }
+        void clr(u32 _flag) { m_flags = m_flags & (~(u64(1) << _flag)); }
         bool test(u32 _flag) { return (m_flags & (u64(1) << _flag)) > 0; }
 
         bool operator==(ShaderFlags _other) const { return m_flags == _other.m_flags; }

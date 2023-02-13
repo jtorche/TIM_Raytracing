@@ -30,7 +30,7 @@ vec4 toLinear(vec4 sRGB)
 #define USE_SHARED_MEM		1
 #define NO_LIGHTING         0
 
-#define DEBUG_GEOMETRY		0
+#define DEBUG_GEOMETRY		1
 #define DEBUG_BVH		    0
 #define DEBUG_BVH_TRAVERSAL 0
 #define ANY_DEBUG           (DEBUG_GEOMETRY + DEBUG_BVH + DEBUG_BVH_TRAVERSAL)

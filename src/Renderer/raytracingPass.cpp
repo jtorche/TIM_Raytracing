@@ -11,7 +11,7 @@
 
 namespace tim
 {
-    RayTracingPass::RayTracingPass(IRenderer* _renderer, IRenderContext* _context, ResourceAllocator& _allocator, TextureManager& _texManager) 
+    RayTracingPass::RayTracingPass(IRenderer* _renderer, IRenderContext* _context, ResourceAllocator& _allocator, TextureManager& _texManager)
         : m_frameSize{ 800,600 }, m_renderer{ _renderer }, m_context{ _context }, m_resourceAllocator{ _allocator }, m_textureManager{ _texManager }
     {
         m_rayBounceRecursionDepth = 2;
@@ -45,7 +45,7 @@ namespace tim
         passData.invFrameSize = { 1.f / m_frameSize.x, 1.f / m_frameSize.y };
         passData.cameraPos = { _camera.getPos(), 0 };
         passData.cameraDir = { _camera.getDir(), 0 };
-        passData.sunDir = { normalize(_scene.getSunData().sunDir), 0};
+        passData.sunDir = { normalize(_scene.getSunData().sunDir), 0 };
         passData.sunColor = { _scene.getSunData().sunColor, 0 };
 
         mat4 projMat = linalg::perspective_matrix<float>(fov, float(m_frameSize.x) / m_frameSize.y, 0.1f, TMAX, linalg::neg_z, linalg::zero_to_one);
@@ -53,8 +53,8 @@ namespace tim
         passData.invProjView = linalg::inverse(viewProj);
 
         passData.frustumCorner00 = linalg::mul(passData.invProjView, vec4(-1, -1, 0.5f, 1));
-        passData.frustumCorner10 = linalg::mul(passData.invProjView, vec4( 1, -1, 0.5f, 1));
-        passData.frustumCorner01 = linalg::mul(passData.invProjView, vec4(-1,  1, 0.5f, 1));
+        passData.frustumCorner10 = linalg::mul(passData.invProjView, vec4(1, -1, 0.5f, 1));
+        passData.frustumCorner01 = linalg::mul(passData.invProjView, vec4(-1, 1, 0.5f, 1));
 
         passData.frustumCorner00 /= passData.frustumCorner00.w;
         passData.frustumCorner10 /= passData.frustumCorner10.w;
@@ -67,6 +67,9 @@ namespace tim
         BufferView passDataBuffer;
         void* passDataPtr = m_renderer->GetDynamicBuffer(sizeof(PassData), passDataBuffer);
         memcpy(passDataPtr, &passData, sizeof(PassData));
+
+        const u32 tracingResultBufferSize = m_frameSize.x * m_frameSize.y * sizeof(uvec4);
+        BufferHandle tracingResultBuffer = m_resourceAllocator.allocBuffer(tracingResultBufferSize, BufferUsage::Storage | BufferUsage::Transfer, MemoryType::Default);
 
         BufferHandle reflexionRayBuffer = m_resourceAllocator.allocBuffer(getRayStorageBufferSize(), BufferUsage::Storage | BufferUsage::Transfer, MemoryType::Default);
         BufferHandle refractionRayBuffer = m_resourceAllocator.allocBuffer(getRayStorageBufferSize(), BufferUsage::Storage | BufferUsage::Transfer, MemoryType::Default);
@@ -83,39 +86,55 @@ namespace tim
         std::vector<BufferBinding> bindings = {
             { passDataBuffer, { 0, g_PassData_bind } },
             { { reflexionRayBuffer, 0, getRayStorageBufferSize() }, { 0, g_OutReflexionRayBuffer_bind } },
-            { { refractionRayBuffer, 0, getRayStorageBufferSize() }, { 0, g_OutRefractionRayBuffer_bind } }
+            { { refractionRayBuffer, 0, getRayStorageBufferSize() }, { 0, g_OutRefractionRayBuffer_bind } },
+            { { tracingResultBuffer, 0, tracingResultBufferSize }, { 0, g_outputBuffer_bind } }
         };
 
         _scene.fillGeometryBufferBindings(bindings);
         _scene.getBVH().fillBvhBindings(bindings);
+
+        PushConstants constants = { _scene.getTrianglesCount(), _scene.getBlasInstancesCount(), _scene.getPrimitivesCount(), _scene.getLightsCount(), _scene.getNodesCount() };
+        arg.m_constants = &constants;
+        arg.m_constantSize = sizeof(constants);
 
         arg.m_imageBindings = imgBinds.data();
         arg.m_numImageBindings = (u32)imgBinds.size();
         arg.m_bufferBindings = bindings.data();
         arg.m_numBufferBindings = (u32)bindings.size();
 
-        PushConstants constants = { _scene.getTrianglesCount(), _scene.getBlasInstancesCount(), _scene.getPrimitivesCount(), _scene.getLightsCount(), _scene.getNodesCount() };
-        arg.m_constants = &constants;
-        arg.m_constantSize = sizeof(constants);
         ShaderFlags flags;
         flags.set(C_FIRST_RECURSION_STEP);
         flags.set(C_USE_LPF);
-        if(_scene.useTlas())
+
+        if (_scene.useTlas())
             flags.set(C_USE_TRAVERSE_TLAS);
 
-        arg.m_key = { TIM_HASH32(cameraPass.comp), flags };
-
         const u32 localSize = LOCAL_SIZE;
-        m_context->Dispatch(arg, alignUp<u32>(m_frameSize.x, localSize) / localSize, alignUp<u32>(m_frameSize.y, localSize) / localSize);
 
-        if (m_rayBounceRecursionDepth > 1)
+        // Tracing step, output to tracingResultBuffer
         {
-            drawBounce(_scene, 1, passDataBuffer, reflexionRayBuffer, _outputBuffer);
-            drawBounce(_scene, 1, passDataBuffer, refractionRayBuffer, _outputBuffer);
+            flags.set(C_TRACING_STEP);
+            arg.m_key = { TIM_HASH32(cameraPass.comp), flags };
+
+            m_context->Dispatch(arg, alignUp<u32>(m_frameSize.x, localSize) / localSize, alignUp<u32>(m_frameSize.y, localSize) / localSize);
         }
+        // Lighting step
+        {
+            flags.clr(C_TRACING_STEP);
+            arg.m_key = { TIM_HASH32(cameraPass.comp), flags };
+
+            m_context->Dispatch(arg, alignUp<u32>(m_frameSize.x, localSize) / localSize, alignUp<u32>(m_frameSize.y, localSize) / localSize);
+        }
+
+        //if (m_rayBounceRecursionDepth > 1)
+        //{
+        //    drawBounce(_scene, 1, passDataBuffer, reflexionRayBuffer, _outputBuffer);
+        //    drawBounce(_scene, 1, passDataBuffer, refractionRayBuffer, _outputBuffer);
+        //}
 
         m_resourceAllocator.releaseBuffer(reflexionRayBuffer);
         m_resourceAllocator.releaseBuffer(refractionRayBuffer);
+        m_resourceAllocator.releaseBuffer(tracingResultBuffer);
     }
 
     void RayTracingPass::drawBounce(const Scene& _scene, u32 _depth, BufferView _passData, BufferHandle _inputRayBuffer, ImageHandle _curImage)
@@ -137,6 +156,8 @@ namespace tim
 
         BufferHandle outRayBuffer;
         ShaderFlags flags;
+        flags.set(C_USE_LPF);
+
         if (_depth + 1 < m_rayBounceRecursionDepth)
         {
             flags.set(C_CONTINUE_RECURSION);

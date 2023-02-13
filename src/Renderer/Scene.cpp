@@ -275,7 +275,7 @@ namespace tim
 
     void Scene::build(const BVHBuildParameters& _bvhParams, const BVHBuildParameters& _tlasParams, bool _useTlasBlas)
     {
-        constexpr bool useSponza = false;
+        constexpr bool useSponza = true;
         constexpr bool useRoom = false;
 
         m_renderer->WaitForIdle();

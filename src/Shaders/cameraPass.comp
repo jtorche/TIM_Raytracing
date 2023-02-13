@@ -3,14 +3,21 @@
 #extension GL_EXT_nonuniform_qualifier : enable
 
 //#define NO_LPF
+#define NUM_THREADS_PER_GROUP (LOCAL_SIZE*LOCAL_SIZE)
 
 #include "core/system.glsl"
+#include "bvh/bvhBindings_cpp.glsl"
 #include "struct_cpp.glsl"
 
 layout(std430, set=0, binding = g_PassData_bind)
 uniform PassData_block
 {
 	PassData g_passData;
+};
+
+layout(std430, set = 0, binding = g_outputBuffer_bind) buffer TracingResult
+{
+	uvec4 g_tracingData[];
 };
 
 layout(set=0, binding = g_outputImage_bind, rgba16f) uniform writeonly image2D g_outputImage;
@@ -33,6 +40,7 @@ layout (local_size_x = LOCAL_SIZE, local_size_y = LOCAL_SIZE) in;
 void main()
 {
 	ivec2 pixelCoord = ivec2(gl_GlobalInvocationID.x, gl_NumWorkGroups.y * LOCAL_SIZE - gl_GlobalInvocationID.y);
+	
 	if(pixelCoord.x < g_passData.frameSize.x && pixelCoord.y < g_passData.frameSize.y)
 	{	
 		vec3 stepW = (g_passData.frustumCorner10.xyz - g_passData.frustumCorner00.xyz) * g_passData.invFrameSize.x;
@@ -41,90 +49,66 @@ void main()
 		vec3 rayTarget = g_passData.frustumCorner00.xyz + stepW * gl_GlobalInvocationID.x + stepH * gl_GlobalInvocationID.y;
         Ray ray = createRay(g_passData.cameraPos.xyz, normalize(rayTarget - g_passData.cameraPos.xyz));
 
-		ClosestHit closestHit;
-        uint numTraversal = rayTrace(ray, closestHit);
+		uint pixelId = g_passData.frameSize.x * pixelCoord.y + pixelCoord.x;
 
-	#if SHOW_LPF_DEBUG
-		raytraceLightProbFieldDebug(ray, closestHit);
-	#endif
-        
-	#if ANY_DEBUG
+	#ifdef TRACING_STEP
+		ClosestHit closestHit;
+		uint numTraversal = rayTrace(ray, closestHit);
+
+		g_tracingData[pixelId] = ClosestHit_getHitData(closestHit);
+
+		#if ANY_DEBUG
 		vec3 lit = applyDebugLighting(ray, closestHit, numTraversal);
 		imageStore(g_outputImage, pixelCoord, vec4(lit, 1));
-	#else
+		#endif
+	#elif !ANY_DEBUG
 		SunDirColor sun;
 		sun.sunDir = g_passData.sunDir.xyz;
 		sun.sunColor = g_passData.sunColor.xyz;
-
+	
 		LightProbFieldHeader lpfHeader;
 		lpfHeader.aabb.minExtent = g_passData.sceneMinExtent.xyz;
 		lpfHeader.aabb.maxExtent = g_passData.sceneMaxExtent.xyz;
 		lpfHeader.resolution = g_passData.lpfResolution.xyz;
+		
+		Triangle tri = unpackTriangle(g_tracingData[pixelId].xyz);
+		float t = uintBitsToFloat(g_tracingData[pixelId].w);
 
-		vec3 lit = computeLighting(sun, lpfHeader, ray, closestHit);
+	//#if SHOW_LPF_DEBUG
+	//	raytraceLightProbFieldDebug(ray, closestHit);
+	//#endif
 
+		vec3 lit = computeLighting(sun, lpfHeader, ray, t, tri);
 		imageStore(g_outputImage, pixelCoord, vec4(lit, 1));
-        nextBounce(vec3(1,1,1), closestHit, ray);
+        //nextBounce(vec3(1,1,1), closestHit, ray);
 	#endif
 	}
-
-	//cullWithFrustumTile(g_passData, g_Constants);
-	//
-	//ivec2 pixelCoord = ivec2(gl_GlobalInvocationID.x, gl_NumWorkGroups.y * LOCAL_SIZE - gl_GlobalInvocationID.y);
-	//if(pixelCoord.x < g_passData.frameSize.x && pixelCoord.y < g_passData.frameSize.y)
-	//{	
-	//	vec3 stepW = (g_passData.frustumCorner10.xyz - g_passData.frustumCorner00.xyz) * g_passData.invFrameSize.x;
-	//	vec3 stepH = (g_passData.frustumCorner01.xyz - g_passData.frustumCorner00.xyz) * g_passData.invFrameSize.y;
-	//
-	//	vec3 rayTarget = g_passData.frustumCorner00.xyz + stepW * gl_GlobalInvocationID.x + stepH * gl_GlobalInvocationID.y;
-	//
-	//	Ray ray = createRay(g_passData.cameraPos.xyz, normalize(rayTarget - g_passData.cameraPos.xyz));
-	//
-	//	ClosestHit closestHit;
-	//	closestHit.t = TMAX;
-	//	closestHit.mid_objId = 0xFFFFffff;
-	//	uint rootId = g_Constants.numNodes == 1 ? NID_LEAF_BIT : 0;
-	//
-	//	collideRayAgainstTileData(ray, closestHit);
-	//	
-	//	vec3 lit = vec3(0,0,0);
-	//	if(closestHit.t < TMAX)
-	//	{
-	//		for(uint i=0 ; i<g_lightCount ; ++i)
-    //            lit += evalLighting(rootId, g_lights[i], getMaterialId(closestHit), ray, closestHit);
-	//	}
-	//	
-	//	imageStore(g_outputImage, pixelCoord, vec4(lit, 1));
-    //    nextBounce(vec3(1,1,1), closestHit, ray);
-	//}
 }
 
-void raytraceLightProbFieldDebug(in Ray _ray, inout ClosestHit _hitResult)
-{
-	LightProbFieldHeader lpfHeader;
-	lpfHeader.aabb.minExtent = g_passData.sceneMinExtent.xyz;
-	lpfHeader.aabb.maxExtent = g_passData.sceneMaxExtent.xyz;
-	lpfHeader.resolution = g_passData.lpfResolution.xyz;
-
-	uint numProb = lpfHeader.resolution.x * lpfHeader.resolution.y * lpfHeader.resolution.z;
-	for(uint i = 0 ; i < numProb ; ++i)
-	{
-		ivec3 coord = getLightProbCoord(i, lpfHeader.resolution);
-		vec3 pos = getLightProbPosition(coord, lpfHeader.resolution, lpfHeader.aabb);
-		Sphere sphere;
-		sphere.center = pos;
-		sphere.radius = LPF_DEBUG_SIZE;
-		sphere.invRadius = 1.0 / LPF_DEBUG_SIZE;
-
-		Hit hit;
-		if(HitSphere(_ray, sphere, _hitResult.t, hit))
-		{
-			_hitResult.t			= hit.t - OFFSET_RAY_COLLISION;
-			_hitResult.mid_objId	= i + ((0 << 16) & 0xFFFF0000);
-			_hitResult.nid			= 0xFFFFffff;
-
-			ClosestHit_setDebugColorId(_hitResult, i);
-			storeHitNormal(_hitResult, hit.normal);
-		}
-	}
-}
+//void raytraceLightProbFieldDebug(in Ray _ray, inout ClosestHit _closestHit)
+//{
+//	LightProbFieldHeader lpfHeader;
+//	lpfHeader.aabb.minExtent = g_passData.sceneMinExtent.xyz;
+//	lpfHeader.aabb.maxExtent = g_passData.sceneMaxExtent.xyz;
+//	lpfHeader.resolution = g_passData.lpfResolution.xyz;
+//
+//	uint numProb = lpfHeader.resolution.x * lpfHeader.resolution.y * lpfHeader.resolution.z;
+//	for(uint i = 0 ; i < numProb ; ++i)
+//	{
+//		ivec3 coord = getLightProbCoord(i, lpfHeader.resolution);
+//		vec3 pos = getLightProbPosition(coord, lpfHeader.resolution, lpfHeader.aabb);
+//		Sphere sphere;
+//		sphere.center = pos;
+//		sphere.radius = LPF_DEBUG_SIZE;
+//		sphere.invRadius = 1.0 / LPF_DEBUG_SIZE;
+//
+//		float t = CollideSphere(_ray, sphere, _closestHit.t);
+//		if(t < TMAX)
+//		{
+//			_closestHit.t			= t - OFFSET_RAY_COLLISION;
+//
+//			ClosestHit_storeNid(_closestHit, 0xFFFFffff);
+//			ClosestHit_setDebugColorId(_closestHit, i);
+//		}
+//	}
+//}

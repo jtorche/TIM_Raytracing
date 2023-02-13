@@ -70,27 +70,6 @@ AreaLight loadAreaLight(uint lightIndex)
 	return l;
 }
 
-void loadTriangleVertices(out vec3 p0, out vec3 p1, out vec3 p2, uint index0, uint index1, uint index2)
-{
-	p0 = vec3(g_positionData[index0 * 3], g_positionData[index0 * 3 + 1], g_positionData[index0 * 3 + 2]);
-	p1 = vec3(g_positionData[index1 * 3], g_positionData[index1 * 3 + 1], g_positionData[index1 * 3 + 2]);
-	p2 = vec3(g_positionData[index2 * 3], g_positionData[index2 * 3 + 1], g_positionData[index2 * 3 + 2]);
-}
-
-void loadNormalVertices(out vec3 n0, out vec3 n1, out vec3 n2, uint index0, uint index1, uint index2)
-{
-	n0 = vec3(g_normalData[index0 * 3], g_normalData[index0 * 3 + 1], g_normalData[index0 * 3 + 2]);
-	n1 = vec3(g_normalData[index1 * 3], g_normalData[index1 * 3 + 1], g_normalData[index1 * 3 + 2]);
-	n2 = vec3(g_normalData[index2 * 3], g_normalData[index2 * 3 + 1], g_normalData[index2 * 3 + 2]);
-}
-
-void loadUvVertices(out vec2 uv0, out vec2 uv1, out vec2 uv2, uint index0, uint index1, uint index2)
-{
-	uv0 = vec2(g_texCoordData[index0 * 2], g_texCoordData[index0 * 2 + 1]);
-	uv1 = vec2(g_texCoordData[index1 * 2], g_texCoordData[index1 * 2 + 1]);
-	uv2 = vec2(g_texCoordData[index2 * 2], g_texCoordData[index2 * 2 + 1]);
-}
-
 void fillUvNormal(Ray r, float t, vec3 p0, vec3 p1, vec3 p2, uint index0, uint index1, uint index2, out Hit outHit)
 {
 	vec3 colP = r.from + r.dir * t;
@@ -260,7 +239,7 @@ uint tlas_collide(uint _nid, Ray _ray, inout ClosestHit closestHit)
 	return numTraversal;
 }
 
-void bvh_collide(uint _nid, Ray _ray, inout ClosestHit closestHit)
+void bvh_collide(uint _nid, Ray _ray, inout ClosestHit _closestHit)
 {
 	_nid = _nid & NID_MASK;
 	uint leafDataOffset = g_BvhNodeData[_nid].nid.w;
@@ -274,17 +253,15 @@ void bvh_collide(uint _nid, Ray _ray, inout ClosestHit closestHit)
 	{
 		TriangleStrip strip = loadTriangleStripFromNode(1 + leafDataOffset + i * NodeTriangleStride);
 		Hit hit;
-		bool hasHit = HitTriangleStrip(_ray, strip, 0, closestHit.t, hit);
+		bool hasHit = HitTriangleStrip(_ray, strip, 0, _closestHit.t, hit);
 		
 		if(hasHit)
 		{
-			closestHit.t = hit.t - OFFSET_RAY_COLLISION;
-			closestHit.mid_objId = 0x0000FFFF + (strip.index2_matId & 0xFFFF0000);
-			closestHit.nid = _nid;
-			ClosestHit_setDebugColorId(closestHit, strip.index01+strip.index2_matId+strip.index34/*triIndex*/);
+			_closestHit.t = hit.t - OFFSET_RAY_COLLISION;
 
-			storeHitNormal(closestHit, hit.normal);
-			storeHitUv(closestHit, hit.uv);
+			ClosestHit_storeTriangle(_closestHit, triangle);
+			ClosestHit_storeNid(_closestHit, _nid);
+			ClosestHit_setDebugColorId(_closestHit, triangle.index01+triangle.index2_matId);
 		}
 	}
 	#else
@@ -292,17 +269,15 @@ void bvh_collide(uint _nid, Ray _ray, inout ClosestHit closestHit)
 	{
 		Triangle triangle = loadTriangleFromNode(1 + leafDataOffset + i * NodeTriangleStride);
 		Hit hit;
-		bool hasHit = HitTriangle(_ray, triangle, 0, closestHit.t, hit);
+		bool hasHit = HitTriangle(_ray, triangle, 0, _closestHit.t, hit);
 
 		if(hasHit)
 		{
-			closestHit.t = hit.t - OFFSET_RAY_COLLISION;
-			closestHit.mid_objId = 0x0000FFFF + (triangle.index2_matId & 0xFFFF0000);
-			closestHit.nid = _nid;
-			ClosestHit_setDebugColorId(closestHit, triangle.index01+triangle.index2_matId/*triIndex*/);
+			_closestHit.t = hit.t - OFFSET_RAY_COLLISION;
 
-			storeHitNormal(closestHit, hit.normal);
-			storeHitUv(closestHit, hit.uv);
+			ClosestHit_storeTriangle(_closestHit, triangle);
+			ClosestHit_storeNid(_closestHit, _nid);
+			ClosestHit_setDebugColorId(_closestHit, triangle.index01+triangle.index2_matId);
 		}
 	}
 	#endif
@@ -314,16 +289,14 @@ void bvh_collide(uint _nid, Ray _ray, inout ClosestHit closestHit)
 
 		Hit hit;
 		Box box = { g_blasHeader[blasIndex].minExtent, g_blasHeader[blasIndex].maxExtent };
-		bool hasHit = !isPointInBox(box, _ray.from) && HitBox(_ray, box, closestHit.t, hit);
+		bool hasHit = !isPointInBox(box, _ray.from) && HitBox(_ray, box, _closestHit.t, hit);
 
 		if (hasHit)
 		{
-			closestHit.t = hit.t - OFFSET_RAY_COLLISION;
-			closestHit.mid_objId = 0x0000FFFF + (g_blasHeader[blasIndex].matId & 0xFFFF0000);
-			closestHit.nid = _nid;
-			ClosestHit_setDebugColorId(closestHit, blasIndex);
+			_closestHit.t = hit.t - OFFSET_RAY_COLLISION;
 
-			storeHitNormal(closestHit, hit.normal);
+			ClosestHit_storeNid(_closestHit, _nid);
+			ClosestHit_setDebugColorId(_closestHit, blasIndex);
 		}
 	}
 	#endif
