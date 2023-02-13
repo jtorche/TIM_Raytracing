@@ -5,6 +5,7 @@
 #include "shaderMacros.h"
 #include "Scene.h"
 #include "Shaders/struct_cpp.glsl"
+#include "Shaders/bvh/bvhBindings_cpp.glsl"
 
 #include <iostream>
 

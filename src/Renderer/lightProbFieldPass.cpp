@@ -5,6 +5,7 @@
 #include "shaderMacros.h"
 #include "Shaders/struct_cpp.glsl"
 #include "Shaders/lightprob/lightprob.glsl"
+#include "Shaders/bvh/bvhBindings_cpp.glsl"
 
 namespace tim
 {

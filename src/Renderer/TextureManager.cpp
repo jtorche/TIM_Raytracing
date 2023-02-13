@@ -1,4 +1,5 @@
 #include "TextureManager.h"
+#include "Shaders/bvh/bvhBindings_cpp.glsl"
 
 #include <FreeImage.h>
 

@@ -1,6 +1,7 @@
 #include "timCore/Common.h"
 #include "BVHData.h"
 #include "Shaders/struct_cpp.glsl"
+#include "Shaders/bvh/bvhBindings_cpp.glsl"
 
 namespace tim
 {
