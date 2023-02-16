@@ -68,7 +68,7 @@ namespace tim
         void* passDataPtr = m_renderer->GetDynamicBuffer(sizeof(PassData), passDataBuffer);
         memcpy(passDataPtr, &passData, sizeof(PassData));
 
-        const u32 tracingResultBufferSize = m_frameSize.x * m_frameSize.y * sizeof(uvec4);
+        const u32 tracingResultBufferSize = m_frameSize.x * m_frameSize.y * sizeof(uvec4) * 2;
         BufferHandle tracingResultBuffer = m_resourceAllocator.allocBuffer(tracingResultBufferSize, BufferUsage::Storage | BufferUsage::Transfer, MemoryType::Default);
 
         BufferHandle reflexionRayBuffer = m_resourceAllocator.allocBuffer(getRayStorageBufferSize(), BufferUsage::Storage | BufferUsage::Transfer, MemoryType::Default);
@@ -87,7 +87,7 @@ namespace tim
             { passDataBuffer, { 0, g_PassData_bind } },
             { { reflexionRayBuffer, 0, getRayStorageBufferSize() }, { 0, g_OutReflexionRayBuffer_bind } },
             { { refractionRayBuffer, 0, getRayStorageBufferSize() }, { 0, g_OutRefractionRayBuffer_bind } },
-            { { tracingResultBuffer, 0, tracingResultBufferSize }, { 0, g_outputBuffer_bind } }
+            { { tracingResultBuffer, 0, tracingResultBufferSize }, { 0, g_tracingResult_bind } }
         };
 
         _scene.fillGeometryBufferBindings(bindings);

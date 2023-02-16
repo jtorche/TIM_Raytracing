@@ -68,6 +68,9 @@ namespace tim
 		BufferHandle irradianceBuffer = m_resourceAllocator.allocBuffer(irradianceBufferSize, BufferUsage::Storage | BufferUsage::Transfer, MemoryType::Default);
 		BufferView irradianceFieldView = { irradianceBuffer, 0, irradianceBufferSize };
 
+		const u32 tracingResultBufferSize = NUM_RAYS_PER_PROB * numProbs * sizeof(uvec4) * 2;
+		BufferHandle tracingResultBuffer = m_resourceAllocator.allocBuffer(tracingResultBufferSize, BufferUsage::Storage | BufferUsage::Transfer, MemoryType::Default);
+
 		DrawArguments arg = {};
 		std::vector<ImageBinding> imgBinds;
 		m_textureManager.fillImageBindings(imgBinds);
@@ -75,7 +78,8 @@ namespace tim
 
 		std::vector<BufferBinding> bindings = {
 			{ irradianceFieldView, { 0, g_outputBuffer_bind } },
-			{ _lpfConstants, { 0, g_CstBuffer_bind } }
+			{ _lpfConstants, { 0, g_CstBuffer_bind } },
+			{ { tracingResultBuffer, 0, tracingResultBufferSize }, { 0, g_tracingResult_bind } }
 		};
 
 		_scene.fillGeometryBufferBindings(bindings);
@@ -94,11 +98,25 @@ namespace tim
 		flags.set(C_USE_LPF);
 		if (_scene.useTlas())
 			flags.set(C_USE_TRAVERSE_TLAS);
-		arg.m_key = { TIM_HASH32(genLightProbField.comp), flags };
 
 		u32 numProbBatch = alignUp<u32>(numProbs, UPDATE_LPF_NUM_PROBS_PER_GROUP) / UPDATE_LPF_NUM_PROBS_PER_GROUP;
-		m_context->Dispatch(arg, numProbBatch, NUM_RAYS_PER_PROB);
 
+		// Tracing step, output to tracingResultBuffer
+		{
+			flags.set(C_TRACING_STEP);
+			arg.m_key = { TIM_HASH32(genLightProbField.comp), flags };
+
+			m_context->Dispatch(arg, numProbBatch, NUM_RAYS_PER_PROB);
+		}
+		// Lighting step
+		{
+			flags.clr(C_TRACING_STEP);
+			arg.m_key = { TIM_HASH32(genLightProbField.comp), flags };
+
+			m_context->Dispatch(arg, numProbBatch, NUM_RAYS_PER_PROB);
+		}
+
+		m_resourceAllocator.releaseBuffer(tracingResultBuffer);
 		return irradianceFieldView;
 	}
 

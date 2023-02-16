@@ -64,19 +64,34 @@ void fillUvNormal(vec3 _pos, in Triangle _tri, out vec3 _normal, out vec2 _uv)
 }
 
 //--------------------------------------------------------------------------------
-vec3 computeLighting(in SunDirColor _sun, in LightProbFieldHeader _lpfHeader, in Ray _ray, float _t, in Triangle _triangle)
+vec3 computeLighting(in SunDirColor _sun, in LightProbFieldHeader _lpfHeader, uint _shadowMask, in Ray _ray, float _t, in Triangle _triangle)
 {
 	if(_t < TMAX)
 	{
+		vec3 pos = _ray.from + _ray.dir * _t;
+		vec3 eye = _ray.from;
 		vec3 normal; 
 		vec2 uv = vec2(0,0);
-		fillUvNormal(_ray.from + _ray.dir * _t, _triangle, normal, uv);
+		fillUvNormal(pos, _triangle, normal, uv);
 		
 		uint rootId = g_Constants.numNodes == 1 ? NID_LEAF_BIT : 0;
-		return computeLighting(rootId, _ray, _sun, _lpfHeader, getTriangleMaterial(_triangle), normal, uv);
+		return computeLighting(rootId, _sun, _lpfHeader, _shadowMask, getTriangleMaterial(_triangle), pos, eye, normal, uv);
 	}
 
 	return vec3(200,220,255) / 255;
+}
+
+uvec4 computeAdditionalHitData(in Ray _ray, in ClosestHit _closestHit, in vec3 _sunDir)
+{	
+	uint hitData = 0;
+	if(_closestHit.t > 0)
+	{
+		uint nid = ClosestHit_getNid(_closestHit);
+		vec3 hitPos = _ray.from + _ray.dir * _closestHit.t;
+		hitData = computeShadowMask(_sunDir, hitPos, nid); 
+	}
+
+	return uvec4(hitData, 0, 0, 0);
 }
 
 //--------------------------------------------------------------------------------

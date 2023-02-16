@@ -70,13 +70,11 @@ AreaLight loadAreaLight(uint lightIndex)
 	return l;
 }
 
-bool HitTriangle(Ray r, Triangle triangle, float tmax, out Hit outHit)
+float collideTriangle(Ray r, Triangle triangle, float tmax)
 {
 	vec3 p0,p1,p2; 
 	loadTriangleVertices(p0, p1, p2, getIndex0(triangle), getIndex1(triangle), getIndex2(triangle));
-	outHit.t = CollideTriangle(r, p0, p1, p2, tmax);
-	
-	return outHit.t > 0;
+	return CollideTriangle(r, p0, p1, p2, tmax);
 }
 
 //bool HitTriangleStrip(Ray r, TriangleStrip strip, float tMin, float tmax, out Hit outHit)
@@ -176,6 +174,116 @@ uvec4 unpackObjectCount(uint _packed)
 	return v;
 }
 
+void bvh_collide(uint _nid, Ray _ray, inout ClosestHit _closestHit)
+{
+	_nid = _nid & NID_MASK;
+	uint leafDataOffset = g_BvhNodeData[_nid].nid.w;
+	uvec4 unpackedLeafDat = unpackObjectCount(g_BvhLeafData[leafDataOffset]);
+	uint numTriangles = unpackedLeafDat.x;
+	uint triangleOffset = numTriangles * NodeTriangleStride;
+	uint numBlas = unpackedLeafDat.y;
+
+	#if INLINE_STRIP
+	//for(uint i=0 ; i<numTriangles ; ++i)
+	//{
+	//	TriangleStrip strip = loadTriangleStripFromNode(1 + leafDataOffset + i * NodeTriangleStride);
+	//	Hit hit;
+	//	bool hasHit = HitTriangleStrip(_ray, strip, 0, _closestHit.t, hit);
+	//	
+	//	if(hasHit)
+	//	{
+	//		_closestHit.t = hit.t - OFFSET_RAY_COLLISION;
+	//
+	//		ClosestHit_storeTriangle(_closestHit, triangle);
+	//		ClosestHit_storeNid(_closestHit, _nid);
+	//		ClosestHit_setDebugColorId(_closestHit, triangle.index01+triangle.index2_matId);
+	//	}
+	//}
+	#else
+	for(uint i=0 ; i<numTriangles ; ++i)
+	{
+		Triangle triangle = loadTriangleFromNode(1 + leafDataOffset + i * NodeTriangleStride);
+		float t = collideTriangle(_ray, triangle, _closestHit.t);
+
+		if(t > 0)
+		{
+			_closestHit.t = t - OFFSET_RAY_COLLISION;
+
+			ClosestHit_storeTriangle(_closestHit, triangle);
+			ClosestHit_storeNid(_closestHit, _nid);
+			ClosestHit_setDebugColorId(_closestHit, triangle.index01+triangle.index2_matId);
+		}
+	}
+	#endif
+
+	#ifndef USE_TRAVERSE_TLAS
+	//for (uint i = 0; i < numBlas; ++i)
+	//{
+	//	uint blasIndex = g_BvhLeafData[1 + leafDataOffset + triangleOffset + i];
+	//
+	//	Box box = { g_blasHeader[blasIndex].minExtent, g_blasHeader[blasIndex].maxExtent };
+	//	if(!isPointInBox(box, _ray.from))
+	//	{
+	//		float t = HitBox(_ray, box, _closestHit.t);
+	//
+	//		if (t > 0)
+	//		{
+	//			_closestHit.t = t - OFFSET_RAY_COLLISION;
+	//
+	//			ClosestHit_storeNid(_closestHit, _nid);
+	//			ClosestHit_setDebugColorId(_closestHit, blasIndex);
+	//		}
+	//	}
+	//}
+	#endif
+}
+
+bool bvh_collide_fast(uint _nid, Ray _ray, float tmax)
+{
+	_nid = _nid & NID_MASK;
+	uint leafDataOffset = g_BvhNodeData[_nid].nid.w;
+	uvec4 unpackedLeafDat = unpackObjectCount(g_BvhLeafData[leafDataOffset]);
+	uint numTriangles = unpackedLeafDat.x;
+	uint triangleOffset = numTriangles * NodeTriangleStride;
+	uint numBlas = unpackedLeafDat.y;
+
+	#if INLINE_STRIP
+	//for(uint i=0 ; i<numTriangles ; ++i)
+	//{
+	//	if(hitTriangleStripFast(_ray, loadTriangleStripFromNode(1 + leafDataOffset + i * NodeTriangleStride), tmax))
+	//		return true;
+	//}
+	#else
+	for(uint i=0 ; i<numTriangles ; ++i)
+	{
+		Triangle triangle = loadTriangleFromNode(1 + leafDataOffset + i * NodeTriangleStride);
+		vec3 p0,p1,p2; 
+		loadTriangleVertices(p0, p1, p2, getIndex0(triangle), getIndex1(triangle), getIndex2(triangle));
+
+		if(CollideTriangle(_ray, p0, p1, p2, tmax) > 0)
+			return true;
+	}
+	#endif
+
+	#ifndef USE_TRAVERSE_TLAS
+	for (uint i = 0; i < numBlas; ++i)
+	{
+		uint blasIndex = g_BvhLeafData[1 + leafDataOffset + triangleOffset + i];
+
+		Box box = { g_blasHeader[blasIndex].minExtent, g_blasHeader[blasIndex].maxExtent };
+
+		if (!isPointInBox(box, _ray.from))
+		{
+			if (CollideBox(_ray, box, tmax, true) > 0)
+				return true;
+		}
+	}
+	#endif
+
+	return false;
+}
+
+#ifdef USE_TRAVERSE_TLAS
 uint tlas_collide(uint _nid, Ray _ray, inout ClosestHit closestHit)
 {
 	_nid = _nid & NID_MASK;
@@ -210,114 +318,6 @@ uint tlas_collide(uint _nid, Ray _ray, inout ClosestHit closestHit)
 	return numTraversal;
 }
 
-void bvh_collide(uint _nid, Ray _ray, inout ClosestHit _closestHit)
-{
-	_nid = _nid & NID_MASK;
-	uint leafDataOffset = g_BvhNodeData[_nid].nid.w;
-	uvec4 unpackedLeafDat = unpackObjectCount(g_BvhLeafData[leafDataOffset]);
-	uint numTriangles = unpackedLeafDat.x;
-	uint triangleOffset = numTriangles * NodeTriangleStride;
-	uint numBlas = unpackedLeafDat.y;
-
-	#if INLINE_STRIP
-	for(uint i=0 ; i<numTriangles ; ++i)
-	{
-		TriangleStrip strip = loadTriangleStripFromNode(1 + leafDataOffset + i * NodeTriangleStride);
-		Hit hit;
-		bool hasHit = HitTriangleStrip(_ray, strip, 0, _closestHit.t, hit);
-		
-		if(hasHit)
-		{
-			_closestHit.t = hit.t - OFFSET_RAY_COLLISION;
-
-			ClosestHit_storeTriangle(_closestHit, triangle);
-			ClosestHit_storeNid(_closestHit, _nid);
-			ClosestHit_setDebugColorId(_closestHit, triangle.index01+triangle.index2_matId);
-		}
-	}
-	#else
-	for(uint i=0 ; i<numTriangles ; ++i)
-	{
-		Triangle triangle = loadTriangleFromNode(1 + leafDataOffset + i * NodeTriangleStride);
-		Hit hit;
-		bool hasHit = HitTriangle(_ray, triangle, _closestHit.t, hit);
-
-		if(hasHit)
-		{
-			_closestHit.t = hit.t - OFFSET_RAY_COLLISION;
-
-			ClosestHit_storeTriangle(_closestHit, triangle);
-			ClosestHit_storeNid(_closestHit, _nid);
-			ClosestHit_setDebugColorId(_closestHit, triangle.index01+triangle.index2_matId);
-		}
-	}
-	#endif
-
-	#ifndef USE_TRAVERSE_TLAS
-	for (uint i = 0; i < numBlas; ++i)
-	{
-		uint blasIndex = g_BvhLeafData[1 + leafDataOffset + triangleOffset + i];
-
-		Hit hit;
-		Box box = { g_blasHeader[blasIndex].minExtent, g_blasHeader[blasIndex].maxExtent };
-		bool hasHit = !isPointInBox(box, _ray.from) && HitBox(_ray, box, _closestHit.t, hit);
-
-		if (hasHit)
-		{
-			_closestHit.t = hit.t - OFFSET_RAY_COLLISION;
-
-			ClosestHit_storeNid(_closestHit, _nid);
-			ClosestHit_setDebugColorId(_closestHit, blasIndex);
-		}
-	}
-	#endif
-}
-
-bool bvh_collide_fast(uint _nid, Ray _ray, float tmax)
-{
-	_nid = _nid & NID_MASK;
-	uint leafDataOffset = g_BvhNodeData[_nid].nid.w;
-	uvec4 unpackedLeafDat = unpackObjectCount(g_BvhLeafData[leafDataOffset]);
-	uint numTriangles = unpackedLeafDat.x;
-	uint triangleOffset = numTriangles * NodeTriangleStride;
-	uint numBlas = unpackedLeafDat.y;
-
-	#if INLINE_STRIP
-	for(uint i=0 ; i<numTriangles ; ++i)
-	{
-		if(hitTriangleStripFast(_ray, loadTriangleStripFromNode(1 + leafDataOffset + i * NodeTriangleStride), tmax))
-			return true;
-	}
-	#else
-	for(uint i=0 ; i<numTriangles ; ++i)
-	{
-		Triangle triangle = loadTriangleFromNode(1 + leafDataOffset + i * NodeTriangleStride);
-		vec3 p0,p1,p2; 
-		loadTriangleVertices(p0, p1, p2, getIndex0(triangle), getIndex1(triangle), getIndex2(triangle));
-
-		if(CollideTriangle(_ray, p0, p1, p2, tmax) > 0)
-			return true;
-	}
-	#endif
-
-	#ifndef USE_TRAVERSE_TLAS
-	for (uint i = 0; i < numBlas; ++i)
-	{
-		uint blasIndex = g_BvhLeafData[1 + leafDataOffset + triangleOffset + i];
-
-		Box box = { g_blasHeader[blasIndex].minExtent, g_blasHeader[blasIndex].maxExtent };
-
-		if (!isPointInBox(box, _ray.from))
-		{
-			if (CollideBox(_ray, box, tmax, true) > 0)
-				return true;
-		}
-	}
-	#endif
-
-	return false;
-}
-
 bool tlas_collide_fast(uint _nid, Ray _ray, float tmax)
 {
 	uint numTraversal = 0;
@@ -346,5 +346,6 @@ bool tlas_collide_fast(uint _nid, Ray _ray, float tmax)
 
 	return false;
 }
+#endif
 
 #endif

@@ -2,7 +2,8 @@
 #extension GL_EXT_scalar_block_layout : enable
 #extension GL_EXT_nonuniform_qualifier : enable
 
-//#define NO_LPF
+// #define NO_LPF
+// #define IGNORE_BACKFACE
 #define NUM_THREADS_PER_GROUP (LOCAL_SIZE*LOCAL_SIZE)
 
 #include "core/system.glsl"
@@ -15,7 +16,7 @@ uniform PassData_block
 	PassData g_passData;
 };
 
-layout(std430, set = 0, binding = g_outputBuffer_bind) buffer TracingResult
+layout(std430, set = 0, binding = g_tracingResult_bind) buffer TracingResult
 {
 	uvec4 g_tracingData[];
 };
@@ -55,7 +56,8 @@ void main()
 		ClosestHit closestHit;
 		uint numTraversal = rayTrace(ray, closestHit);
 
-		g_tracingData[pixelId] = ClosestHit_getHitData(closestHit);
+		g_tracingData[pixelId * 2] = ClosestHit_getHitData(closestHit);
+		g_tracingData[pixelId * 2 + 1] = computeAdditionalHitData(ray, closestHit, g_passData.sunDir.xyz);
 
 		#if ANY_DEBUG
 		vec3 lit = applyDebugLighting(ray, closestHit, numTraversal);
@@ -71,14 +73,15 @@ void main()
 		lpfHeader.aabb.maxExtent = g_passData.sceneMaxExtent.xyz;
 		lpfHeader.resolution = g_passData.lpfResolution.xyz;
 		
-		Triangle tri = unpackTriangle(g_tracingData[pixelId].xyz);
-		float t = uintBitsToFloat(g_tracingData[pixelId].w);
+		Triangle tri = unpackTriangle(g_tracingData[pixelId * 2].xyz);
+		float t = uintBitsToFloat(g_tracingData[pixelId * 2].w);
 
 	//#if SHOW_LPF_DEBUG
 	//	raytraceLightProbFieldDebug(ray, closestHit);
 	//#endif
-
-		vec3 lit = computeLighting(sun, lpfHeader, ray, t, tri);
+		
+		uint shadowMask = g_tracingData[pixelId * 2 + 1].x;
+		vec3 lit = computeLighting(sun, lpfHeader, shadowMask, ray, t, tri);
 		imageStore(g_outputImage, pixelCoord, vec4(lit, 1));
         //nextBounce(vec3(1,1,1), closestHit, ray);
 	#endif

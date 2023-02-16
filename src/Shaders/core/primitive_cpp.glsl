@@ -20,6 +20,11 @@
 #define LightBitCount 4
 #define BlasBitCount 8
 
+#define TriangleBitMask		((1u << TriangleBitCount) - 1)
+#define PrimitiveBitMask	((1u << PrimitiveBitCount) - 1)
+#define LightBitMask		((1u << LightBitCount) - 1)
+#define BlasBitMask			((1u << BlasBitCount) - 1)
+
 struct Ray
 {
     vec3 from;
@@ -130,7 +135,7 @@ uint getIndex2(in Triangle triangle)
 
 uint getTriangleMaterial(in Triangle triangle)
 {
-	return triangle.vertexOffset + ((triangle.index2_matId & 0xFFFF0000) >> 16);
+	return (triangle.index2_matId & 0xFFFF0000) >> 16;
 }
 
 //---------------------------------------------------------------------------

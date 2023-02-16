@@ -96,13 +96,11 @@ float CollideTriangle(Ray r, vec3 p0, vec3 p1, vec3 p2, float tmax)
 
 struct ClosestHit
 {
-#if !USE_SHARED_MEM
-    vec3 normal;
-	vec2 uv;
-#endif
     float t;
+#if !USE_SHARED_MEM
+    Triangle triangle;
 	uint nid;
-	uint mid_objId;
+#endif
 #if DEBUG_GEOMETRY
     uint dbgColorId;
 #endif
@@ -114,122 +112,109 @@ void ClosestHit_setDebugColorId(inout ClosestHit hit, uint id) { hit.dbgColorId 
 void ClosestHit_setDebugColorId(inout ClosestHit hit, uint id) { }
 #endif
 
-uint getMaterialId(in ClosestHit _hit)
-{
-	return (_hit.mid_objId & 0xFFFF0000) >> 16;
-}
-
-struct Hit
-{
-    vec3 normal;
-    float t;
-	uint nid_mid;
-	vec2 uv;
-};
-
-bool HitSphere(Ray r, Sphere s, float tmax, out Hit outHit)
-{
-    vec3 oc = r.from - s.center;
-    float b = dot(oc, r.dir);
-    float c = dot(oc, oc) - s.radius*s.radius;
-    float discr = b * b - c;
-    if (discr > 0)
-    {
-        float discrSq = sqrt(discr);
-
-        float t = (-b - discrSq);
-        if (t > 0 && t < tmax)
-        {
-			vec3 pos = r.from + t * r.dir;
-            outHit.normal = (pos - s.center) * s.invRadius;
-            outHit.t = t;
-            return true;
-        }
-        t = (-b + discrSq);
-        if (t > 0 && t < tmax)
-        {
-			vec3 pos = r.from + t * r.dir;
-            outHit.normal = (pos - s.center) * s.invRadius;
-            outHit.t = t;
-            return true;
-        }
-    }
-    return false;
-}
-
-bool HitSphereThrough(Ray r, Sphere s, float tmax, out Hit outHit)
-{
-    vec3 oc = r.from - s.center;
-    float b = dot(oc, r.dir);
-    float c = dot(oc, oc) - s.radius*s.radius;
-    float discr = b * b - c;
-    if (discr > 0)
-    {
-        float discrSq = sqrt(discr);
-
-		float t = (-b + discrSq);
-        if (t > 0 && t < tmax)
-        {
-			vec3 pos = r.from + t * r.dir;
-            outHit.normal = (pos - s.center) * s.invRadius;
-            outHit.t = t;
-            return true;
-        }
-        t = (-b - discrSq);
-        if (t > 0 && t < tmax)
-        {
-			vec3 pos = r.from + t * r.dir;
-            outHit.normal = (pos - s.center) * s.invRadius;
-            outHit.t = t;
-            return true;
-        }
-    }
-    return false;
-}
-
-bool HitBox(Ray r, Box box, float tmax, out Hit outHit)
-{
-	float t = CollideBox(r, box, tmax, true).x;
-	if(t >= 0)
-	{
-		vec3 pos = r.from + r.dir * t;
-		vec3 center = (box.maxExtent + box.minExtent) * 0.5;
-
-		vec3 p = pos - center;
-		vec3 d = (box.maxExtent - box.minExtent) * 0.5;
-
-		vec3 normal = 1.0001 * (p / d);
-
-		outHit.t = t;
-		outHit.normal = vec3(int(normal.x), int(normal.y), int(normal.z));
-
-		return true;
-	}
-
-	return false;
-}
-
-bool HitBoxThrough(Ray r, Box box, float tmax, out Hit outHit)
-{
-	float t = CollideBox(r, box, tmax, false).x;
-	if(t >= 0)
-	{
-		vec3 pos = r.from + r.dir * t;
-		vec3 center = (box.maxExtent + box.minExtent) * 0.5;
-
-		vec3 p = pos - center;
-		vec3 d = (box.maxExtent - box.minExtent) * 0.5;
-
-		vec3 normal = 1.0001 * (p / d);
-
-		outHit.t = t;
-		outHit.normal = vec3(int(normal.x), int(normal.y), int(normal.z));
-
-		return true;
-	}
-
-	return false;
-}
+//bool HitSphere(Ray r, Sphere s, float tmax, out Hit outHit)
+//{
+//    vec3 oc = r.from - s.center;
+//    float b = dot(oc, r.dir);
+//    float c = dot(oc, oc) - s.radius*s.radius;
+//    float discr = b * b - c;
+//    if (discr > 0)
+//    {
+//        float discrSq = sqrt(discr);
+//
+//        float t = (-b - discrSq);
+//        if (t > 0 && t < tmax)
+//        {
+//			vec3 pos = r.from + t * r.dir;
+//            outHit.normal = (pos - s.center) * s.invRadius;
+//            outHit.t = t;
+//            return true;
+//        }
+//        t = (-b + discrSq);
+//        if (t > 0 && t < tmax)
+//        {
+//			vec3 pos = r.from + t * r.dir;
+//            outHit.normal = (pos - s.center) * s.invRadius;
+//            outHit.t = t;
+//            return true;
+//        }
+//    }
+//    return false;
+//}
+//
+//bool HitSphereThrough(Ray r, Sphere s, float tmax, out Hit outHit)
+//{
+//    vec3 oc = r.from - s.center;
+//    float b = dot(oc, r.dir);
+//    float c = dot(oc, oc) - s.radius*s.radius;
+//    float discr = b * b - c;
+//    if (discr > 0)
+//    {
+//        float discrSq = sqrt(discr);
+//
+//		float t = (-b + discrSq);
+//        if (t > 0 && t < tmax)
+//        {
+//			vec3 pos = r.from + t * r.dir;
+//            outHit.normal = (pos - s.center) * s.invRadius;
+//            outHit.t = t;
+//            return true;
+//        }
+//        t = (-b - discrSq);
+//        if (t > 0 && t < tmax)
+//        {
+//			vec3 pos = r.from + t * r.dir;
+//            outHit.normal = (pos - s.center) * s.invRadius;
+//            outHit.t = t;
+//            return true;
+//        }
+//    }
+//    return false;
+//}
+//
+//bool HitBox(Ray r, Box box, float tmax, out Hit outHit)
+//{
+//	float t = CollideBox(r, box, tmax, true).x;
+//	if(t >= 0)
+//	{
+//		vec3 pos = r.from + r.dir * t;
+//		vec3 center = (box.maxExtent + box.minExtent) * 0.5;
+//
+//		vec3 p = pos - center;
+//		vec3 d = (box.maxExtent - box.minExtent) * 0.5;
+//
+//		vec3 normal = 1.0001 * (p / d);
+//
+//		outHit.t = t;
+//		outHit.normal = vec3(int(normal.x), int(normal.y), int(normal.z));
+//
+//		return true;
+//	}
+//
+//	return false;
+//}
+//
+//bool HitBoxThrough(Ray r, Box box, float tmax, out Hit outHit)
+//{
+//	float t = CollideBox(r, box, tmax, false).x;
+//	if(t >= 0)
+//	{
+//		vec3 pos = r.from + r.dir * t;
+//		vec3 center = (box.maxExtent + box.minExtent) * 0.5;
+//
+//		vec3 p = pos - center;
+//		vec3 d = (box.maxExtent - box.minExtent) * 0.5;
+//
+//		vec3 normal = 1.0001 * (p / d);
+//
+//		outHit.t = t;
+//		outHit.normal = vec3(int(normal.x), int(normal.y), int(normal.z));
+//
+//		return true;
+//	}
+//
+//	return false;
+//}
 
 bool sphereFrustum4Collision(in Sphere _sphere, in vec4 _plans[4])
 {

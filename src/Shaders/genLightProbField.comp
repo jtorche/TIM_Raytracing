@@ -2,10 +2,12 @@
 #extension GL_EXT_scalar_block_layout : enable
 #extension GL_EXT_nonuniform_qualifier : enable
 
-//#undef USE_LPF
-//#define IGNORE_BACKFACE
+//#define NO_LPF
+// #define IGNORE_BACKFACE
+#define NUM_THREADS_PER_GROUP UPDATE_LPF_NUM_PROBS_PER_GROUP
 
 #include "core/system.glsl"
+#include "bvh/bvhBindings_cpp.glsl"
 #include "struct_cpp.glsl"
 #include "lightprob/lightprob.glsl"
 
@@ -18,6 +20,11 @@ layout(std430, set=0, binding = g_CstBuffer_bind)
 uniform CstBuffer_block
 {
 	GenLightProbFieldConstants g_lpfCst;
+};
+
+layout(std430, binding = g_tracingResult_bind) buffer TracingResult
+{
+	uvec4 g_tracingData[];
 };
 
 layout(std430, binding = g_outputBuffer_bind) writeonly buffer OutputLayout
@@ -37,6 +44,7 @@ void main()
 	uint probBatchId = gl_WorkGroupID.x;
 	uint rayId = gl_WorkGroupID.y;
     uint probIndex = gl_LocalInvocationID.x + UPDATE_LPF_NUM_PROBS_PER_GROUP * probBatchId;
+	uint sampleIndex = probIndex * NUM_RAYS_PER_PROB + rayId;
 
 	Box lpfAABB;
 	lpfAABB.minExtent = g_lpfCst.lpfMin.xyz;
@@ -45,11 +53,15 @@ void main()
 	uvec3 probCoord = getLightProbCoord(probIndex, g_lpfCst.lpfResolution.xyz);
 	vec3 probPosition = getLightProbPosition(probCoord, g_lpfCst.lpfResolution.xyz, lpfAABB);
 
-	ClosestHit closestHit;
 	Ray ray = createRay(probPosition, g_lpfCst.rays[rayId].xyz);
 
+#ifdef TRACING_STEP
+	ClosestHit closestHit;
 	rayTrace(ray, closestHit);
 
+	g_tracingData[sampleIndex * 2] = ClosestHit_getHitData(closestHit);
+	g_tracingData[sampleIndex * 2 + 1] = computeAdditionalHitData(ray, closestHit, g_lpfCst.sunDir.xyz);
+#else
 	SunDirColor sun;
 	sun.sunDir = g_lpfCst.sunDir.xyz;
 	sun.sunColor = g_lpfCst.sunColor.xyz;
@@ -59,10 +71,14 @@ void main()
 	lpfHeader.aabb.maxExtent = g_lpfCst.lpfMax.xyz;
 	lpfHeader.resolution = g_lpfCst.lpfResolution.xyz;
 
-    vec3 lit = computeLighting(sun, lpfHeader, ray, closestHit);
+	Triangle tri = unpackTriangle(g_tracingData[sampleIndex * 2].xyz);
+	float t = uintBitsToFloat(g_tracingData[sampleIndex * 2].w);
+	uint shadowMask = g_tracingData[sampleIndex * 2 + 1].x;
 
-	uint sampleIndex = (probIndex * NUM_RAYS_PER_PROB + rayId) * 3;
-	g_irradiance[sampleIndex + 0] = lit.x;
-	g_irradiance[sampleIndex + 1] = lit.y;
-	g_irradiance[sampleIndex + 2] = lit.z;
+	vec3 lit = computeLighting(sun, lpfHeader, shadowMask, ray, t, tri);
+
+	g_irradiance[sampleIndex*3 + 0] = lit.x;
+	g_irradiance[sampleIndex*3 + 1] = lit.y;
+	g_irradiance[sampleIndex*3 + 2] = lit.z;
+#endif
 }
