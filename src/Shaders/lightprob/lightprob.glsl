@@ -20,7 +20,7 @@ struct LightProbFieldHeader
 };
 
 #define NUM_RAYS_PER_PROB 64
-#define UPDATE_LPF_NUM_PROBS_PER_GROUP 256
+#define UPDATE_LPF_NUM_PROBS_PER_GROUP 64
 #define UPDATE_LPF_LOCALSIZE 64
 
 struct GenLightProbFieldConstants

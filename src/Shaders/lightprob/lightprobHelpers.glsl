@@ -4,19 +4,54 @@
 #include "lightprob.glsl"
 #include "core/primitive_cpp.glsl"
 
+#define LP_TILE_RES 4
+#define LP_TILE_SIZE (LP_TILE_RES*LP_TILE_RES*LP_TILE_RES)
+
 uint getLightProbIndex(uvec3 _coord, uvec3 _lpfResolution)
 {
+#if LP_TILE_RES > 1
+	uvec3 tileCoord = _coord / LP_TILE_RES;
+	uvec3 tileResolution =  _lpfResolution / LP_TILE_RES;
+	
+	uint result = tileCoord.x + tileCoord.y * tileResolution.x + tileCoord.z * tileResolution.x * tileResolution.y;
+	result *= LP_TILE_SIZE;
+	
+	_coord = _coord % LP_TILE_RES;
+	result += _coord.x + _coord.y * LP_TILE_RES + _coord.z * LP_TILE_RES * LP_TILE_RES;
+	return result;
+#else
 	return _coord.x + _coord.y * _lpfResolution.x + _coord.z * _lpfResolution.x * _lpfResolution.y;
+#endif
 }
 
 ivec3 getLightProbCoord(uint _index, uvec3 _lpfResolution)
 {
+#if LP_TILE_RES > 1
+	uvec3 tileResolution =  _lpfResolution / LP_TILE_RES;
+	uint tileIndex = _index / LP_TILE_SIZE;
+	uint inTileIndex = _index % LP_TILE_SIZE;
+	
+	uvec3 result;
+	result.z = tileIndex / (tileResolution.x * tileResolution.y);
+	tileIndex = tileIndex  % (tileResolution.x * tileResolution.y);
+	result.y = tileIndex / tileResolution.x;
+	result.x = tileIndex % tileResolution.x;
+	
+	result *= LP_TILE_RES;
+	
+	result.x += inTileIndex % LP_TILE_RES;
+	result.y += (inTileIndex / LP_TILE_RES) % LP_TILE_RES;
+	result.z += (inTileIndex / (LP_TILE_RES*LP_TILE_RES)) % LP_TILE_RES;
+	
+	return ivec3(result.x, result.y, result.z);
+#else
 	uint z = _index / (_lpfResolution.x * _lpfResolution.y);
 	_index = _index  % (_lpfResolution.x * _lpfResolution.y);
 	uint y = _index / _lpfResolution.x;
 	uint x = _index % _lpfResolution.x;
-
+	
 	return ivec3(x,y,z);
+#endif
 }
 
 vec3 getLightProbPosition(uvec3 _coord, uvec3 _lpfResolution, Box _aabb)
