@@ -18,106 +18,134 @@ namespace tim
 	{
 	}
 
-	void LightProbFieldPass::updateLightProbField(const Scene& _scene)
+	LightProbFieldPass::PassResource LightProbFieldPass::fillPassResources(const Scene& _scene)
 	{
-		BufferView lpfConstantsBuffer;
-		GenLightProbFieldConstants& lpfConstants = *((GenLightProbFieldConstants*)m_renderer->GetDynamicBuffer(sizeof(GenLightProbFieldConstants), lpfConstantsBuffer));
+		PassResource resources;
+
+		GenLightProbFieldConstants& lpfConstants = *((GenLightProbFieldConstants*)m_renderer->GetDynamicBuffer(sizeof(GenLightProbFieldConstants), resources.m_lpfConstants));
 		lpfConstants.lpfMin = { _scene.getAABB().minExtent, 0 };
 		lpfConstants.lpfMax = { _scene.getAABB().maxExtent, 0 };
-		lpfConstants.lpfResolution = { _scene.getLPF().m_fieldSize, 0};
+		lpfConstants.lpfResolution = { _scene.getLPF().m_fieldSize, 0 };
 		lpfConstants.sunDir = { _scene.getSunData().sunDir, 0 };
 		lpfConstants.sunColor = { _scene.getSunData().sunColor, 0 };
 
-		BufferView shCoefsBuffer;
-		SH9* shCoefs = (SH9*)m_renderer->GetDynamicBuffer(sizeof(SH9) * NUM_RAYS_PER_PROB, shCoefsBuffer);
+		SH9* shCoefs = (SH9*)m_renderer->GetDynamicBuffer(sizeof(SH9) * NUM_RAYS_PER_PROB, resources.m_shCoefsBuffer);
 		sampleRays(lpfConstants.rays, shCoefs, NUM_RAYS_PER_PROB);
 
-		BufferView irradianceField = generateIrradiance(lpfConstantsBuffer, _scene);
-
-		DrawArguments arg = {};
-
-		std::vector<BufferBinding> bindings = {
-			{ lpfConstantsBuffer, { 0, 0 } },
-			{ shCoefsBuffer, { 0, 1 } },
-			{ irradianceField, { 0, 2 } }
-		};
-
-		std::vector<ImageBinding> imgBinds;
-		_scene.getLPF().fillBindings(imgBinds, 3);
-
-		arg.m_imageBindings = imgBinds.data();
-		arg.m_numImageBindings = (u32)imgBinds.size();
-		arg.m_bufferBindings = bindings.data();
-		arg.m_numBufferBindings = (u32)bindings.size();
-
-		arg.m_constants = &_scene.getLPF().m_fieldSize;
-		arg.m_constantSize = sizeof(uvec3);
-		arg.m_key = { TIM_HASH32(updateLightProbField.comp), {} };
-
-		const u32 numProbs = _scene.getLPF().m_numProbs;
-		u32 numGroup = alignUp<u32>(numProbs, UPDATE_LPF_LOCALSIZE) / UPDATE_LPF_LOCALSIZE;
-		m_context->Dispatch(arg, numGroup, 1);
-
-		m_resourceAllocator.releaseBuffer(irradianceField.m_buffer);
-	}
-
-	BufferView LightProbFieldPass::generateIrradiance(const BufferView& _lpfConstants, const Scene& _scene)
-	{
 		const u32 numProbs = _scene.getLPF().m_numProbs;
 		const u32 irradianceBufferSize = sizeof(vec3) * NUM_RAYS_PER_PROB * numProbs;
 		BufferHandle irradianceBuffer = m_resourceAllocator.allocBuffer(irradianceBufferSize, BufferUsage::Storage | BufferUsage::Transfer, MemoryType::Default);
-		BufferView irradianceFieldView = { irradianceBuffer, 0, irradianceBufferSize };
+		resources.m_irradianceField = { irradianceBuffer, 0, irradianceBufferSize };
 
 		const u32 tracingResultBufferSize = NUM_RAYS_PER_PROB * numProbs * sizeof(uvec4) * 2;
 		BufferHandle tracingResultBuffer = m_resourceAllocator.allocBuffer(tracingResultBufferSize, BufferUsage::Storage | BufferUsage::Transfer, MemoryType::Default);
+		resources.m_tracingResult = { tracingResultBuffer, 0, tracingResultBufferSize };
 
+		return resources;
+	}
+
+	void LightProbFieldPass::freePassResources(const PassResource& _resources)
+	{
+		m_resourceAllocator.releaseBuffer(_resources.m_irradianceField.m_buffer);
+		m_resourceAllocator.releaseBuffer(_resources.m_tracingResult.m_buffer);
+	}
+
+	DrawArguments LightProbFieldPass::fillBindings(const Scene& _scene, const PassResource& _resources, PushConstants& _cst, std::vector<BufferBinding>& _bufBinds, std::vector<ImageBinding>& _imgBinds)
+	{
 		DrawArguments arg = {};
-		std::vector<ImageBinding> imgBinds;
-		m_textureManager.fillImageBindings(imgBinds);
-		_scene.getLPF().fillBindings(imgBinds, g_lpfTextures_bind);
 
-		std::vector<BufferBinding> bindings = {
-			{ irradianceFieldView, { 0, g_outputBuffer_bind } },
-			{ _lpfConstants, { 0, g_CstBuffer_bind } },
-			{ { tracingResultBuffer, 0, tracingResultBufferSize }, { 0, g_tracingResult_bind } }
+		m_textureManager.fillImageBindings(_imgBinds);
+		_scene.getLPF().fillBindings(_imgBinds, g_lpfTextures_bind);
+
+		_bufBinds = {
+			{ _resources.m_irradianceField, { 0, g_outputBuffer_bind } },
+			{ _resources.m_lpfConstants, { 0, g_CstBuffer_bind } },
+			{ _resources.m_tracingResult, { 0, g_tracingResult_bind } }
 		};
 
-		_scene.fillGeometryBufferBindings(bindings);
-		_scene.getBVH().fillBvhBindings(bindings);
+		_scene.fillGeometryBufferBindings(_bufBinds);
+		_scene.getBVH().fillBvhBindings(_bufBinds);
 
-		arg.m_imageBindings = imgBinds.data();
-		arg.m_numImageBindings = (u32)imgBinds.size();
-		arg.m_bufferBindings = bindings.data();
-		arg.m_numBufferBindings = (u32)bindings.size();
+		arg.m_imageBindings = _imgBinds.data();
+		arg.m_numImageBindings = (u32)_imgBinds.size();
+		arg.m_bufferBindings = _bufBinds.data();
+		arg.m_numBufferBindings = (u32)_bufBinds.size();
 
 		PushConstants constants = { _scene.getTrianglesCount(), _scene.getBlasInstancesCount(), _scene.getPrimitivesCount(), _scene.getLightsCount(), _scene.getNodesCount() };
 		arg.m_constants = &constants;
 		arg.m_constantSize = sizeof(constants);
 
+		return arg;
+	}
+
+	void LightProbFieldPass::traceLightProbField(const Scene& _scene, const PassResource& _resources)
+	{
+		// Tracing step, output to tracingResultBuffer
+
+		PushConstants cst;
+		std::vector<BufferBinding> bufBinds; 
+		std::vector<ImageBinding> imgBinds;
+		DrawArguments arg = fillBindings(_scene, _resources, cst, bufBinds, imgBinds);
+
 		ShaderFlags flags;
-		flags.set(C_USE_LPF);
 		if (_scene.useTlas())
 			flags.set(C_USE_TRAVERSE_TLAS);
 
+		flags.set(C_TRACING_STEP);
+		arg.m_key = { TIM_HASH32(genLightProbField.comp), flags };
+
+		const u32 numProbs = _scene.getLPF().m_numProbs;
 		u32 numProbBatch = alignUp<u32>(numProbs, UPDATE_LPF_NUM_PROBS_PER_GROUP) / UPDATE_LPF_NUM_PROBS_PER_GROUP;
+		m_context->Dispatch(arg, numProbBatch, NUM_RAYS_PER_PROB);
+	}
 
-		// Tracing step, output to tracingResultBuffer
+	void LightProbFieldPass::updateLightProbField(const Scene& _scene, const PassResource& _resources)
+	{
+		// Lighting step of the generated LPF
 		{
-			flags.set(C_TRACING_STEP);
+			PushConstants cst;
+			std::vector<BufferBinding> bufBinds;
+			std::vector<ImageBinding> imgBinds;
+			DrawArguments arg = fillBindings(_scene, _resources, cst, bufBinds, imgBinds);
+
+			ShaderFlags flags;
+			flags.set(C_USE_LPF);
+			if (_scene.useTlas())
+				flags.set(C_USE_TRAVERSE_TLAS);
+
 			arg.m_key = { TIM_HASH32(genLightProbField.comp), flags };
 
+			const u32 numProbs = _scene.getLPF().m_numProbs;
+			u32 numProbBatch = alignUp<u32>(numProbs, UPDATE_LPF_NUM_PROBS_PER_GROUP) / UPDATE_LPF_NUM_PROBS_PER_GROUP;
 			m_context->Dispatch(arg, numProbBatch, NUM_RAYS_PER_PROB);
 		}
-		// Lighting step
+
+		// Merge generated LPF in the current light prob field
 		{
-			flags.clr(C_TRACING_STEP);
-			arg.m_key = { TIM_HASH32(genLightProbField.comp), flags };
+			DrawArguments arg = {};
 
-			m_context->Dispatch(arg, numProbBatch, NUM_RAYS_PER_PROB);
+			std::vector<BufferBinding> bindings = {
+				{ _resources.m_lpfConstants, { 0, 0 } },
+				{ _resources.m_shCoefsBuffer, { 0, 1 } },
+				{ _resources.m_irradianceField, { 0, 2 } }
+			};
+
+			std::vector<ImageBinding> imgBinds;
+			_scene.getLPF().fillBindings(imgBinds, 3);
+
+			arg.m_imageBindings = imgBinds.data();
+			arg.m_numImageBindings = (u32)imgBinds.size();
+			arg.m_bufferBindings = bindings.data();
+			arg.m_numBufferBindings = (u32)bindings.size();
+
+			arg.m_constants = &_scene.getLPF().m_fieldSize;
+			arg.m_constantSize = sizeof(uvec3);
+			arg.m_key = { TIM_HASH32(updateLightProbField.comp), {} };
+
+			const u32 numProbs = _scene.getLPF().m_numProbs;
+			u32 numGroup = alignUp<u32>(numProbs, UPDATE_LPF_LOCALSIZE) / UPDATE_LPF_LOCALSIZE;
+			m_context->Dispatch(arg, numGroup, 1);
 		}
-
-		m_resourceAllocator.releaseBuffer(tracingResultBuffer);
-		return irradianceFieldView;
 	}
 
 	void LightProbFieldPass::sampleRays(vec4 rays[], SH9 shCoef[], u32 _count)

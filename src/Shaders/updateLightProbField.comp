@@ -58,7 +58,7 @@ void main()
 		ivec3 probCoord = getLightProbCoord(probIndex, g_lpfCst.lpfResolution.xyz);
 		SH9Color prevSh = fetchSH9(probCoord);
 		
-		storeSH9(probCoord, lerp(prevSh, shCoef, 0.05));
+		storeSH9(probCoord, lerp(prevSh, shCoef, 0.03));
 		//storeSH9(probCoord, getZeroInitializedSHCoef());
 	}
 }

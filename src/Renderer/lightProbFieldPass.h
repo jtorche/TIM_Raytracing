@@ -5,6 +5,7 @@
 #include "LightProbField.h"
 #include <random>
 
+#include "Shaders/struct_cpp.glsl"
 #include "Shaders/lightprob/lightprob.glsl"
 
 namespace tim
@@ -15,10 +16,23 @@ namespace tim
     class LightProbFieldPass
     {
     public:
+        struct PassResource
+        {
+            BufferView m_lpfConstants;
+            BufferView m_shCoefsBuffer;
+
+            BufferView m_irradianceField;
+            BufferView m_tracingResult;
+        };
+
         LightProbFieldPass(IRenderer* _renderer, IRenderContext* _context, ResourceAllocator& _allocator, TextureManager& _texManager);
         ~LightProbFieldPass();
 
-        void updateLightProbField(const Scene& _scene);
+        PassResource fillPassResources(const Scene& _scene);
+        void freePassResources(const PassResource&);
+
+        void traceLightProbField(const Scene& _scene, const PassResource& _resources);
+        void updateLightProbField(const Scene& _scene, const PassResource& _resources);
 
     private:
         IRenderer* m_renderer = nullptr;
@@ -30,6 +44,6 @@ namespace tim
         std::random_device m_rand;
 
         void sampleRays(vec4 rays[], SH9 shCoef[], u32 _count);
-        BufferView generateIrradiance(const BufferView& _lpfConstants, const Scene& _scene);
+        DrawArguments fillBindings(const Scene& _scene, const PassResource& _resources, PushConstants& _cst, std::vector<BufferBinding>& _bufBinds, std::vector<ImageBinding>& _imgBinds);
     };
 }

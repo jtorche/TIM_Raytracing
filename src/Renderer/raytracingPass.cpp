@@ -36,8 +36,10 @@ namespace tim
         return m_frameSize.x * m_frameSize.y * sizeof(IndirectLightRay);
     }
 
-    void RayTracingPass::draw(ImageHandle _outputBuffer, const Scene& _scene, const SimpleCamera& _camera)
+    RayTracingPass::PassResource RayTracingPass::fillPassResources(const SimpleCamera& _camera, const Scene& _scene)
     {
+        PassResource resources;
+
         const float fov = 70.f * 3.14f / 180;
 
         PassData passData;
@@ -64,43 +66,60 @@ namespace tim
         passData.sceneMaxExtent = { _scene.getAABB().maxExtent, 0 };
         passData.lpfResolution = { _scene.getLPF().m_fieldSize, 0 };
 
-        BufferView passDataBuffer;
-        void* passDataPtr = m_renderer->GetDynamicBuffer(sizeof(PassData), passDataBuffer);
+        void* passDataPtr = m_renderer->GetDynamicBuffer(sizeof(PassData), resources.m_passData);
         memcpy(passDataPtr, &passData, sizeof(PassData));
 
         const u32 tracingResultBufferSize = m_frameSize.x * m_frameSize.y * sizeof(uvec4) * 2;
         BufferHandle tracingResultBuffer = m_resourceAllocator.allocBuffer(tracingResultBufferSize, BufferUsage::Storage | BufferUsage::Transfer, MemoryType::Default);
+        resources.m_tracingResult = { tracingResultBuffer, 0, tracingResultBufferSize };
+    
+        resources.m_reflexionRayBuffer = m_resourceAllocator.allocBuffer(getRayStorageBufferSize(), BufferUsage::Storage | BufferUsage::Transfer, MemoryType::Default);
+        resources.m_refractionRayBuffer = m_resourceAllocator.allocBuffer(getRayStorageBufferSize(), BufferUsage::Storage | BufferUsage::Transfer, MemoryType::Default);
+    
+        return resources;
+    }
 
-        BufferHandle reflexionRayBuffer = m_resourceAllocator.allocBuffer(getRayStorageBufferSize(), BufferUsage::Storage | BufferUsage::Transfer, MemoryType::Default);
-        BufferHandle refractionRayBuffer = m_resourceAllocator.allocBuffer(getRayStorageBufferSize(), BufferUsage::Storage | BufferUsage::Transfer, MemoryType::Default);
-        m_context->ClearBuffer(reflexionRayBuffer, 0);
-        m_context->ClearBuffer(refractionRayBuffer, 0);
+    void RayTracingPass::freePassResources(const PassResource& _resources)
+    {
+        m_resourceAllocator.releaseBuffer(_resources.m_tracingResult.m_buffer);
+        m_resourceAllocator.releaseBuffer(_resources.m_reflexionRayBuffer);
+        m_resourceAllocator.releaseBuffer(_resources.m_refractionRayBuffer);
+    }
 
-        DrawArguments arg = {};
+    void RayTracingPass::tracePass(ImageHandle _outputBuffer, const Scene& _scene, const PassResource& _resources)
+    {
+        PushConstants cst;
+        std::vector<BufferBinding> bufBinds;
+        std::vector<ImageBinding> imgBinds = { 
+            { _outputBuffer, ImageViewType::Storage, 0, g_outputImage_bind } 
+        };
+
+        DrawArguments arg = fillBindings(_scene, _resources, cst, bufBinds, imgBinds);
+
+        ShaderFlags flags;
+        flags.set(C_TRACING_STEP);
+
+        if (_scene.useTlas())
+            flags.set(C_USE_TRAVERSE_TLAS);
+
+        const u32 localSize = LOCAL_SIZE;
+
+        arg.m_key = { TIM_HASH32(cameraPass.comp), flags };
+        m_context->Dispatch(arg, alignUp<u32>(m_frameSize.x, localSize) / localSize, alignUp<u32>(m_frameSize.y, localSize) / localSize);
+    }
+
+    void RayTracingPass::lightingPass(ImageHandle _outputBuffer, const Scene& _scene, const PassResource& _resources)
+    {
+        m_context->ClearBuffer(_resources.m_reflexionRayBuffer, 0);
+        m_context->ClearBuffer(_resources.m_refractionRayBuffer, 0);
+
+        PushConstants cst;
+        std::vector<BufferBinding> bufBinds;
         std::vector<ImageBinding> imgBinds = {
             { _outputBuffer, ImageViewType::Storage, 0, g_outputImage_bind }
         };
-        _scene.getLPF().fillBindings(imgBinds, g_lpfTextures_bind);
-        m_textureManager.fillImageBindings(imgBinds);
 
-        std::vector<BufferBinding> bindings = {
-            { passDataBuffer, { 0, g_PassData_bind } },
-            { { reflexionRayBuffer, 0, getRayStorageBufferSize() }, { 0, g_OutReflexionRayBuffer_bind } },
-            { { refractionRayBuffer, 0, getRayStorageBufferSize() }, { 0, g_OutRefractionRayBuffer_bind } },
-            { { tracingResultBuffer, 0, tracingResultBufferSize }, { 0, g_tracingResult_bind } }
-        };
-
-        _scene.fillGeometryBufferBindings(bindings);
-        _scene.getBVH().fillBvhBindings(bindings);
-
-        PushConstants constants = { _scene.getTrianglesCount(), _scene.getBlasInstancesCount(), _scene.getPrimitivesCount(), _scene.getLightsCount(), _scene.getNodesCount() };
-        arg.m_constants = &constants;
-        arg.m_constantSize = sizeof(constants);
-
-        arg.m_imageBindings = imgBinds.data();
-        arg.m_numImageBindings = (u32)imgBinds.size();
-        arg.m_bufferBindings = bindings.data();
-        arg.m_numBufferBindings = (u32)bindings.size();
+        DrawArguments arg = fillBindings(_scene, _resources, cst, bufBinds, imgBinds);
 
         ShaderFlags flags;
         flags.set(C_FIRST_RECURSION_STEP);
@@ -111,30 +130,37 @@ namespace tim
 
         const u32 localSize = LOCAL_SIZE;
 
-        // Tracing step, output to tracingResultBuffer
-        {
-            flags.set(C_TRACING_STEP);
-            arg.m_key = { TIM_HASH32(cameraPass.comp), flags };
+        arg.m_key = { TIM_HASH32(cameraPass.comp), flags };
+        m_context->Dispatch(arg, alignUp<u32>(m_frameSize.x, localSize) / localSize, alignUp<u32>(m_frameSize.y, localSize) / localSize);
+    }
 
-            m_context->Dispatch(arg, alignUp<u32>(m_frameSize.x, localSize) / localSize, alignUp<u32>(m_frameSize.y, localSize) / localSize);
-        }
-        // Lighting step
-        {
-            flags.clr(C_TRACING_STEP);
-            arg.m_key = { TIM_HASH32(cameraPass.comp), flags };
+    DrawArguments RayTracingPass::fillBindings(const Scene& _scene, const PassResource& _resources, PushConstants& _cst, std::vector<BufferBinding>& _bufBinds, std::vector<ImageBinding>& _imgBinds)
+    {
+        DrawArguments arg = {};
 
-            m_context->Dispatch(arg, alignUp<u32>(m_frameSize.x, localSize) / localSize, alignUp<u32>(m_frameSize.y, localSize) / localSize);
-        }
+        _scene.getLPF().fillBindings(_imgBinds, g_lpfTextures_bind);
+        m_textureManager.fillImageBindings(_imgBinds);
 
-        //if (m_rayBounceRecursionDepth > 1)
-        //{
-        //    drawBounce(_scene, 1, passDataBuffer, reflexionRayBuffer, _outputBuffer);
-        //    drawBounce(_scene, 1, passDataBuffer, refractionRayBuffer, _outputBuffer);
-        //}
+        _bufBinds = {
+            { _resources.m_passData, { 0, g_PassData_bind } },
+            { { _resources.m_reflexionRayBuffer, 0, getRayStorageBufferSize() }, { 0, g_OutReflexionRayBuffer_bind } },
+            { { _resources.m_refractionRayBuffer, 0, getRayStorageBufferSize() }, { 0, g_OutRefractionRayBuffer_bind } },
+            { _resources.m_tracingResult, { 0, g_tracingResult_bind } }
+        };
 
-        m_resourceAllocator.releaseBuffer(reflexionRayBuffer);
-        m_resourceAllocator.releaseBuffer(refractionRayBuffer);
-        m_resourceAllocator.releaseBuffer(tracingResultBuffer);
+        _scene.fillGeometryBufferBindings(_bufBinds);
+        _scene.getBVH().fillBvhBindings(_bufBinds);
+
+        _cst = { _scene.getTrianglesCount(), _scene.getBlasInstancesCount(), _scene.getPrimitivesCount(), _scene.getLightsCount(), _scene.getNodesCount() };
+        arg.m_constants = &_cst;
+        arg.m_constantSize = sizeof(PushConstants);
+
+        arg.m_imageBindings = _imgBinds.data();
+        arg.m_numImageBindings = (u32)_imgBinds.size();
+        arg.m_bufferBindings = _bufBinds.data();
+        arg.m_numBufferBindings = (u32)_bufBinds.size();
+
+        return arg;
     }
 
     void RayTracingPass::drawBounce(const Scene& _scene, u32 _depth, BufferView _passData, BufferHandle _inputRayBuffer, ImageHandle _curImage)

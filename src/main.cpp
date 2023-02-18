@@ -275,11 +275,18 @@ int main(int argc, char* argv[])
                 rtPass.setFrameBufferSize(frameResolution);
                 scene.setSunData(g_sunData);
 
-                lpfPass.updateLightProbField(scene);
+                LightProbFieldPass::PassResource lpfPassResources = lpfPass.fillPassResources(scene);
+                lpfPass.traceLightProbField(scene, lpfPassResources);
+                lpfPass.updateLightProbField(scene, lpfPassResources);
+                lpfPass.freePassResources(lpfPassResources);
 
                 ImageCreateInfo imgInfo(ImageFormat::RGBA16F, frameResolution.x, frameResolution.y, 1, 1, ImageType::Image2D, MemoryType::Default);
                 ImageHandle outputColorBuffer = resourceAllocator.allocTexture(imgInfo);
-                rtPass.draw(outputColorBuffer, scene, camera);
+
+                RayTracingPass::PassResource rtPassResources = rtPass.fillPassResources(camera, scene);
+                rtPass.tracePass(outputColorBuffer, scene, rtPassResources);
+                rtPass.lightingPass(outputColorBuffer, scene, rtPassResources);
+                rtPass.freePassResources(rtPassResources);
 
                 ImageCreateInfo imgInfo2(ImageFormat::RGBA8, frameResolution.x, frameResolution.y, 1, 1, ImageType::Image2D, MemoryType::Default, ImageUsage::Sampled | ImageUsage::Storage);
                 ImageHandle finalOutput = resourceAllocator.allocTexture(imgInfo2);
