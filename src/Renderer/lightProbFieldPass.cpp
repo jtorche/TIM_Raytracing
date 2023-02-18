@@ -71,9 +71,9 @@ namespace tim
 		arg.m_bufferBindings = _bufBinds.data();
 		arg.m_numBufferBindings = (u32)_bufBinds.size();
 
-		PushConstants constants = { _scene.getTrianglesCount(), _scene.getBlasInstancesCount(), _scene.getPrimitivesCount(), _scene.getLightsCount(), _scene.getNodesCount() };
-		arg.m_constants = &constants;
-		arg.m_constantSize = sizeof(constants);
+		_cst = { _scene.getTrianglesCount(), _scene.getBlasInstancesCount(), _scene.getPrimitivesCount(), _scene.getLightsCount(), _scene.getNodesCount() };
+		arg.m_constants = &_cst;
+		arg.m_constantSize = sizeof(_cst);
 
 		return arg;
 	}
