@@ -120,7 +120,7 @@ uint ClosestHit_getMaterialId(in ClosestHit _hit)
 #if USE_SHARED_MEM
 	return (g_hitData[gl_LocalInvocationIndex].z & 0xFFFF0000) >> 16;
 #else
-	return (_hit.index2_matId & 0xFFFF0000) >> 16;
+	return (_hit.triangle.index2_matId & 0xFFFF0000) >> 16;
 #endif
 }
 

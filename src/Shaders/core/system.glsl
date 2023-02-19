@@ -25,7 +25,8 @@ vec4 toLinear(vec4 sRGB)
 
 #define USE_SHADOW					1
 #define COMPUTE_SHADOW_ON_THE_FLY	0
-#define NO_RAY_INVDIR				1
+#define USE_LPF_MASK	            0
+#define STORE_RAY_INVDIR			0
 
 #define USE_SHARED_MEM		1
 #define NO_LIGHTING         0

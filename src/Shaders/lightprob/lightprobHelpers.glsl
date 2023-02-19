@@ -7,6 +7,12 @@
 #define LP_TILE_RES 4
 #define LP_TILE_SIZE (LP_TILE_RES*LP_TILE_RES*LP_TILE_RES)
 
+vec3 computeLpfStep(uvec3 _lpfResolution, Box _aabb)
+{
+	vec3 dim = _aabb.maxExtent - _aabb.minExtent;
+	return dim / vec3(_lpfResolution.x, _lpfResolution.y, _lpfResolution.z);
+}
+
 uint getLightProbIndex(uvec3 _coord, uvec3 _lpfResolution)
 {
 #if LP_TILE_RES > 1
@@ -62,12 +68,9 @@ vec3 getLightProbPosition(uvec3 _coord, uvec3 _lpfResolution, Box _aabb)
 	return _aabb.minExtent + step * vec3(_coord.x + 0.5, _coord.y + 0.5, _coord.z + 0.5);
 }
 
-vec3 getLightProbCoordUVW(vec3 _pos, uvec3 _lpfResolution, Box _aabb)
+vec3 getLightProbCoordUVW(vec3 _pos, uvec3 _lpfResolution, in Box _aabb, vec3 _step)
 {
-	vec3 dim = _aabb.maxExtent - _aabb.minExtent;
-	vec3 step = dim / vec3(_lpfResolution.x, _lpfResolution.y, _lpfResolution.z);
-	
-	vec3 uvw = ((_pos - _aabb.minExtent) / step) - vec3(0.5,0.5,0.5); 
+	vec3 uvw = ((_pos - _aabb.minExtent) / _step) - vec3(0.5,0.5,0.5); 
 	uvw = min(max(uvw, vec3(0,0,0)), vec3(_lpfResolution.x - 1.0, _lpfResolution.y - 1.0, _lpfResolution.z - 1.0));
 
 	return uvw;

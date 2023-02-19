@@ -41,7 +41,7 @@ vec3 computeLighting(uint rootId, in Material _mat, vec3 _texColor, vec3 _lightC
 	if(att * dotL > 0.001)
 	{
 		Ray shadowRay; shadowRay.from = P; shadowRay.dir = L; 
-		#if !NO_RAY_INVDIR   
+		#if STORE_RAY_INVDIR
 		shadowRay.invdir = vec3(1,1,1) / L;
 		#endif
 	#ifdef USE_TRAVERSE_TLAS

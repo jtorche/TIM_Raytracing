@@ -46,22 +46,6 @@ void main()
     uint probIndex = gl_LocalInvocationID.x + UPDATE_LPF_NUM_PROBS_PER_GROUP * probBatchId;
 	uint sampleIndex = probIndex * NUM_RAYS_PER_PROB + rayId;
 
-	Box lpfAABB;
-	lpfAABB.minExtent = g_lpfCst.lpfMin.xyz;
-	lpfAABB.maxExtent = g_lpfCst.lpfMax.xyz;
-
-	uvec3 probCoord = getLightProbCoord(probIndex, g_lpfCst.lpfResolution.xyz);
-	vec3 probPosition = getLightProbPosition(probCoord, g_lpfCst.lpfResolution.xyz, lpfAABB);
-
-	Ray ray = createRay(probPosition, g_lpfCst.rays[rayId].xyz);
-
-#ifdef TRACING_STEP
-	ClosestHit closestHit;
-	rayTrace(ray, closestHit);
-
-	g_tracingData[sampleIndex * 2] = ClosestHit_getHitData(closestHit);
-	g_tracingData[sampleIndex * 2 + 1] = computeAdditionalHitData(ray, closestHit, g_lpfCst.sunDir.xyz);
-#else
 	SunDirColor sun;
 	sun.sunDir = g_lpfCst.sunDir.xyz;
 	sun.sunColor = g_lpfCst.sunColor.xyz;
@@ -70,7 +54,20 @@ void main()
 	lpfHeader.aabb.minExtent = g_lpfCst.lpfMin.xyz;
 	lpfHeader.aabb.maxExtent = g_lpfCst.lpfMax.xyz;
 	lpfHeader.resolution = g_lpfCst.lpfResolution.xyz;
+	lpfHeader.step = computeLpfStep(lpfHeader.resolution, lpfHeader.aabb);
 
+	uvec3 probCoord = getLightProbCoord(probIndex, lpfHeader.resolution);
+	vec3 probPosition = getLightProbPosition(probCoord, lpfHeader.resolution, lpfHeader.aabb);
+
+	Ray ray = createRay(probPosition, g_lpfCst.rays[rayId].xyz);
+
+#ifdef TRACING_STEP
+	ClosestHit closestHit;
+	rayTrace(ray, closestHit);
+
+	g_tracingData[sampleIndex * 2] = ClosestHit_getHitData(closestHit);
+	g_tracingData[sampleIndex * 2 + 1].xy = computeAdditionalHitData(ray, closestHit, sun, lpfHeader);
+#else
 	Triangle tri = unpackTriangle(g_tracingData[sampleIndex * 2].xyz);
 	float t = uintBitsToFloat(g_tracingData[sampleIndex * 2].w);
 	uint shadowMask = g_tracingData[sampleIndex * 2 + 1].x;

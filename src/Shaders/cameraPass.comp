@@ -52,18 +52,6 @@ void main()
 
 		uint pixelId = g_passData.frameSize.x * pixelCoord.y + pixelCoord.x;
 
-	#ifdef TRACING_STEP
-		ClosestHit closestHit;
-		uint numTraversal = rayTrace(ray, closestHit);
-
-		g_tracingData[pixelId * 2] = ClosestHit_getHitData(closestHit);
-		g_tracingData[pixelId * 2 + 1] = computeAdditionalHitData(ray, closestHit, g_passData.sunDir.xyz);
-
-		#if ANY_DEBUG
-		vec3 lit = applyDebugLighting(ray, closestHit, numTraversal);
-		imageStore(g_outputImage, pixelCoord, vec4(lit, 1));
-		#endif
-	#elif !ANY_DEBUG
 		SunDirColor sun;
 		sun.sunDir = g_passData.sunDir.xyz;
 		sun.sunColor = g_passData.sunColor.xyz;
@@ -72,7 +60,20 @@ void main()
 		lpfHeader.aabb.minExtent = g_passData.sceneMinExtent.xyz;
 		lpfHeader.aabb.maxExtent = g_passData.sceneMaxExtent.xyz;
 		lpfHeader.resolution = g_passData.lpfResolution.xyz;
-		
+		lpfHeader.step = computeLpfStep(lpfHeader.resolution, lpfHeader.aabb);
+
+	#ifdef TRACING_STEP
+		ClosestHit closestHit;
+		uint numTraversal = rayTrace(ray, closestHit);
+
+		g_tracingData[pixelId * 2] = ClosestHit_getHitData(closestHit);
+		g_tracingData[pixelId * 2 + 1].xy = computeAdditionalHitData(ray, closestHit, sun, lpfHeader);
+
+		#if ANY_DEBUG
+		vec3 lit = applyDebugLighting(ray, closestHit, numTraversal);
+		imageStore(g_outputImage, pixelCoord, vec4(lit, 1));
+		#endif
+	#elif !ANY_DEBUG
 		Triangle tri = unpackTriangle(g_tracingData[pixelId * 2].xyz);
 		float t = uintBitsToFloat(g_tracingData[pixelId * 2].w);
 

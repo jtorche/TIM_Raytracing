@@ -29,7 +29,7 @@ struct Ray
 {
     vec3 from;
     vec3 dir;
-	#if !NO_RAY_INVDIR
+	#if STORE_RAY_INVDIR
 	vec3 invdir;
 	#endif
 };

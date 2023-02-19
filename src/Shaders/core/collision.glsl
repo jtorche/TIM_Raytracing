@@ -8,7 +8,7 @@ Ray createRay(vec3 _from, vec3 _dir)
 	Ray r;
 	r.from = _from;
 	r.dir = _dir;
-	#if !NO_RAY_INVDIR   
+	#if STORE_RAY_INVDIR
 	r.invdir = vec3(1,1,1) / _dir;
 	#endif
 	return r;
@@ -22,7 +22,7 @@ bool isPointInBox(in Box _box, vec3 _point)
 
 float CollideBox(Ray _ray, Box _box, float tmax, bool returnTmin)
 {
-#if !NO_RAY_INVDIR
+#if STORE_RAY_INVDIR
     vec3 t0s = (_box.minExtent - _ray.from) * _ray.invdir;
     vec3 t1s = (_box.maxExtent - _ray.from) * _ray.invdir;
 #else

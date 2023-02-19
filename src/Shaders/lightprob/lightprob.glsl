@@ -17,6 +17,7 @@ struct LightProbFieldHeader
 {
 	Box aabb;
 	uvec3 resolution;
+	vec3 step;
 };
 
 #define NUM_RAYS_PER_PROB 64

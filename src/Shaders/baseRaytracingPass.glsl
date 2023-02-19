@@ -81,18 +81,21 @@ vec3 computeLighting(in SunDirColor _sun, in LightProbFieldHeader _lpfHeader, ui
 	return vec3(200,220,255) / 255;
 }
 
-uvec4 computeAdditionalHitData(in Ray _ray, in ClosestHit _closestHit, in vec3 _sunDir)
+#ifdef TRACING_STEP
+uvec2 computeAdditionalHitData(in Ray _ray, in ClosestHit _closestHit, in SunDirColor _sun, in LightProbFieldHeader _lpfHeader)
 {	
-	uint hitData = 0;
+	uvec2 hitData = uvec2(0, 0xFFFFffff);
 	if(_closestHit.t > 0)
 	{
 		uint nid = ClosestHit_getNid(_closestHit);
 		vec3 hitPos = _ray.from + _ray.dir * _closestHit.t;
-		hitData = computeShadowMask(_sunDir, hitPos, nid); 
+		hitData.x = computeShadowMask(hitPos, nid, _sun); 
+		hitData.y = computeProbMask(hitPos, _lpfHeader);
 	}
 
-	return uvec4(hitData, 0, 0, 0);
+	return hitData;
 }
+#endif
 
 //--------------------------------------------------------------------------------
 vec3 applyDebugLighting(in Ray _ray, in ClosestHit _closestHit, uint _numTraversal)

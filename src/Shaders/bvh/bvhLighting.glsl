@@ -24,7 +24,7 @@ vec3 computeLPFLighting(uint _rootId, in LightProbFieldHeader _lpfHeader, uint _
 #ifdef NO_LPF
 	return vec3(0, 0, 0);
 #else
-	vec3 uvw = getLightProbCoordUVW(_pos, _lpfHeader.resolution, _lpfHeader.aabb);
+	vec3 uvw = getLightProbCoordUVW(_pos, _lpfHeader.resolution, _lpfHeader.aabb, _lpfHeader.step);
 
 	// SH9Color sh = fetchSH9(ivec3(uvw.x+0.5, uvw.y+0.5, uvw.z+0.5));
 	SH9Color sh = sampleSH9(uvw, _lpfHeader.resolution);
@@ -81,7 +81,7 @@ Ray createShadowRay(vec3 _pos, vec3 _dir)
 	shadowRay.from = _pos; 
 	shadowRay.dir = _dir;
 	
-#if !NO_RAY_INVDIR   
+#if STORE_RAY_INVDIR   
 	shadowRay.invdir = vec3(1,1,1) / _dir;
 #endif
 	
@@ -131,12 +131,12 @@ uvec2 unpackLightCountAndOffset(uint _packed)
 	return countOffset;
 }
 
-uint computeShadowMask(vec3 _sunDir, vec3 _pos, uint _nid)
+uint computeShadowMask(vec3 _pos, uint _nid, in SunDirColor _sun)
 {
 	uint mask = 0;
 
 #if USE_SHADOW && !COMPUTE_SHADOW_ON_THE_FLY
-	Ray sunRay = createShadowRay(_pos, -_sunDir);
+	Ray sunRay = createShadowRay(_pos, -_sun.sunDir);
 	mask |= traverseForShadow(sunRay, TMAX) ? 1 : 0;
 	
 	uint leafDataOffset = g_BvhNodeData[_nid].nid.w;
@@ -147,6 +147,26 @@ uint computeShadowMask(vec3 _sunDir, vec3 _pos, uint _nid)
 	{
 		uint lightIndex = g_BvhLeafData[lightCountOffset.y + i];
 		mask |= evalShadow(lightIndex, _pos) ? (1u << (lightIndex + 1)) : 0;
+	}
+#endif
+
+	return mask;
+}
+
+uint computeProbMask(vec3 _pos, in LightProbFieldHeader _lpfHeader)
+{
+	uint mask = 0;
+
+#if USE_LPF_MASK
+	vec3 uvw = getLightProbCoordUVW(_pos, _lpfHeader.resolution, _lpfHeader.aabb, _lpfHeader.step);
+	ivec3 coord = ivec3(uvw.x, uvw.y, uvw.z);
+	
+	for(uint i=0 ; i<8 ; ++i)
+	{
+		ivec3 offset = ivec3(i & 1, (i >> 1) & 1, (i >> 2) & 1);
+		vec3 probPos = _lpfHeader.aabb.minExtent + _lpfHeader.step * vec3(offset.x + coord.x + 0.5, offset.y + coord.y + 0.5, offset.z + coord.z + 0.5);
+		Ray ray = createShadowRay(_pos, probPos - _pos);
+		mask |= ( (traverseForShadow(ray, TMAX) ? 1u : 0u) << i );
 	}
 #endif
 
