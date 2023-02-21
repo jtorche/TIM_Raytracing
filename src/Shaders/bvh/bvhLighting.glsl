@@ -48,6 +48,9 @@ vec3 computeLighting(uint _rootId, in SunDirColor _sun, in LightProbFieldHeader 
 	if (diffuseMap < 0xFFFF)
 		texColor *= texture(g_dataTextures[nonuniformEXT(diffuseMap)], _uv).xyz;
 #endif
+#ifdef NEUTRAL_ALBEDO
+	texColor = vec3(0.7);
+#endif
 
 	//uint leafDataOffset = g_BvhNodeData[_hit.nid].nid.w;
 	//uvec4 unpacked = unpackObjectCount(g_BvhLeafData[leafDataOffset]);
@@ -64,6 +67,7 @@ vec3 computeLighting(uint _rootId, in SunDirColor _sun, in LightProbFieldHeader 
 	//	lit += evalLighting(_rootId, lightIndex, matId, diffuse, _ray, _hit);
 	//}
 
+#ifndef NO_DIRECT_LIGTHING
 	for(uint i=0 ; i<g_Constants.numLights ; ++i)
 	{
 		if((_lightingMask.x & (1u << (i + 1))) == 0)
@@ -72,6 +76,7 @@ vec3 computeLighting(uint _rootId, in SunDirColor _sun, in LightProbFieldHeader 
 
 	if((_lightingMask.x & 1) == 0)
 		lit += evalSunLight(_rootId, _sun.sunDir, _sun.sunColor, g_BvhMaterialData[_matId], texColor, _pos, _eye, _normal);
+#endif
 
 #ifdef USE_LPF
 	lit += computeLPFLighting(_rootId, _lpfHeader, _matId, _lightingMask.y, texColor, _pos, _normal);

@@ -78,7 +78,7 @@ vec3 computeLighting(in SunDirColor _sun, in LightProbFieldHeader _lpfHeader, uv
 		return computeLighting(rootId, _sun, _lpfHeader, _lightingMask, getTriangleMaterial(_triangle), pos, eye, normal, uv);
 	}
 
-	return 0.2 * vec3(200,220,255) / 255;
+	return 0.3 * vec3(200,220,255) / 255;
 }
 
 #ifdef TRACING_STEP

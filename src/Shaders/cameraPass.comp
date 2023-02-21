@@ -4,6 +4,9 @@
 
 // #define NO_LPF
 // #define IGNORE_BACKFACE
+// #define NO_DIRECT_LIGTHING
+#define NEUTRAL_ALBEDO
+
 #define NUM_THREADS_PER_GROUP (LOCAL_SIZE*LOCAL_SIZE)
 
 #include "core/system.glsl"

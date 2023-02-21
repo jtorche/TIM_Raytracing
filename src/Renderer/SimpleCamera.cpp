@@ -28,6 +28,7 @@ namespace tim
 
             vec4 verticalAxisRot = linalg::rotation_quat(up, -m_mouseDx * g_RotationMouseSpeed);
             dir = linalg::qrot(verticalAxisRot, dir);
+            dir = linalg::normalize(dir);
 
             m_mouseDx = 0;
             m_mouseDy = 0;

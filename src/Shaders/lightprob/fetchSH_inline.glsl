@@ -107,7 +107,7 @@ SH9Color sampleSH9_test(vec3 _uvw, uvec3 _resolution, uint _lpfMask)
 	ivec3 icoord = ivec3(min(int(_uvw.x), _resolution.x-2), min(int(_uvw.y), _resolution.y-2), min(int(_uvw.z), _resolution.z-2));
 	vec3 fractUVW = _uvw - icoord;
 
-	const float baseLength = 1;
+	const float baseLength = sqrt(3);
 
 	float sum = 0;
 	SH9Color shResult;
