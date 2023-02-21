@@ -64,7 +64,7 @@ void fillUvNormal(vec3 _pos, in Triangle _tri, out vec3 _normal, out vec2 _uv)
 }
 
 //--------------------------------------------------------------------------------
-vec3 computeLighting(in SunDirColor _sun, in LightProbFieldHeader _lpfHeader, uint _shadowMask, in Ray _ray, float _t, in Triangle _triangle)
+vec3 computeLighting(in SunDirColor _sun, in LightProbFieldHeader _lpfHeader, uvec2 _lightingMask, in Ray _ray, float _t, in Triangle _triangle)
 {
 	if(_t < TMAX)
 	{
@@ -75,17 +75,17 @@ vec3 computeLighting(in SunDirColor _sun, in LightProbFieldHeader _lpfHeader, ui
 		fillUvNormal(pos, _triangle, normal, uv);
 		
 		uint rootId = g_Constants.numNodes == 1 ? NID_LEAF_BIT : 0;
-		return computeLighting(rootId, _sun, _lpfHeader, _shadowMask, getTriangleMaterial(_triangle), pos, eye, normal, uv);
+		return computeLighting(rootId, _sun, _lpfHeader, _lightingMask, getTriangleMaterial(_triangle), pos, eye, normal, uv);
 	}
 
-	return vec3(200,220,255) / 255;
+	return 0.2 * vec3(200,220,255) / 255;
 }
 
 #ifdef TRACING_STEP
 uvec2 computeAdditionalHitData(in Ray _ray, in ClosestHit _closestHit, in SunDirColor _sun, in LightProbFieldHeader _lpfHeader)
 {	
-	uvec2 hitData = uvec2(0, 0xFFFFffff);
-	if(_closestHit.t > 0)
+	uvec2 hitData = uvec2(0, 0);
+	if(_closestHit.t < TMAX)
 	{
 		uint nid = ClosestHit_getNid(_closestHit);
 		vec3 hitPos = _ray.from + _ray.dir * _closestHit.t;
@@ -98,7 +98,7 @@ uvec2 computeAdditionalHitData(in Ray _ray, in ClosestHit _closestHit, in SunDir
 #endif
 
 //--------------------------------------------------------------------------------
-vec3 applyDebugLighting(in Ray _ray, in ClosestHit _closestHit, uint _numTraversal)
+vec3 applyDebugLighting(in Ray _ray, in ClosestHit _closestHit, uint _numTraversal, uint _lpfMask)
 {
 #if DEBUG_BVH_TRAVERSAL
 	const uint numColors = 5;
@@ -153,6 +153,28 @@ vec3 applyDebugLighting(in Ray _ray, in ClosestHit _closestHit, uint _numTravers
 	#else
 		return dbgColor[ClosestHit_getNid(_closestHit) % 14];
 	#endif
+	}
+#endif
+
+#if DEBUG_LPF_MASK
+	if(_closestHit.t < TMAX)
+	{
+		vec3 dbgColor[8] = 
+		{
+			vec3(1,0,0),
+			vec3(0,1,0),
+			vec3(0,0,1),
+			vec3(1,1,0),
+			vec3(1,0,1),
+			vec3(0,1,1),
+			vec3(1,0.5,0),
+			vec3(1,0,0.5),
+		};
+		uint sum = 0;
+		for(uint i=0 ; i<8 ; ++i)
+			sum += (_lpfMask & (1u << i)) > 0 ? 1 : 0;
+
+		return dbgColor[sum];
 	}
 #endif
 

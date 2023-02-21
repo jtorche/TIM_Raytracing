@@ -112,35 +112,35 @@ void ClosestHit_setDebugColorId(inout ClosestHit hit, uint id) { hit.dbgColorId 
 void ClosestHit_setDebugColorId(inout ClosestHit hit, uint id) { }
 #endif
 
-//bool HitSphere(Ray r, Sphere s, float tmax, out Hit outHit)
-//{
-//    vec3 oc = r.from - s.center;
-//    float b = dot(oc, r.dir);
-//    float c = dot(oc, oc) - s.radius*s.radius;
-//    float discr = b * b - c;
-//    if (discr > 0)
-//    {
-//        float discrSq = sqrt(discr);
-//
-//        float t = (-b - discrSq);
-//        if (t > 0 && t < tmax)
-//        {
-//			vec3 pos = r.from + t * r.dir;
-//            outHit.normal = (pos - s.center) * s.invRadius;
-//            outHit.t = t;
-//            return true;
-//        }
-//        t = (-b + discrSq);
-//        if (t > 0 && t < tmax)
-//        {
-//			vec3 pos = r.from + t * r.dir;
-//            outHit.normal = (pos - s.center) * s.invRadius;
-//            outHit.t = t;
-//            return true;
-//        }
-//    }
-//    return false;
-//}
+bool HitSphere(Ray r, Sphere s, float tmax, out float _t, out vec3 _normal)
+{
+    vec3 oc = r.from - s.center;
+    float b = dot(oc, r.dir);
+    float c = dot(oc, oc) - s.radius*s.radius;
+    float discr = b * b - c;
+    if (discr > 0)
+    {
+        float discrSq = sqrt(discr);
+
+        float t = (-b - discrSq);
+        if (t > 0 && t < tmax)
+        {
+			vec3 pos = r.from + t * r.dir;
+            _normal = (pos - s.center) * s.invRadius;
+            _t = t;
+            return true;
+        }
+        t = (-b + discrSq);
+        if (t > 0 && t < tmax)
+        {
+			vec3 pos = r.from + t * r.dir;
+            _normal = (pos - s.center) * s.invRadius;
+            _t = t;
+            return true;
+        }
+    }
+    return false;
+}
 //
 //bool HitSphereThrough(Ray r, Sphere s, float tmax, out Hit outHit)
 //{

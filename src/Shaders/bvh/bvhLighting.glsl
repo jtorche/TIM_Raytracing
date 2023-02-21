@@ -19,22 +19,27 @@ vec3 evalLighting(uint _rootId, uint _lightIndex, uint _matId, vec3 _texColor, v
 	return vec3(0,0,0);
 }
 
-vec3 computeLPFLighting(uint _rootId, in LightProbFieldHeader _lpfHeader, uint _matId, vec3 _texColor, vec3 _pos, vec3 _normal)
+vec3 computeLPFLighting(uint _rootId, in LightProbFieldHeader _lpfHeader, uint _matId, uint _lpfMask, vec3 _texColor, vec3 _pos, vec3 _normal)
 {
 #ifdef NO_LPF
 	return vec3(0, 0, 0);
 #else
 	vec3 uvw = getLightProbCoordUVW(_pos, _lpfHeader.resolution, _lpfHeader.aabb, _lpfHeader.step);
 
-	// SH9Color sh = fetchSH9(ivec3(uvw.x+0.5, uvw.y+0.5, uvw.z+0.5));
+	#if USE_LPF_MASK
+	SH9Color sh = sampleSH9(uvw, _lpfHeader.resolution, _lpfMask);
+	// SH9Color sh = sampleSH9_test(uvw, _lpfHeader.resolution, _lpfMask);
+	#else
 	SH9Color sh = sampleSH9(uvw, _lpfHeader.resolution);
+	// SH9Color sh = sampleSH9_test(uvw, _lpfHeader.resolution);
+	#endif
 
 	vec3 L = evalSH(sh, _normal);
 	return computeIndirectLighting(g_BvhMaterialData[_matId], _texColor, L);
 #endif
 }
 
-vec3 computeLighting(uint _rootId, in SunDirColor _sun, in LightProbFieldHeader _lpfHeader, uint _shadowMask, uint _matId, vec3 _pos, vec3 _eye, vec3 _normal, vec2 _uv)
+vec3 computeLighting(uint _rootId, in SunDirColor _sun, in LightProbFieldHeader _lpfHeader, uvec2 _lightingMask, uint _matId, vec3 _pos, vec3 _eye, vec3 _normal, vec2 _uv)
 {
 	vec3 texColor = vec3(1,1,1);
 
@@ -61,15 +66,15 @@ vec3 computeLighting(uint _rootId, in SunDirColor _sun, in LightProbFieldHeader 
 
 	for(uint i=0 ; i<g_Constants.numLights ; ++i)
 	{
-		if((_shadowMask & (1u << (i + 1))) == 0)
+		if((_lightingMask.x & (1u << (i + 1))) == 0)
 			lit += evalLighting(_rootId, i, _matId, texColor, _pos, _eye, _normal);
 	}
 
-	if((_shadowMask & 1) == 0)
+	if((_lightingMask.x & 1) == 0)
 		lit += evalSunLight(_rootId, _sun.sunDir, _sun.sunColor, g_BvhMaterialData[_matId], texColor, _pos, _eye, _normal);
 
 #ifdef USE_LPF
-	lit += computeLPFLighting(_rootId, _lpfHeader, _matId, texColor, _pos, _normal);
+	lit += computeLPFLighting(_rootId, _lpfHeader, _matId, _lightingMask.y, texColor, _pos, _normal);
 #endif
 
 	return lit;
@@ -159,14 +164,15 @@ uint computeProbMask(vec3 _pos, in LightProbFieldHeader _lpfHeader)
 
 #if USE_LPF_MASK
 	vec3 uvw = getLightProbCoordUVW(_pos, _lpfHeader.resolution, _lpfHeader.aabb, _lpfHeader.step);
-	ivec3 coord = ivec3(uvw.x, uvw.y, uvw.z);
+	ivec3 coord = ivec3(min(int(uvw.x), _lpfHeader.resolution.x-2), min(int(uvw.y), _lpfHeader.resolution.y-2), min(int(uvw.z), _lpfHeader.resolution.z-2));
 	
 	for(uint i=0 ; i<8 ; ++i)
 	{
 		ivec3 offset = ivec3(i & 1, (i >> 1) & 1, (i >> 2) & 1);
-		vec3 probPos = _lpfHeader.aabb.minExtent + _lpfHeader.step * vec3(offset.x + coord.x + 0.5, offset.y + coord.y + 0.5, offset.z + coord.z + 0.5);
+		vec3 probPos = getLightProbPosition(coord + offset, _lpfHeader.resolution, _lpfHeader.aabb);
+
 		Ray ray = createShadowRay(_pos, probPos - _pos);
-		mask |= ( (traverseForShadow(ray, TMAX) ? 1u : 0u) << i );
+		mask |= ( (traverseForShadow(ray, 1) ? 1u : 0u) << i );
 	}
 #endif
 

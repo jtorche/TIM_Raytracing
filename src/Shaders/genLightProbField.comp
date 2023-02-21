@@ -2,7 +2,7 @@
 #extension GL_EXT_scalar_block_layout : enable
 #extension GL_EXT_nonuniform_qualifier : enable
 
-//#define NO_LPF
+#define NO_LPF
 // #define IGNORE_BACKFACE
 #define NUM_THREADS_PER_GROUP UPDATE_LPF_NUM_PROBS_PER_GROUP
 
@@ -70,9 +70,9 @@ void main()
 #else
 	Triangle tri = unpackTriangle(g_tracingData[sampleIndex * 2].xyz);
 	float t = uintBitsToFloat(g_tracingData[sampleIndex * 2].w);
-	uint shadowMask = g_tracingData[sampleIndex * 2 + 1].x;
+	uvec2 lightingMask = g_tracingData[sampleIndex * 2 + 1].xy;
 
-	vec3 lit = computeLighting(sun, lpfHeader, shadowMask, ray, t, tri);
+	vec3 lit = computeLighting(sun, lpfHeader, lightingMask, ray, t, tri);
 
 	g_irradiance[sampleIndex*3 + 0] = lit.x;
 	g_irradiance[sampleIndex*3 + 1] = lit.y;
