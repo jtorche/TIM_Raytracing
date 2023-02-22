@@ -98,6 +98,7 @@ namespace tim
 
         ShaderFlags flags;
         flags.set(C_TRACING_STEP);
+        flags.set(C_USE_LPF_MASK);
 
         if (_scene.useTlas())
             flags.set(C_USE_TRAVERSE_TLAS);
@@ -124,6 +125,7 @@ namespace tim
         ShaderFlags flags;
         flags.set(C_FIRST_RECURSION_STEP);
         flags.set(C_USE_LPF);
+        flags.set(C_USE_LPF_MASK);
 
         if (_scene.useTlas())
             flags.set(C_USE_TRAVERSE_TLAS);

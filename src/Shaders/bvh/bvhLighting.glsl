@@ -26,11 +26,11 @@ vec3 computeLPFLighting(uint _rootId, in LightProbFieldHeader _lpfHeader, uint _
 #else
 	vec3 uvw = getLightProbCoordUVW(_pos, _lpfHeader.resolution, _lpfHeader.aabb, _lpfHeader.step);
 
-	#if USE_LPF_MASK
+	#ifdef USE_LPF_MASK
 	SH9Color sh = sampleSH9(uvw, _lpfHeader.resolution, _lpfMask);
 	// SH9Color sh = sampleSH9_test(uvw, _lpfHeader.resolution, _lpfMask);
 	#else
-	SH9Color sh = sampleSH9(uvw, _lpfHeader.resolution);
+	SH9Color sh = sampleSH9(uvw, _lpfHeader.resolution, _normal);
 	// SH9Color sh = sampleSH9_test(uvw, _lpfHeader.resolution);
 	#endif
 
@@ -43,13 +43,12 @@ vec3 computeLighting(uint _rootId, in SunDirColor _sun, in LightProbFieldHeader 
 {
 	vec3 texColor = vec3(1,1,1);
 
-#if DYNAMIC_TEXTURE_INDEXING
+#ifdef NEUTRAL_ALBEDO
+	texColor = vec3(0.7);
+#elif DYNAMIC_TEXTURE_INDEXING
 	uint diffuseMap = g_BvhMaterialData[_matId].type_ids.y & 0xFFFF;
 	if (diffuseMap < 0xFFFF)
 		texColor *= texture(g_dataTextures[nonuniformEXT(diffuseMap)], _uv).xyz;
-#endif
-#ifdef NEUTRAL_ALBEDO
-	texColor = vec3(0.7);
 #endif
 
 	//uint leafDataOffset = g_BvhNodeData[_hit.nid].nid.w;
@@ -167,7 +166,7 @@ uint computeProbMask(vec3 _pos, in LightProbFieldHeader _lpfHeader)
 {
 	uint mask = 0;
 
-#if USE_LPF_MASK
+#ifdef USE_LPF_MASK
 	vec3 uvw = getLightProbCoordUVW(_pos, _lpfHeader.resolution, _lpfHeader.aabb, _lpfHeader.step);
 	ivec3 coord = ivec3(min(int(uvw.x), _lpfHeader.resolution.x-2), min(int(uvw.y), _lpfHeader.resolution.y-2), min(int(uvw.z), _lpfHeader.resolution.z-2));
 	
