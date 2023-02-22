@@ -5,7 +5,7 @@
 // #define NO_LPF
 // #define IGNORE_BACKFACE
 // #define NO_DIRECT_LIGTHING
-#define NEUTRAL_ALBEDO
+// #define NEUTRAL_ALBEDO
 
 #define NUM_THREADS_PER_GROUP (LOCAL_SIZE*LOCAL_SIZE)
 
@@ -65,6 +65,7 @@ void main()
 		lpfHeader.resolution = g_passData.lpfResolution.xyz;
 		lpfHeader.step = computeLpfStep(lpfHeader.resolution, lpfHeader.aabb);
 
+		// Tracing step
 	#ifdef TRACING_STEP
 		ClosestHit closestHit;
 		uint numTraversal = rayTrace(ray, closestHit);
@@ -73,22 +74,24 @@ void main()
 		uvec2 hitData = computeAdditionalHitData(ray, closestHit, sun, lpfHeader);
 		g_tracingData[pixelId * 2 + 1].xy = hitData;
 
-	#if ANY_DEBUG
+		#if ANY_DEBUG
 		vec3 lit = applyDebugLighting(ray, closestHit, numTraversal, hitData.y);
 		imageStore(g_outputImage, pixelCoord, vec4(lit, 1));
-	#endif
-
-	#if SHOW_LPF_DEBUG
-		raytraceLightProbFieldDebug(ray, lpfHeader, closestHit.t);
-	#endif
-
-	#elif !ANY_DEBUG && !SHOW_LPF_DEBUG
+		#endif
+		
+		// Lighting step
+	#elif !ANY_DEBUG
 		Triangle tri = unpackTriangle(g_tracingData[pixelId * 2].xyz);
 		float t = uintBitsToFloat(g_tracingData[pixelId * 2].w);
 		
 		uvec2 ligthingMask = g_tracingData[pixelId * 2 + 1].xy;
 		vec3 lit = computeLighting(sun, lpfHeader, ligthingMask, ray, t, tri);
+
 		imageStore(g_outputImage, pixelCoord, vec4(lit, 1));
+
+		#if SHOW_LPF_DEBUG
+		raytraceLightProbFieldDebug(ray, lpfHeader, t);
+		#endif
         //nextBounce(vec3(1,1,1), closestHit, ray);
 	#endif
 	}
@@ -98,7 +101,7 @@ void raytraceLightProbFieldDebug(in Ray _ray, in LightProbFieldHeader _lpfHeader
 {
 	ivec2 pixelCoord = ivec2(gl_GlobalInvocationID.x, gl_NumWorkGroups.y * LOCAL_SIZE - gl_GlobalInvocationID.y);
 	uint numProb = _lpfHeader.resolution.x * _lpfHeader.resolution.y * _lpfHeader.resolution.z;
-	vec3 color = vec3(0,0,0);
+	vec3 normal = vec3(0,0,0);
 	bool hasHit = false;
 	for(uint i = 0 ; i < numProb ; ++i)
 	{
@@ -109,16 +112,17 @@ void raytraceLightProbFieldDebug(in Ray _ray, in LightProbFieldHeader _lpfHeader
 		sphere.radius = LPF_DEBUG_SIZE;
 		sphere.invRadius = 1.0 / LPF_DEBUG_SIZE;
 
-		vec3 normal;
 		float t;
 		if(HitSphere(_ray, sphere, _t, t, normal))
 		{
-			color = normal;
 			_t = t;
 			hasHit = true;
 		}
 	}
 
 	if(hasHit)
-		imageStore(g_outputImage, pixelCoord, vec4(color, 1));
+	{
+		vec3 lit = computeLPFLighting(_lpfHeader, 0, 0, vec3(1,1,1), _ray.from + _t * _ray.dir, normal);
+		imageStore(g_outputImage, pixelCoord, vec4(lit, 1));
+	}
 }

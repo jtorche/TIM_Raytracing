@@ -19,7 +19,7 @@ vec3 evalLighting(uint _rootId, uint _lightIndex, uint _matId, vec3 _texColor, v
 	return vec3(0,0,0);
 }
 
-vec3 computeLPFLighting(uint _rootId, in LightProbFieldHeader _lpfHeader, uint _matId, uint _lpfMask, vec3 _texColor, vec3 _pos, vec3 _normal)
+vec3 computeLPFLighting(in LightProbFieldHeader _lpfHeader, uint _matId, uint _lpfMask, vec3 _texColor, vec3 _pos, vec3 _normal)
 {
 #ifdef NO_LPF
 	return vec3(0, 0, 0);
@@ -78,7 +78,7 @@ vec3 computeLighting(uint _rootId, in SunDirColor _sun, in LightProbFieldHeader 
 #endif
 
 #ifdef USE_LPF
-	lit += computeLPFLighting(_rootId, _lpfHeader, _matId, _lightingMask.y, texColor, _pos, _normal);
+	lit += computeLPFLighting(_lpfHeader, _matId, _lightingMask.y, texColor, _pos, _normal);
 #endif
 
 	return lit;
