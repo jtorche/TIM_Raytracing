@@ -390,7 +390,7 @@ namespace tim
 
     ubyte * VezRenderer::GetDynamicBuffer(u32 _size, BufferView& _buffer)
     {
-        constexpr u32 minAlignement = 0x10;
+        const u32 minAlignement = std::max(m_physicalDeviceProperties.limits.minUniformBufferOffsetAlignment, m_physicalDeviceProperties.limits.minStorageBufferOffsetAlignment);
         u64 offset = m_scratchBufferCursor.fetch_add(alignUp<u32>(_size, minAlignement));
         TIM_ASSERT(offset + _size <= g_scratchBufferSize);
 
